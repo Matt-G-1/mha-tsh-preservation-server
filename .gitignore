@@ -1,0 +1,32 @@
+# Original/proprietary client material and extracted game assets.
+/phone_dump/
+/patched_client/
+/decompiled/
+/recovered_luac/
+/backup.ab
+
+# Generated investigation output. Keep the compact protocol index.
+/analysis/*
+!/analysis/protocol_ids.csv
+
+# Third-party binary tools and source checkouts.
+/tools/jadx*/
+/tools/temurin*/
+/tools/unluac-rs/
+/tools/*.jar
+/tools/*.zip
+
+# Python/test output.
+**/__pycache__/
+*.py[cod]
+/.pytest_cache/
+/preservation_server/.pytest_cache/
+
+# Local server logs and signing material.
+*.log
+*.keystore
+*.jks
+*.apk
+*.aab
+*.obb
+

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup documentation
+    url: https://github.com/Matt-G-1/mha-tsh-preservation-server/blob/main/RUNBOOK.md
+    about: Review the current Windows and Android setup process before reporting a problem.

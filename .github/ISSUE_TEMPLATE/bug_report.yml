@@ -1,0 +1,48 @@
+name: Compatibility bug
+description: Report a reproducible problem in the local server or documented workflow.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not attach APKs, OBBs, extracted assets, copyrighted media, signing keys, tokens, or unsanitized device logs.
+  - type: input
+    id: phase
+    attributes:
+      label: Last successful phase
+      description: For example bootstrap, login, player entry, scene load, guide, or reconnect.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Describe what happened and include only sanitized log excerpts.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Start...
+        2. Launch...
+        3. Observe...
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: The Git commit or release used for the test.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Upload safety
+      options:
+        - label: I removed credentials, device identifiers, proprietary binaries, and copyrighted assets.
+          required: true

@@ -1,0 +1,43 @@
+name: Protocol research finding
+description: Share a sanitized, independently documented interoperability finding.
+title: "[Research] "
+labels:
+  - research
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Separate direct evidence from inference. Do not upload proprietary game files or decompiled source.
+  - type: input
+    id: protocol
+    attributes:
+      label: Protocol or subsystem
+      description: Packet name, wire ID, table name, quest system, character system, or other area.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Direct evidence
+      description: Provide sanitized field names, values, hashes, offsets, or observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: inference
+    attributes:
+      label: Interpretation
+      description: Explain what you believe the evidence means and identify uncertainty.
+    validations:
+      required: true
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Proposed compatibility behavior
+      description: Describe the clean-room response or test that could use this finding.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Upload safety
+      options:
+        - label: This report contains no proprietary binaries, extracted assets, credentials, or personal identifiers.
+          required: true
