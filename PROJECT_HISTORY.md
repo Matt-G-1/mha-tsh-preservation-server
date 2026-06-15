@@ -55,7 +55,8 @@ The clean-room server now supports:
 - A minimal task journal that can list, accept, submit, sync, and acknowledge
   starter task-stage entry through recovered task packet schemas.
 - Observed first-guide client telemetry is recorded and used to complete the
-  starter task once.
+  starter task once; this guide/task bridge has now been validated on-device
+  through the map-marker tutorial step.
 - Movement, frame-stat, and client-error telemetry is retained in world-session
   state for live validation and future quest conditions.
 - Time-ping replies and login-level reconnect acknowledgment.

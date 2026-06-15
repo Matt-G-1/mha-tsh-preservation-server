@@ -50,6 +50,12 @@ environment details are intentionally omitted from Git.
   acknowledgment.
 - Observed first-guide telemetry (`s_client_stat` guide `1301`, step `10011`)
   is recorded in tutorial state and can complete the starter task exactly once.
+- A controlled on-device run of the current server code validated the starter
+  task bridge live: tapping the highlighted map marker produced
+  `s_client_stat` `[1, 1301, 10011]`, `s_guide_finish` for guide `1301`,
+  `s_guide_drama`, and `s_base_station_all_info`; the client accepted
+  `c_task_info_update`, `c_guide_finish`, and `c_base_station_all_info`, then
+  opened the world map UI.
 - World-session telemetry now records player movement (`s_scene_move`),
   frame-stat heartbeats (`s_client_stat_frame`), and client error reports
   (`s_client_error`) without sending unsafe extra replies.
@@ -68,7 +74,8 @@ environment details are intentionally omitted from Git.
   `h1032` is Mirio Togata, and `h1998` is an All Might variant.
 - The initial `c_card_seeinfo` roster contains a validated starter set while
   Midoriya remains the active world avatar. The first owned card is now marked
-  as the active fighting card in the serialized roster state.
+  as the active fighting card in the serialized roster state and was accepted
+  by the client in controlled on-device validation.
 - An opt-in expanded roster path serializes all 29 protocol-verified playable
   characters in `c_card_seeinfo` while preserving Midoriya as the first active
   card.

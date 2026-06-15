@@ -43,9 +43,11 @@ The catalog contains 29 protocol-verified playable mappings; only All For One
 `h1039` and Best Jeanist `h1927` remain asset-only. The roster and NPC
 additions pass packet-level tests. The roster now tracks active card and active
 visible hero state for user-info, card-fight, bridge-fight, team-change, and
-area-event switch requests. Death Arms visibly rendered beside Midoriya in a
-controlled on-device run. The client still performs one initial ping-waiter
-reconnect, then remains stable through the implemented reconnect acknowledgment.
+area-event switch requests. Death Arms visibly rendered beside Midoriya, the
+active starter card state was accepted, and the map-marker guide step completed
+through the task/guide/base-station handlers in controlled on-device runs. The
+client still performs one initial ping-waiter reconnect, then remains stable
+through the implemented reconnect acknowledgment.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.
