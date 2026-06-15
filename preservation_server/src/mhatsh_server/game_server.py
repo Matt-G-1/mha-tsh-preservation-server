@@ -22,6 +22,7 @@ from .schema import SchemaRegistry
 from .tasks import TaskState
 from .tutorial import TutorialState
 from .world import WorldState
+from .world_tasks import WorldTaskState
 
 
 LOG = logging.getLogger("mhatsh.game")
@@ -44,6 +45,7 @@ class Session:
     tutorial: TutorialState = field(default_factory=TutorialState)
     tasks: TaskState = field(default_factory=TaskState)
     world: WorldState = field(default_factory=WorldState)
+    world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
     roster: RosterState | None = None
 
 
@@ -238,6 +240,59 @@ class GameServer:
                 session.tutorial.base_station_all_info(
                     int(values.get("iClientVersion") or 0)
                 ),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_city_level_info",
+                session.world_tasks.city_level_info(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_world_task_info",
+                session.world_tasks.world_task_info(),
+            )
+        elif name == "s_city_level_click":
+            await self._send(
+                writer,
+                session,
+                "c_city_level_click",
+                session.world_tasks.city_level_click(int(values.get("Level") or 0)),
+            )
+        elif name == "s_world_task_reward_rate":
+            await self._send(
+                writer,
+                session,
+                "c_world_task_reward_rate",
+                session.world_tasks.world_task_reward_rate(
+                    int(values.get("Rate") or 0)
+                ),
+            )
+        elif name == "s_world_task_ignore_auto_finish_tips":
+            await self._send(
+                writer,
+                session,
+                "c_world_task_ignore_auto_finish_tips",
+                session.world_tasks.ignore_auto_finish_tips_response(
+                    int(values.get("Flag") or 0)
+                ),
+            )
+        elif name == "s_world_task_auto_finish":
+            await self._send(
+                writer,
+                session,
+                "c_world_task_auto_finish",
+                session.world_tasks.auto_finish_response(
+                    int(values.get("TaskId") or 0)
+                ),
+            )
+        elif name == "s_world_task_pick_prestige":
+            await self._send(
+                writer,
+                session,
+                "c_world_task_pick_prestige",
+                session.world_tasks.pick_prestige_response(),
             )
         elif name == "s_userinfo_heros":
             roster = self._ensure_roster(session)

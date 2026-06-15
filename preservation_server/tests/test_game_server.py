@@ -44,6 +44,7 @@ from mhatsh_server.tasks import (
 )
 from mhatsh_server.tutorial import TutorialState
 from mhatsh_server.world import ScenePosition, WorldState
+from mhatsh_server.world_tasks import STARTER_WORLD_MAP_ID, WorldTaskState
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -1089,12 +1090,110 @@ async def _run_base_station_info() -> None:
     )
 
     decoder = FrameDecoder(RollingXor(0x50607080))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
-    assert registry.protocol_names[reply_id] == "c_base_station_all_info"
-    assert codec.decode_message("c_base_station_all_info", reply_body) == {
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_base_station_all_info",
+        "c_city_level_info",
+        "c_world_task_info",
+    ]
+    assert codec.decode_message("c_base_station_all_info", replies[0][1]) == {
         "iClientVersion": 23,
         "arrFinishAidCount": [],
         "arrBaseStationInfo": [],
+    }
+    assert codec.decode_message("c_city_level_info", replies[1][1]) == {
+        "Level": 1,
+        "ClickList": [],
+    }
+    assert codec.decode_message("c_world_task_info", replies[2][1]) == {
+        "FinishList": [],
+        "OpenWorldMap": [{"MapId": STARTER_WORLD_MAP_ID}],
+        "PrestigeMap": 0,
+        "PrestigeTaskStatus": 0,
+        "IsFirstRewardSign": 0,
+        "RewardBase": 0,
+        "ExtraReward": [],
+        "IgnoreAutoFinishTips": 0,
+    }
+
+
+def test_world_task_state_tracks_map_compatibility_values() -> None:
+    world_tasks = WorldTaskState()
+    assert world_tasks.world_task_info()["OpenWorldMap"] == [
+        {"MapId": STARTER_WORLD_MAP_ID}
+    ]
+
+    assert world_tasks.city_level_click(3) == {"Level": 3}
+    assert world_tasks.city_level_info() == {"Level": 1, "ClickList": [3]}
+    assert world_tasks.world_task_reward_rate(15) == {"Rate": 15}
+    assert world_tasks.ignore_auto_finish_tips_response(7) == {"Flag": 1}
+    assert world_tasks.auto_finish_response(1301) == {"IsSuccess": 1}
+    assert world_tasks.pick_prestige_response() == {
+        "IsSuccess": 1,
+        "FixedReward": [],
+        "RandomReward": [],
+        "RandomItem": 0,
+    }
+    assert world_tasks.world_task_info()["IgnoreAutoFinishTips"] == 1
+
+
+def test_world_map_task_requests_receive_compatibility_replies() -> None:
+    asyncio.run(_run_world_map_task_requests())
+
+
+async def _run_world_map_task_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x11335577),
+    )
+
+    request_cases = [
+        ("s_city_level_click", {"Level": 4}),
+        ("s_world_task_reward_rate", {"Rate": 25}),
+        ("s_world_task_ignore_auto_finish_tips", {"Flag": 1}),
+        ("s_world_task_auto_finish", {"TaskId": 1301}),
+        ("s_world_task_pick_prestige", {}),
+    ]
+
+    for request_name, request_values in request_cases:
+        await game._dispatch(
+            session,
+            registry.protocol_ids[request_name],
+            codec.encode_message(request_name, request_values),
+            writer,
+        )
+
+    decoder = FrameDecoder(RollingXor(0x11335577))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_city_level_click",
+        "c_world_task_reward_rate",
+        "c_world_task_ignore_auto_finish_tips",
+        "c_world_task_auto_finish",
+        "c_world_task_pick_prestige",
+    ]
+    assert codec.decode_message("c_city_level_click", replies[0][1]) == {"Level": 4}
+    assert codec.decode_message("c_world_task_reward_rate", replies[1][1]) == {
+        "Rate": 25
+    }
+    assert codec.decode_message(
+        "c_world_task_ignore_auto_finish_tips", replies[2][1]
+    ) == {"Flag": 1}
+    assert codec.decode_message("c_world_task_auto_finish", replies[3][1]) == {
+        "IsSuccess": 1
+    }
+    assert codec.decode_message("c_world_task_pick_prestige", replies[4][1]) == {
+        "IsSuccess": 1,
+        "FixedReward": [],
+        "RandomReward": [],
+        "RandomItem": 0,
     }
 
 

@@ -43,7 +43,9 @@ environment details are intentionally omitted from Git.
   that tracks completed tutorial skill-practice counts by hero.
 - `s_base_station_all_info` receives an empty, version-matched
   `c_base_station_all_info` through the same tutorial-state container; the
-  client then opens the archived world quest map.
+  server now follows it with minimal `c_city_level_info` and
+  `c_world_task_info` seed packets so the archived world quest map has city
+  and open-map state to consume.
 - The server has a minimal stateful task journal for `c_task_info`,
   `c_task_info_update`, `c_task_sync_info`, and `c_task_enter_stage`, covering
   starter task listing, acceptance, submission, sync echo, and stage-entry
@@ -54,8 +56,13 @@ environment details are intentionally omitted from Git.
   task bridge live: tapping the highlighted map marker produced
   `s_client_stat` `[1, 1301, 10011]`, `s_guide_finish` for guide `1301`,
   `s_guide_drama`, and `s_base_station_all_info`; the client accepted
-  `c_task_info_update`, `c_guide_finish`, and `c_base_station_all_info`, then
-  opened the world map UI.
+  `c_task_info_update`, `c_guide_finish`, `c_base_station_all_info`,
+  `c_city_level_info`, and `c_world_task_info`, then opened the world map UI
+  with visible map markers.
+- World-map compatibility handlers now acknowledge city-level clicks,
+  world-task reward-rate requests, auto-finish-tip preference changes,
+  world-task auto-finish requests, and prestige reward picks through recovered
+  packet schemas.
 - World-session telemetry now records player movement (`s_scene_move`),
   frame-stat heartbeats (`s_client_stat_frame`), and client error reports
   (`s_client_error`) without sending unsafe extra replies.
@@ -110,8 +117,8 @@ Current limitations:
    validated in controlled client runs. All For One `h1039` and Best Jeanist
    `h1927` still lack matching playable `hero_cfg` rows in the recovered table.
 2. The broader initial activity and quest-state packet set has not been
-   reconstructed. Guide, teach-finish, and base-station exchanges are now
-   stateful, and the first task-list/update/sync handlers exist, but a full
+   reconstructed. Guide, teach-finish, base-station, city-level, world-map
+   seed, and first task-list/update/sync handlers exist, but a full
    quest/tutorial progression path is not.
 3. Death Arms' protocol row is proven, but the current nearby placement is a
    local demonstration coordinate rather than an archived authored placement.
@@ -148,13 +155,20 @@ The recovered CSV IDs are one greater than the actual wire IDs.
 | `c_data_end` | 7 |
 | `c_chunk` | 8 |
 | `s_guide_finish` | 38 |
+| `s_city_level_click` | 88 |
 | `c_team_change_hero` | 142 |
 | `c_time_ping` | 215 |
+| `s_world_task_pick_prestige` | 224 |
+| `c_city_level_click` | 252 |
 | `s_login_account_enter` | 275 |
 | `c_userinfo_hero_set` | 350 |
+| `s_world_task_reward_rate` | 375 |
 | `c_card_go_to_fight` | 390 |
+| `c_world_task_ignore_auto_finish_tips` | 424 |
 | `s_login_player_enter` | 465 |
+| `c_world_task_auto_finish` | 500 |
 | `c_reconnect_flag` | 502 |
+| `c_world_task_info` | 513 |
 | `c_base_station_all_info` | 573 |
 | `s_card_go_to_fight` | 617 |
 | `c_login_player_info` | 654 |
@@ -164,19 +178,23 @@ The recovered CSV IDs are one greater than the actual wire IDs.
 | `s_scene_enter_end` | 879 |
 | `s_area_event_switch_hero` | 903 |
 | `s_time_ping` | 989 |
+| `s_world_task_ignore_auto_finish_tips` | 999 |
 | `s_login_player_add` | 1008 |
 | `c_card_go_to_bridge_fight` | 1036 |
 | `c_scene_enter_end` | 1077 |
 | `c_login_checkstr` | 1138 |
 | `c_guide_finish` | 1214 |
 | `s_card_go_to_bridge_fight` | 1276 |
+| `c_city_level_info` | 1282 |
 | `c_scene_npc_create` | 1292 |
+| `s_world_task_auto_finish` | 1296 |
 | `c_team_change_play` | 1297 |
 | `c_scene_enter` | 1369 |
 | `c_login_account_info` | 1378 |
 | `c_area_event_switch_hero` | 1419 |
 | `c_data_merge_to` | 1564 |
 | `c_scene_player_info` | 1569 |
+| `c_world_task_reward_rate` | 1577 |
 | `c_scene_hero_change` | 1644 |
 
 ## Client Record

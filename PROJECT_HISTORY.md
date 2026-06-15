@@ -50,13 +50,18 @@ The clean-room server now supports:
   area-event hero-switch responses grounded on recovered schemas.
 - Scene visible-hero updates after team hero changes.
 - Guide-finish and base-station replies sufficient to open the world quest map.
+- City-level and world-task seed replies that populate the opened world map's
+  city/open-map compatibility state.
 - Stateful guide, teach-finish, and base-station tracking for the first
   tutorial-practice exchanges.
 - A minimal task journal that can list, accept, submit, sync, and acknowledge
   starter task-stage entry through recovered task packet schemas.
 - Observed first-guide client telemetry is recorded and used to complete the
   starter task once; this guide/task bridge has now been validated on-device
-  through the map-marker tutorial step.
+  through the map-marker tutorial step, including the map opening with visible
+  markers after the new world-task seed packets.
+- World-task compatibility acknowledgments for city-level click, reward-rate,
+  auto-finish-tip preference, auto-finish, and prestige-pick requests.
 - Movement, frame-stat, and client-error telemetry is retained in world-session
   state for live validation and future quest conditions.
 - Time-ping replies and login-level reconnect acknowledgment.

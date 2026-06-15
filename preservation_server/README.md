@@ -21,9 +21,10 @@ frame checksum, schema-driven payload codec, version/account responses, player
 creation response, login-check response, initial user/scene packets, scene-load
 completion, a stateful seven-hero card roster, first-pass character selection
 responses, one verified map NPC, guide-finish acknowledgment, teach-finish
-acknowledgment, base-station initialization, starter task listing and updates,
-observed first-guide client-stat tracking, world-session movement/frame/error
-tracking, time-ping replies, and the login-level reconnect acknowledgment.
+acknowledgment, base-station initialization, city/world-task map seed packets,
+starter task listing and updates, observed first-guide client-stat tracking,
+world-session movement/frame/error tracking, time-ping replies, and the
+login-level reconnect acknowledgment.
 Unknown client messages are decoded and logged for iterative compatibility
 work.
 
@@ -45,9 +46,11 @@ additions pass packet-level tests. The roster now tracks active card and active
 visible hero state for user-info, card-fight, bridge-fight, team-change, and
 area-event switch requests. Death Arms visibly rendered beside Midoriya, the
 active starter card state was accepted, and the map-marker guide step completed
-through the task/guide/base-station handlers in controlled on-device runs. The
-client still performs one initial ping-waiter reconnect, then remains stable
-through the implemented reconnect acknowledgment.
+through the task/guide/base-station/world-task handlers in controlled
+on-device runs. The world map opens with visible markers after the city-level
+and open-map seed packets. The client still performs one initial ping-waiter
+reconnect, then remains stable through the implemented reconnect
+acknowledgment.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.
