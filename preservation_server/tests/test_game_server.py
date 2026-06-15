@@ -34,6 +34,7 @@ from mhatsh_server.characters import (
 )
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
 from mhatsh_server.schema import SchemaRegistry
+from mhatsh_server.tutorial import TutorialState
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -130,6 +131,33 @@ def test_death_arms_scene_npc_uses_verified_protocol_row() -> None:
         "Y": DEATH_ARMS_DEMO_SPAWN.y,
         "Face": DEATH_ARMS_DEMO_SPAWN.face,
     }
+
+
+def test_tutorial_state_accumulates_guides_teach_and_base_station() -> None:
+    state = TutorialState()
+
+    assert state.finish_guides([9], [1301]) == {"Sets": [9], "Ids": [1301]}
+    assert state.finish_guides([9, 10], [1301, 1302]) == {
+        "Sets": [9, 10],
+        "Ids": [1301, 1302],
+    }
+    assert state.finish_teach(
+        1011,
+        [{"SkillId": 2, "Count": 1}, {"SkillId": 1, "Count": 3}],
+    ) == {
+        "HeroCId": 1011,
+        "SkillList": [{"SkillId": 1, "Count": 3}, {"SkillId": 2, "Count": 1}],
+    }
+    assert state.finish_teach(1011, [{"SkillId": 2, "Count": 4}]) == {
+        "HeroCId": 1011,
+        "SkillList": [{"SkillId": 1, "Count": 3}, {"SkillId": 2, "Count": 4}],
+    }
+    assert state.base_station_all_info(23) == {
+        "iClientVersion": 23,
+        "arrFinishAidCount": [],
+        "arrBaseStationInfo": [],
+    }
+    assert state.base_station_client_version == 23
 
 
 def test_version_and_account_login_exchange() -> None:
@@ -427,6 +455,67 @@ async def _run_guide_finish() -> None:
     assert codec.decode_message("c_guide_finish", reply_body) == {
         "Sets": [9],
         "Ids": [1301],
+    }
+    writer.data.clear()
+    session.outbound = RollingXor(0x20304050)
+    next_guide_finish = codec.encode_message(
+        "s_guide_finish",
+        {"setIdList": [10], "guideIdList": [1302]},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_guide_finish"],
+        next_guide_finish,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x20304050))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_guide_finish"
+    assert codec.decode_message("c_guide_finish", reply_body) == {
+        "Sets": [9, 10],
+        "Ids": [1301, 1302],
+    }
+
+
+def test_teach_finish_acknowledges_skill_practice_state() -> None:
+    asyncio.run(_run_teach_finish())
+
+
+async def _run_teach_finish() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x22334455),
+    )
+    teach_finish = codec.encode_message(
+        "s_teach_finish",
+        {
+            "HeroCId": STARTER_HERO_ID,
+            "SkillList": [{"SkillId": 11, "Count": 1}],
+        },
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_teach_finish"],
+        teach_finish,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x22334455))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_teach_finish"
+    assert codec.decode_message("c_teach_finish", reply_body) == {
+        "HeroCId": STARTER_HERO_ID,
+        "SkillList": [{"SkillId": 11, "Count": 1}],
     }
 
 

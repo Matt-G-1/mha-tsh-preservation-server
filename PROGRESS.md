@@ -38,9 +38,12 @@ environment details are intentionally omitted from Git.
 - The client reports `s_scene_enter_end`; the server answers
   `c_scene_enter_end`, completing the initial scene-entry exchange.
 - `s_guide_finish` receives a schema-matched `c_guide_finish` acknowledgment
-  that echoes the completed set and guide IDs.
+  based on accumulated session guide state.
+- `s_teach_finish` receives a schema-matched `c_teach_finish` acknowledgment
+  that tracks completed tutorial skill-practice counts by hero.
 - `s_base_station_all_info` receives an empty, version-matched
-  `c_base_station_all_info`; the client then opens the archived world quest map.
+  `c_base_station_all_info` through the same tutorial-state container; the
+  client then opens the archived world quest map.
 - The world HUD, minimap, controls, tutorial prompt, and local ping indicator
   render on-device during controlled testing.
 - `s_time_ping` receives an echoed `c_time_ping` response.
@@ -66,7 +69,8 @@ environment details are intentionally omitted from Git.
   rows and authored placements can be added without hardcoding each packet in
   the scene-entry handler.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
-  packet flow, starter roster, and map-character packet generation.
+  packet flow, starter roster, map-character packet generation, and stateful
+  guide/teach/base-station tutorial exchanges.
 
 ## Remaining Compatibility Work
 
@@ -81,8 +85,8 @@ Current limitations:
    controlled client runs. All For One `h1039` and Best Jeanist `h1927` still
    lack matching playable `hero_cfg` rows in the recovered table.
 2. The broader initial activity and quest-state packet set has not been
-   reconstructed. The first guide and base-station exchanges are implemented,
-   but a full quest/tutorial progression path is not.
+   reconstructed. Guide, teach-finish, and base-station exchanges are now
+   stateful, but a full quest/tutorial progression path is not.
 3. Death Arms' protocol row is proven, but the current nearby placement is a
    local demonstration coordinate rather than an archived authored placement.
 4. The client previously performed a periodic reconnect while reporting that it
@@ -98,7 +102,8 @@ Current limitations:
 2. Validate the expanded 29-character roster in a controlled client run.
 3. Add more verified NPC rows and sanitized authored-placement metadata.
 4. Validate character selection and avatar swapping in controlled client runs.
-5. Reconstruct enough quest/activity state to complete the archived tutorial.
+5. Reconstruct enough quest/activity state to complete the archived tutorial,
+   starting from the stateful guide and teach-finish handlers.
 
 ## Known Wire IDs
 

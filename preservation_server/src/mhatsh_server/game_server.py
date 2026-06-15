@@ -7,7 +7,7 @@ import os
 import secrets
 import struct
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from .characters import (
@@ -19,6 +19,7 @@ from .characters import (
 )
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .schema import SchemaRegistry
+from .tutorial import TutorialState
 
 
 LOG = logging.getLogger("mhatsh.game")
@@ -38,6 +39,7 @@ class Session:
     urs: str = "local-account"
     uid: int = 10001
     account_info_urs: str | None = None
+    tutorial: TutorialState = field(default_factory=TutorialState)
 
 
 class GameServer:
@@ -179,21 +181,29 @@ class GameServer:
                 writer,
                 session,
                 "c_guide_finish",
-                {
-                    "Sets": list(values.get("setIdList") or []),
-                    "Ids": list(values.get("guideIdList") or []),
-                },
+                session.tutorial.finish_guides(
+                    list(values.get("setIdList") or []),
+                    list(values.get("guideIdList") or []),
+                ),
+            )
+        elif name == "s_teach_finish":
+            await self._send(
+                writer,
+                session,
+                "c_teach_finish",
+                session.tutorial.finish_teach(
+                    int(values.get("HeroCId") or 0),
+                    list(values.get("SkillList") or []),
+                ),
             )
         elif name == "s_base_station_all_info":
             await self._send(
                 writer,
                 session,
                 "c_base_station_all_info",
-                {
-                    "iClientVersion": int(values.get("iClientVersion") or 0),
-                    "arrFinishAidCount": [],
-                    "arrBaseStationInfo": [],
-                },
+                session.tutorial.base_station_all_info(
+                    int(values.get("iClientVersion") or 0)
+                ),
             )
         elif name == "s_time_ping":
             # Local replies can beat the archived client's callback setup.

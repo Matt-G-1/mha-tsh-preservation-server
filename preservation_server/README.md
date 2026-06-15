@@ -20,9 +20,9 @@ The TCP service implements the native five-byte seed handshake, rolling XOR,
 frame checksum, schema-driven payload codec, version/account responses, player
 creation response, login-check response, initial user/scene packets, scene-load
 completion, a seven-hero card roster, one verified map NPC, guide-finish
-acknowledgment, base-station initialization, time-ping replies, and the
-login-level reconnect acknowledgment. Unknown client messages are decoded and
-logged for iterative compatibility work.
+acknowledgment, teach-finish acknowledgment, base-station initialization,
+time-ping replies, and the login-level reconnect acknowledgment. Unknown client
+messages are decoded and logged for iterative compatibility work.
 
 By default, the server advertises a minimal local role so the archived client
 constructs its required `clsUserData` record before `c_login_ok`. Set

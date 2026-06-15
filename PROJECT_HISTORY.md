@@ -46,6 +46,8 @@ The clean-room server now supports:
 - Scene-load completion acknowledgment.
 - Starter owned-card inventory.
 - Guide-finish and base-station replies sufficient to open the world quest map.
+- Stateful guide, teach-finish, and base-station tracking for the first
+  tutorial-practice exchanges.
 - Time-ping replies and login-level reconnect acknowledgment.
 - A verified Death Arms map-character demonstration packet.
 
@@ -74,6 +76,7 @@ The next build series is focused on characters and tutorial completion:
 3. Add tests for expanded card serialization and active-avatar stability.
 4. Expand map-character support using recovered NPC rows and sanitized
    placement metadata.
-5. Reconstruct enough quest/activity state to complete the archived tutorial.
+5. Reconstruct enough quest/activity state to complete the archived tutorial,
+   starting from stateful guide and teach-finish handling.
 
 Private deployment notes are deliberately kept outside this repository.
