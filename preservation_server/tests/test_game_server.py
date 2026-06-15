@@ -35,12 +35,15 @@ from mhatsh_server.characters import (
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
 from mhatsh_server.schema import SchemaRegistry
 from mhatsh_server.tasks import (
+    STARTER_GUIDE_ID,
+    STARTER_GUIDE_STEP,
     STARTER_TASK,
     TASK_STATUS_ACCEPTED,
     TASK_STATUS_FINISHED,
     TaskState,
 )
 from mhatsh_server.tutorial import TutorialState
+from mhatsh_server.world import ScenePosition, WorldState
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -147,6 +150,16 @@ def test_tutorial_state_accumulates_guides_teach_and_base_station() -> None:
         "Sets": [9, 10],
         "Ids": [1301, 1302],
     }
+    state.record_guide_drama(20001301, 10011)
+    assert state.guide_drama_steps == {20001301: 10011}
+    assert state.record_client_stat(2, [1, 1301, 10011], ["", ""]) == {
+        "StatId": 2,
+        "NumData": [1, 1301, 10011],
+        "StrData": ["", ""],
+    }
+    assert state.client_stats == [
+        {"StatId": 2, "NumData": [1, 1301, 10011], "StrData": ["", ""]}
+    ]
     assert state.finish_teach(
         1011,
         [{"SkillId": 2, "Count": 1}, {"SkillId": 1, "Count": 3}],
@@ -189,6 +202,62 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         "ParamList": ["1301"],
     }
     assert state.enter_stage(1) == {"IsEnter": 1}
+    guide_state = TaskState()
+    guide_update = guide_state.complete_guide(STARTER_GUIDE_ID)
+    assert guide_update is not None
+    assert guide_update["task_info"]["Id"] == STARTER_GUIDE_ID
+    assert guide_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert guide_update["task_info"]["Cond"][0]["CompCount"] == 1
+    assert guide_update["task_info"]["Cond"][0]["ParamList"] == [
+        STARTER_GUIDE_ID,
+        STARTER_GUIDE_STEP,
+    ]
+    assert guide_state.complete_guide(STARTER_GUIDE_ID) is None
+    stat_state = TaskState()
+    stat_update = stat_state.observe_client_stat(
+        {"StatId": 2, "NumData": [1, STARTER_GUIDE_ID, STARTER_GUIDE_STEP]}
+    )
+    assert stat_update is not None
+    assert stat_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert stat_state.observe_client_stat(
+        {"StatId": 2, "NumData": [0, STARTER_GUIDE_ID, STARTER_GUIDE_STEP]}
+    ) is None
+
+
+def test_world_state_records_movement_frames_and_errors() -> None:
+    state = WorldState()
+
+    assert state.record_move([]) is None
+    position = state.record_move(
+        [
+            {
+                "X": 4221,
+                "Y": 2040,
+                "Z": 19931,
+                "Face": 359,
+                "Speed": 0,
+                "ChState": 6,
+                "ChAction": 1,
+                "Extra": 0,
+            }
+        ]
+    )
+    assert position == ScenePosition(
+        x=4221,
+        y=2040,
+        z=19931,
+        face=359,
+        character_state=6,
+        character_action=1,
+    )
+    assert state.move_count == 1
+
+    frame = state.record_frame_stat(uid=10001, stage_id=0, frame=30000, image_level=4)
+    assert frame.uid == 10001
+    assert state.frame_stats == [frame]
+
+    state.record_client_error("local-guest:wait[c_time_ping]")
+    assert state.client_errors == ["local-guest:wait[c_time_ping]"]
 
 
 def test_version_and_account_login_exchange() -> None:
@@ -481,12 +550,22 @@ async def _run_guide_finish() -> None:
     )
 
     decoder = FrameDecoder(RollingXor(0x10203040))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_guide_finish",
+        "c_task_info_update",
+    ]
+    reply_id, reply_body = replies[0]
     assert registry.protocol_names[reply_id] == "c_guide_finish"
     assert codec.decode_message("c_guide_finish", reply_body) == {
         "Sets": [9],
         "Ids": [1301],
     }
+    reply_id, reply_body = replies[1]
+    task_update = codec.decode_message("c_task_info_update", reply_body)
+    assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
+    assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+
     writer.data.clear()
     session.outbound = RollingXor(0x20304050)
     next_guide_finish = codec.encode_message(
@@ -508,6 +587,87 @@ async def _run_guide_finish() -> None:
         "Sets": [9, 10],
         "Ids": [1301, 1302],
     }
+
+
+def test_guide_drama_records_tutorial_step_without_extra_reply() -> None:
+    asyncio.run(_run_guide_drama())
+
+
+async def _run_guide_drama() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x10203040),
+    )
+    guide_drama = codec.encode_message(
+        "s_guide_drama",
+        {"Uid": 10001, "Id": 20001301, "Step": 10011, "skip": 0},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_guide_drama"],
+        guide_drama,
+        writer,
+    )
+
+    assert writer.data == bytearray()
+    assert session.tutorial.guide_drama_steps == {20001301: 10011}
+
+
+def test_client_stat_can_complete_starter_task_once() -> None:
+    asyncio.run(_run_client_stat())
+
+
+async def _run_client_stat() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x31415926),
+    )
+    stat = codec.encode_message(
+        "s_client_stat",
+        {"StatId": 2, "NumData": [1, 1301, 10011], "StrData": ["", ""]},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_client_stat"],
+        stat,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x31415926))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_info_update"
+    task_update = codec.decode_message("c_task_info_update", reply_body)
+    assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
+    assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert session.tutorial.client_stats == [
+        {"StatId": 2, "NumData": [1, 1301, 10011], "StrData": ["", ""]}
+    ]
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x27182818)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_client_stat"],
+        stat,
+        writer,
+    )
+    assert writer.data == bytearray()
 
 
 def test_teach_finish_acknowledges_skill_practice_state() -> None:
@@ -556,6 +716,80 @@ def test_base_station_info_preserves_client_version() -> None:
 
 def test_task_requests_receive_stateful_protocol_responses() -> None:
     asyncio.run(_run_task_requests())
+
+
+def test_world_telemetry_packets_update_session_without_reply() -> None:
+    asyncio.run(_run_world_telemetry())
+
+
+async def _run_world_telemetry() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0xABCDEF01),
+    )
+
+    move = codec.encode_message(
+        "s_scene_move",
+        {
+            "Path": [
+                {
+                    "X": 4221,
+                    "Y": 2040,
+                    "Z": 19931,
+                    "Face": 359,
+                    "Speed": 0,
+                    "ChState": 6,
+                    "ChAction": 1,
+                    "Extra": 0,
+                }
+            ]
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_move"],
+        move,
+        writer,
+    )
+    assert writer.data == bytearray()
+    assert session.world.last_position == ScenePosition(
+        x=4221,
+        y=2040,
+        z=19931,
+        face=359,
+        character_state=6,
+        character_action=1,
+    )
+
+    frame = codec.encode_message(
+        "s_client_stat_frame",
+        {"uid": 10001, "iStageId": 0, "iFrame": 30000, "iImageLevel": 4},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_client_stat_frame"],
+        frame,
+        writer,
+    )
+    assert writer.data == bytearray()
+    assert session.world.frame_stats[-1].uid == 10001
+
+    error = codec.encode_message("s_client_error", {"Msg": "wait[c_time_ping]"})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_client_error"],
+        error,
+        writer,
+    )
+    assert writer.data == bytearray()
+    assert session.world.client_errors == ["wait[c_time_ping]"]
 
 
 async def _run_task_requests() -> None:

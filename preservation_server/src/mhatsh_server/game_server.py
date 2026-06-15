@@ -21,6 +21,7 @@ from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, en
 from .schema import SchemaRegistry
 from .tasks import TaskState
 from .tutorial import TutorialState
+from .world import WorldState
 
 
 LOG = logging.getLogger("mhatsh.game")
@@ -42,6 +43,7 @@ class Session:
     account_info_urs: str | None = None
     tutorial: TutorialState = field(default_factory=TutorialState)
     tasks: TaskState = field(default_factory=TaskState)
+    world: WorldState = field(default_factory=WorldState)
 
 
 class GameServer:
@@ -179,15 +181,44 @@ class GameServer:
         elif name == "s_scene_enter_end":
             await self._send(writer, session, "c_scene_enter_end", {})
         elif name == "s_guide_finish":
+            guide_response = session.tutorial.finish_guides(
+                list(values.get("setIdList") or []),
+                list(values.get("guideIdList") or []),
+            )
             await self._send(
                 writer,
                 session,
                 "c_guide_finish",
-                session.tutorial.finish_guides(
-                    list(values.get("setIdList") or []),
-                    list(values.get("guideIdList") or []),
-                ),
+                guide_response,
             )
+            for guide_id in guide_response["Ids"]:
+                task_update = session.tasks.complete_guide(int(guide_id))
+                if task_update is not None:
+                    await self._send(
+                        writer,
+                        session,
+                        "c_task_info_update",
+                        task_update,
+                    )
+        elif name == "s_guide_drama":
+            session.tutorial.record_guide_drama(
+                int(values.get("Id") or 0),
+                int(values.get("Step") or 0),
+            )
+        elif name == "s_client_stat":
+            stat = session.tutorial.record_client_stat(
+                int(values.get("StatId") or 0),
+                [int(item) for item in list(values.get("NumData") or [])],
+                [str(item) for item in list(values.get("StrData") or [])],
+            )
+            task_update = session.tasks.observe_client_stat(stat)
+            if task_update is not None:
+                await self._send(
+                    writer,
+                    session,
+                    "c_task_info_update",
+                    task_update,
+                )
         elif name == "s_teach_finish":
             await self._send(
                 writer,
@@ -246,6 +277,17 @@ class GameServer:
                 "c_task_enter_stage",
                 session.tasks.enter_stage(int(values.get("IsEnter") or 0)),
             )
+        elif name == "s_scene_move":
+            session.world.record_move(list(values.get("Path") or []))
+        elif name == "s_client_stat_frame":
+            session.world.record_frame_stat(
+                int(values.get("uid") or 0),
+                int(values.get("iStageId") or 0),
+                int(values.get("iFrame") or 0),
+                int(values.get("iImageLevel") or 0),
+            )
+        elif name == "s_client_error":
+            session.world.record_client_error(str(values.get("Msg") or ""))
         elif name == "s_time_ping":
             # Local replies can beat the archived client's callback setup.
             if self.ping_response_delay:

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 TASK_STATUS_AVAILABLE = 1
 TASK_STATUS_ACCEPTED = 2
 TASK_STATUS_FINISHED = 3
+STARTER_GUIDE_ID = 1301
+STARTER_GUIDE_STEP = 10011
 
 
 @dataclass(slots=True)
@@ -20,6 +22,13 @@ class TaskCondition:
             "CompCount": self.completed_count,
             "ParamList": list(self.params),
         }
+
+    def clone(self) -> "TaskCondition":
+        return TaskCondition(
+            id=self.id,
+            completed_count=self.completed_count,
+            params=self.params,
+        )
 
 
 @dataclass(slots=True)
@@ -39,18 +48,19 @@ class TaskRecord:
             "Cond": [condition.to_protocol() for condition in self.conditions],
         }
 
+    def clone(self) -> "TaskRecord":
+        return TaskRecord(
+            id=self.id,
+            type=self.type,
+            status=self.status,
+            loop_times=self.loop_times,
+            conditions=tuple(condition.clone() for condition in self.conditions),
+        )
+
 
 class TaskState:
     def __init__(self) -> None:
-        self.tasks: dict[int, TaskRecord] = {
-            STARTER_TASK.id: TaskRecord(
-                id=STARTER_TASK.id,
-                type=STARTER_TASK.type,
-                status=STARTER_TASK.status,
-                loop_times=STARTER_TASK.loop_times,
-                conditions=STARTER_TASK.conditions,
-            )
-        }
+        self.tasks: dict[int, TaskRecord] = {STARTER_TASK.id: STARTER_TASK.clone()}
         self.finished: set[int] = set()
 
     def task_info(self, task_type: int | None = None) -> dict[str, object]:
@@ -73,9 +83,29 @@ class TaskState:
 
     def submit(self, task_id: int) -> dict[str, object]:
         task = self._task(task_id)
-        task.status = TASK_STATUS_FINISHED
-        self.finished.add(task.id)
+        self._finish(task)
         return self.task_update(task, action_type=2)
+
+    def complete_guide(self, guide_id: int) -> dict[str, object] | None:
+        if guide_id != STARTER_GUIDE_ID:
+            return None
+        task = self._task(STARTER_TASK.id)
+        if task.id in self.finished:
+            return None
+        for condition in task.conditions:
+            if guide_id in condition.params:
+                condition.completed_count = max(condition.completed_count, 1)
+        self._finish(task)
+        return self.task_update(task, action_type=2)
+
+    def observe_client_stat(self, stat: dict[str, object]) -> dict[str, object] | None:
+        nums = list(stat.get("NumData") or [])
+        if len(nums) < 3:
+            return None
+        flag, guide_id, step = (int(nums[0]), int(nums[1]), int(nums[2]))
+        if flag != 1 or guide_id != STARTER_GUIDE_ID or step != STARTER_GUIDE_STEP:
+            return None
+        return self.complete_guide(guide_id)
 
     def sync_info(
         self, task_id: int, sync_type: str, params: list[str]
@@ -104,10 +134,20 @@ class TaskState:
             self.tasks[task_id] = task
         return task
 
+    def _finish(self, task: TaskRecord) -> None:
+        task.status = TASK_STATUS_FINISHED
+        self.finished.add(task.id)
+
 
 STARTER_TASK = TaskRecord(
-    id=100001,
+    id=STARTER_GUIDE_ID,
     type=1,
     status=TASK_STATUS_AVAILABLE,
-    conditions=(TaskCondition(id=1, completed_count=0),),
+    conditions=(
+        TaskCondition(
+            id=1,
+            completed_count=0,
+            params=(STARTER_GUIDE_ID, STARTER_GUIDE_STEP),
+        ),
+    ),
 )

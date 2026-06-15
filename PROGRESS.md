@@ -48,6 +48,11 @@ environment details are intentionally omitted from Git.
   `c_task_info_update`, `c_task_sync_info`, and `c_task_enter_stage`, covering
   starter task listing, acceptance, submission, sync echo, and stage-entry
   acknowledgment.
+- Observed first-guide telemetry (`s_client_stat` guide `1301`, step `10011`)
+  is recorded in tutorial state and can complete the starter task exactly once.
+- World-session telemetry now records player movement (`s_scene_move`),
+  frame-stat heartbeats (`s_client_stat_frame`), and client error reports
+  (`s_client_error`) without sending unsafe extra replies.
 - The world HUD, minimap, controls, tutorial prompt, and local ping indicator
   render on-device during controlled testing.
 - `s_time_ping` receives an echoed `c_time_ping` response.
@@ -74,7 +79,7 @@ environment details are intentionally omitted from Git.
   the scene-entry handler.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
   packet flow, starter roster, map-character packet generation, and stateful
-  guide/teach/base-station/task exchanges.
+  guide/teach/base-station/task/client-stat/world-telemetry exchanges.
 
 ## Remaining Compatibility Work
 
@@ -97,7 +102,8 @@ Current limitations:
 4. The client previously performed a periodic reconnect while reporting that it
    was waiting for `c_time_ping`. The reconnect acknowledgment restores the
    session, after which ping traffic remains stable, but the original waiter
-   defect is not fully resolved.
+   defect is not fully resolved. Client error reports are now retained in
+   world-session state for live validation.
 5. Combat, rewards, persistence, and broader inventory systems still require
    protocol-specific state and handlers.
 
@@ -108,7 +114,8 @@ Current limitations:
 3. Add more verified NPC rows and sanitized authored-placement metadata.
 4. Validate character selection and avatar swapping in controlled client runs.
 5. Reconstruct enough quest/activity state to complete the archived tutorial,
-   starting from the stateful guide, teach-finish, and starter-task handlers.
+   starting from the stateful guide, teach-finish, starter-task, and
+   client-stat handlers.
 
 ## Known Wire IDs
 

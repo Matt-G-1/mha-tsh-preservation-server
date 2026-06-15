@@ -50,6 +50,10 @@ The clean-room server now supports:
   tutorial-practice exchanges.
 - A minimal task journal that can list, accept, submit, sync, and acknowledge
   starter task-stage entry through recovered task packet schemas.
+- Observed first-guide client telemetry is recorded and used to complete the
+  starter task once.
+- Movement, frame-stat, and client-error telemetry is retained in world-session
+  state for live validation and future quest conditions.
 - Time-ping replies and login-level reconnect acknowledgment.
 - A verified Death Arms map-character demonstration packet.
 
@@ -79,6 +83,7 @@ The next build series is focused on characters and tutorial completion:
 4. Expand map-character support using recovered NPC rows and sanitized
    placement metadata.
 5. Reconstruct enough quest/activity state to complete the archived tutorial,
-   starting from stateful guide, teach-finish, and starter-task handling.
+   starting from stateful guide, teach-finish, starter-task, and client-stat
+   handling.
 
 Private deployment notes are deliberately kept outside this repository.
