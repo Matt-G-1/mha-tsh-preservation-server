@@ -19,6 +19,7 @@ from .characters import (
 )
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .schema import SchemaRegistry
+from .tasks import TaskState
 from .tutorial import TutorialState
 
 
@@ -40,6 +41,7 @@ class Session:
     uid: int = 10001
     account_info_urs: str | None = None
     tutorial: TutorialState = field(default_factory=TutorialState)
+    tasks: TaskState = field(default_factory=TaskState)
 
 
 class GameServer:
@@ -204,6 +206,45 @@ class GameServer:
                 session.tutorial.base_station_all_info(
                     int(values.get("iClientVersion") or 0)
                 ),
+            )
+        elif name == "s_task_get_tasklist_bytype":
+            await self._send(
+                writer,
+                session,
+                "c_task_info",
+                session.tasks.task_info(int(values.get("task_type") or 0)),
+            )
+        elif name == "s_task_accept":
+            await self._send(
+                writer,
+                session,
+                "c_task_info_update",
+                session.tasks.accept(int(values.get("task_id") or 0)),
+            )
+        elif name == "s_task_submit":
+            await self._send(
+                writer,
+                session,
+                "c_task_info_update",
+                session.tasks.submit(int(values.get("task_id") or 0)),
+            )
+        elif name == "s_task_sync_info":
+            await self._send(
+                writer,
+                session,
+                "c_task_sync_info",
+                session.tasks.sync_info(
+                    int(values.get("TaskId") or 0),
+                    str(values.get("Type") or ""),
+                    list(values.get("ParamList") or []),
+                ),
+            )
+        elif name == "s_task_enter_stage":
+            await self._send(
+                writer,
+                session,
+                "c_task_enter_stage",
+                session.tasks.enter_stage(int(values.get("IsEnter") or 0)),
             )
         elif name == "s_time_ping":
             # Local replies can beat the archived client's callback setup.

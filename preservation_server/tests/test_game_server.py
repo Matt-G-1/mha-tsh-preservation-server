@@ -34,6 +34,12 @@ from mhatsh_server.characters import (
 )
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
 from mhatsh_server.schema import SchemaRegistry
+from mhatsh_server.tasks import (
+    STARTER_TASK,
+    TASK_STATUS_ACCEPTED,
+    TASK_STATUS_FINISHED,
+    TaskState,
+)
 from mhatsh_server.tutorial import TutorialState
 
 
@@ -158,6 +164,31 @@ def test_tutorial_state_accumulates_guides_teach_and_base_station() -> None:
         "arrBaseStationInfo": [],
     }
     assert state.base_station_client_version == 23
+
+
+def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
+    state = TaskState()
+
+    task_info = state.task_info(STARTER_TASK.type)
+    assert task_info == {
+        "tasks": [STARTER_TASK.to_protocol()],
+        "finishs": [],
+        "IsStart": 1,
+        "IsEnd": 1,
+    }
+    accept = state.accept(STARTER_TASK.id)
+    assert accept["action_type"] == 1
+    assert accept["task_info"]["Status"] == TASK_STATUS_ACCEPTED
+    submit = state.submit(STARTER_TASK.id)
+    assert submit["action_type"] == 2
+    assert submit["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert state.task_info()["finishs"] == [STARTER_TASK.id]
+    assert state.sync_info(STARTER_TASK.id, "guide", ["1301"]) == {
+        "TaskId": STARTER_TASK.id,
+        "Type": "guide",
+        "ParamList": ["1301"],
+    }
+    assert state.enter_stage(1) == {"IsEnter": 1}
 
 
 def test_version_and_account_login_exchange() -> None:
@@ -521,6 +552,115 @@ async def _run_teach_finish() -> None:
 
 def test_base_station_info_preserves_client_version() -> None:
     asyncio.run(_run_base_station_info())
+
+
+def test_task_requests_receive_stateful_protocol_responses() -> None:
+    asyncio.run(_run_task_requests())
+
+
+async def _run_task_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x66778899),
+    )
+
+    task_list = codec.encode_message(
+        "s_task_get_tasklist_bytype",
+        {"task_type": STARTER_TASK.type},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_get_tasklist_bytype"],
+        task_list,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x66778899))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_info"
+    assert codec.decode_message("c_task_info", reply_body) == {
+        "tasks": [STARTER_TASK.to_protocol()],
+        "finishs": [],
+        "IsStart": 1,
+        "IsEnd": 1,
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x778899AA)
+    accept = codec.encode_message("s_task_accept", {"task_id": STARTER_TASK.id})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_accept"],
+        accept,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x778899AA))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_info_update"
+    accepted = codec.decode_message("c_task_info_update", reply_body)
+    assert accepted["action_type"] == 1
+    assert accepted["task_info"]["Id"] == STARTER_TASK.id
+    assert accepted["task_info"]["Status"] == TASK_STATUS_ACCEPTED
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x8899AABB)
+    submit = codec.encode_message("s_task_submit", {"task_id": STARTER_TASK.id})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_submit"],
+        submit,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x8899AABB))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_info_update"
+    submitted = codec.decode_message("c_task_info_update", reply_body)
+    assert submitted["action_type"] == 2
+    assert submitted["task_info"]["Status"] == TASK_STATUS_FINISHED
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x99AABBCC)
+    sync = codec.encode_message(
+        "s_task_sync_info",
+        {"TaskId": STARTER_TASK.id, "Type": "guide", "ParamList": ["1301"]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_sync_info"],
+        sync,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x99AABBCC))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_sync_info"
+    assert codec.decode_message("c_task_sync_info", reply_body) == {
+        "TaskId": STARTER_TASK.id,
+        "Type": "guide",
+        "ParamList": ["1301"],
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xAABBCCDD)
+    enter_stage = codec.encode_message(
+        "s_task_enter_stage",
+        {"IsEnter": 1, "x": 12, "y": 34},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_enter_stage"],
+        enter_stage,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xAABBCCDD))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_enter_stage"
+    assert codec.decode_message("c_task_enter_stage", reply_body) == {"IsEnter": 1}
 
 
 async def _run_base_station_info() -> None:

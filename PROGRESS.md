@@ -44,6 +44,10 @@ environment details are intentionally omitted from Git.
 - `s_base_station_all_info` receives an empty, version-matched
   `c_base_station_all_info` through the same tutorial-state container; the
   client then opens the archived world quest map.
+- The server has a minimal stateful task journal for `c_task_info`,
+  `c_task_info_update`, `c_task_sync_info`, and `c_task_enter_stage`, covering
+  starter task listing, acceptance, submission, sync echo, and stage-entry
+  acknowledgment.
 - The world HUD, minimap, controls, tutorial prompt, and local ping indicator
   render on-device during controlled testing.
 - `s_time_ping` receives an echoed `c_time_ping` response.
@@ -70,7 +74,7 @@ environment details are intentionally omitted from Git.
   the scene-entry handler.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
   packet flow, starter roster, map-character packet generation, and stateful
-  guide/teach/base-station tutorial exchanges.
+  guide/teach/base-station/task exchanges.
 
 ## Remaining Compatibility Work
 
@@ -86,7 +90,8 @@ Current limitations:
    lack matching playable `hero_cfg` rows in the recovered table.
 2. The broader initial activity and quest-state packet set has not been
    reconstructed. Guide, teach-finish, and base-station exchanges are now
-   stateful, but a full quest/tutorial progression path is not.
+   stateful, and the first task-list/update/sync handlers exist, but a full
+   quest/tutorial progression path is not.
 3. Death Arms' protocol row is proven, but the current nearby placement is a
    local demonstration coordinate rather than an archived authored placement.
 4. The client previously performed a periodic reconnect while reporting that it
@@ -103,7 +108,7 @@ Current limitations:
 3. Add more verified NPC rows and sanitized authored-placement metadata.
 4. Validate character selection and avatar swapping in controlled client runs.
 5. Reconstruct enough quest/activity state to complete the archived tutorial,
-   starting from the stateful guide and teach-finish handlers.
+   starting from the stateful guide, teach-finish, and starter-task handlers.
 
 ## Known Wire IDs
 
