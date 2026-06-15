@@ -195,6 +195,24 @@ MAP_CHARACTERS[5007] = MapCharacter(
     model_asset_id=5007,
     npc_id=5007,
 )
+
+# npc_cfg constants verify these row IDs and names near the recovered table's
+# map-system NPC block. The IDs also match the supplied AXMD model IDs, so they
+# can be packet-serialized as optional local demonstration NPCs.
+for model_id, name in (
+    (5001, "Mei Hatsume (Story)"),
+    (5008, "Kamui Woods"),
+    (5009, "Naomasa Tsukauchi"),
+    (5011, "Mt. Lady"),
+    (5035, "Shota Aizawa"),
+    (5041, "Mei Hatsume (U.A.)"),
+):
+    MAP_CHARACTERS[model_id] = MapCharacter(
+        name=name,
+        model_asset_id=model_id,
+        npc_id=model_id,
+    )
+
 DEATH_ARMS = MAP_CHARACTERS[5007]
 DEATH_ARMS_DEMO_SPAWN = MapSpawn(
     label="death_arms_demo_near_honei_spawn",
@@ -206,6 +224,70 @@ DEATH_ARMS_DEMO_SPAWN = MapSpawn(
     face=180,
 )
 INITIAL_MAP_SPAWNS = (DEATH_ARMS_DEMO_SPAWN,)
+DEMO_CAST_MAP_SPAWNS = (
+    DEATH_ARMS_DEMO_SPAWN,
+    MapSpawn(
+        label="mei_story_demo_near_honei_spawn",
+        character=MAP_CHARACTERS[5001],
+        uid=20002,
+        x=4321,
+        y=19881,
+        face=90,
+    ),
+    MapSpawn(
+        label="kamui_woods_demo_near_honei_spawn",
+        character=MAP_CHARACTERS[5008],
+        uid=20003,
+        x=4521,
+        y=19881,
+        face=270,
+    ),
+    MapSpawn(
+        label="tsukauchi_demo_near_honei_spawn",
+        character=MAP_CHARACTERS[5009],
+        uid=20004,
+        x=4221,
+        y=19831,
+        face=0,
+    ),
+    MapSpawn(
+        label="mt_lady_demo_near_honei_spawn",
+        character=MAP_CHARACTERS[5011],
+        uid=20005,
+        x=4621,
+        y=19931,
+        face=180,
+    ),
+    MapSpawn(
+        label="aizawa_demo_near_honei_spawn",
+        character=MAP_CHARACTERS[5035],
+        uid=20006,
+        x=4121,
+        y=19931,
+        face=0,
+    ),
+    MapSpawn(
+        label="mei_ua_demo_near_honei_spawn",
+        character=MAP_CHARACTERS[5041],
+        uid=20007,
+        x=4421,
+        y=19831,
+        face=180,
+    ),
+)
+
+
+def map_spawns(mode: str | None = None) -> tuple[MapSpawn, ...]:
+    normalized = (mode or "starter").strip().lower()
+    if normalized in {"starter", "initial", "default"}:
+        return INITIAL_MAP_SPAWNS
+    if normalized in {"demo_cast", "demo-cast", "verified", "expanded"}:
+        return DEMO_CAST_MAP_SPAWNS
+    if normalized in {"none", "off", "disabled"}:
+        return ()
+    raise ValueError(
+        f"unknown map spawn mode {mode!r}; expected starter, demo_cast, or none"
+    )
 
 
 CHIBI_MODEL_ASSETS = {

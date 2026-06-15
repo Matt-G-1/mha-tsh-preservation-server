@@ -66,6 +66,9 @@ The clean-room server now supports:
   state for live validation and future quest conditions.
 - Time-ping replies and login-level reconnect acknowledgment.
 - A verified Death Arms map-character demonstration packet.
+- An opt-in verified map/NPC demo cast covering Death Arms, Mei Hatsume,
+  Kamui Woods, Naomasa Tsukauchi, Mt. Lady, Shota Aizawa, and a U.A.
+  Mei Hatsume row.
 
 ## Character Catalog
 

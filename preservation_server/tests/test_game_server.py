@@ -21,12 +21,14 @@ from mhatsh_server.characters import (
     CHIBI_MODEL_ASSETS,
     DEATH_ARMS,
     DEATH_ARMS_DEMO_SPAWN,
+    DEMO_CAST_MAP_SPAWNS,
     INITIAL_MAP_SPAWNS,
     INITIAL_PLAYABLE_ROSTER,
     MAP_CHARACTERS,
     PLAYABLE_CHARACTERS,
     STARTER_CHARACTER,
     VERIFIED_PLAYABLE_ROSTER,
+    map_spawns,
     playable_card,
     playable_roster,
     scene_npc,
@@ -98,15 +100,44 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert MAP_CHARACTERS[5007].name == "Death Arms"
     assert MAP_CHARACTERS[5007].npc_id == 5007
     assert MAP_CHARACTERS[5007].is_spawn_verified
+    verified_map_names = {
+        model_id: MAP_CHARACTERS[model_id].name
+        for model_id in (5001, 5008, 5009, 5011, 5035, 5041)
+    }
+    assert verified_map_names == {
+        5001: "Mei Hatsume (Story)",
+        5008: "Kamui Woods",
+        5009: "Naomasa Tsukauchi",
+        5011: "Mt. Lady",
+        5035: "Shota Aizawa",
+        5041: "Mei Hatsume (U.A.)",
+    }
+    assert all(
+        MAP_CHARACTERS[model_id].npc_id == model_id
+        for model_id in verified_map_names
+    )
 
 
 def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
     assert INITIAL_MAP_SPAWNS == (DEATH_ARMS_DEMO_SPAWN,)
+    assert map_spawns("starter") == INITIAL_MAP_SPAWNS
+    assert map_spawns("none") == ()
+    assert map_spawns("demo_cast") == DEMO_CAST_MAP_SPAWNS
     assert DEATH_ARMS_DEMO_SPAWN.label == "death_arms_demo_near_honei_spawn"
     assert DEATH_ARMS_DEMO_SPAWN.character == DEATH_ARMS
     assert DEATH_ARMS_DEMO_SPAWN.uid == 20001
     assert DEATH_ARMS_DEMO_SPAWN.face == 180
     assert not DEATH_ARMS_DEMO_SPAWN.is_authored_placement
+    assert [spawn.uid for spawn in DEMO_CAST_MAP_SPAWNS] == list(range(20001, 20008))
+    assert {spawn.character.npc_id for spawn in DEMO_CAST_MAP_SPAWNS} == {
+        5001,
+        5007,
+        5008,
+        5009,
+        5011,
+        5035,
+        5041,
+    }
 
 
 def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
@@ -468,6 +499,40 @@ async def _run_player_responses() -> None:
 
 def test_expanded_roster_mode_serializes_all_verified_playable_cards() -> None:
     asyncio.run(_run_expanded_roster_cards())
+
+
+def test_demo_cast_scene_sends_verified_map_character_rows() -> None:
+    asyncio.run(_run_demo_cast_scene_sends_verified_map_character_rows())
+
+
+async def _run_demo_cast_scene_sends_verified_map_character_rows() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    game.map_spawns = DEMO_CAST_MAP_SPAWNS
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x12344321),
+        uid=4242,
+    )
+
+    await game._send_initial_scene(writer, session)
+
+    decoder = FrameDecoder(RollingXor(0x12344321))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_scene_player_info",
+        "c_scene_enter",
+        "c_scene_npc_create",
+    ]
+    reply_id, reply_body = replies[2]
+    assert codec.decode_message("c_scene_npc_create", reply_body) == {
+        "NpcList": [scene_npc_from_spawn(spawn) for spawn in DEMO_CAST_MAP_SPAWNS]
+    }
 
 
 async def _run_expanded_roster_cards() -> None:

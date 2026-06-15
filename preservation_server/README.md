@@ -20,11 +20,11 @@ The TCP service implements the native five-byte seed handshake, rolling XOR,
 frame checksum, schema-driven payload codec, version/account responses, player
 creation response, login-check response, initial user/scene packets, scene-load
 completion, a stateful seven-hero card roster, first-pass character selection
-responses, one verified map NPC, guide-finish acknowledgment, teach-finish
-acknowledgment, base-station initialization, city/world-task map seed packets,
-starter task listing and updates, observed first-guide client-stat tracking,
-world-session movement/frame/error tracking, time-ping replies, and the
-login-level reconnect acknowledgment.
+responses, verified map NPC packet generation, guide-finish acknowledgment,
+teach-finish acknowledgment, base-station initialization, city/world-task map
+seed packets, starter task listing and updates, observed first-guide
+client-stat tracking, world-session movement/frame/error tracking, time-ping
+replies, and the login-level reconnect acknowledgment.
 Unknown client messages are decoded and logged for iterative compatibility
 work.
 
@@ -33,24 +33,26 @@ constructs its required `clsUserData` record before `c_login_ok`. Set
 `MHATSH_AUTO_PROVISION_ROLE=0` to exercise the empty-account creation branch.
 `MHATSH_PING_RESPONSE_DELAY` controls the small delay that avoids a
 callback-registration race in the archived client. It defaults to `0.05`
-seconds. `MHATSH_SEND_MAP_CHARACTERS=0` disables the local Death Arms
-demonstration spawn without disabling scene entry.
+seconds. `MHATSH_SEND_MAP_CHARACTERS=0` disables local demonstration NPC
+spawns without disabling scene entry. `MHATSH_MAP_SPAWN_MODE=demo_cast`
+enables the opt-in seven-NPC demonstration cast for controlled testing.
 
 The client now reaches Honei Urban Area, renders Midoriya and its world HUD,
 and opens the world quest map. The server's initial owned-card roster contains
 Midoriya, Bakugo, Iida, Ochaco, Todoroki, Momo, and Denki. Death Arms is sent
-through `c_scene_npc_create` at an explicitly local demonstration position.
-The catalog contains 29 protocol-verified playable mappings; only All For One
-`h1039` and Best Jeanist `h1927` remain asset-only. The roster and NPC
-additions pass packet-level tests. The roster now tracks active card and active
-visible hero state for user-info, card-fight, bridge-fight, team-change, and
-area-event switch requests. Death Arms visibly rendered beside Midoriya, the
-active starter card state was accepted, and the map-marker guide step completed
-through the task/guide/base-station/world-task handlers in controlled
-on-device runs. The world map opens with visible markers after the city-level
-and open-map seed packets. The client still performs one initial ping-waiter
-reconnect, then remains stable through the implemented reconnect
-acknowledgment.
+through `c_scene_npc_create` at an explicitly local demonstration position by
+default; the opt-in demo-cast mode serializes Death Arms plus six additional
+verified NPC rows. The catalog contains 29 protocol-verified playable
+mappings; only All For One `h1039` and Best Jeanist `h1927` remain
+asset-only. The roster and NPC additions pass packet-level tests. The roster
+now tracks active card and active visible hero state for user-info,
+card-fight, bridge-fight, team-change, and area-event switch requests. Death
+Arms visibly rendered beside Midoriya, the active starter card state was
+accepted, and the map-marker guide step completed through the
+task/guide/base-station/world-task handlers in controlled on-device runs. The
+world map opens with visible markers after the city-level and open-map seed
+packets. The client still performs one initial ping-waiter reconnect, then
+remains stable through the implemented reconnect acknowledgment.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.

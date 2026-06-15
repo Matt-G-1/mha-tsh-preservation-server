@@ -95,11 +95,14 @@ environment details are intentionally omitted from Git.
   packet-tested against the recovered schemas. Team hero changes also emit a
   matching `c_scene_hero_change` for the active visible avatar.
 - The archived `npc_cfg` table verifies Death Arms at row `5007` with
-  `ShapeId=5007`. The server can emit it through `c_scene_npc_create` at a
-  clearly labeled local demonstration position near the player spawn.
+  `ShapeId=5007`; additional recovered NPC rows now verify Mei Hatsume,
+  Kamui Woods, Naomasa Tsukauchi, Mt. Lady, Shota Aizawa, and a U.A. Mei
+  Hatsume row.
 - Initial map-character emission now uses a typed spawn catalog, so future NPC
   rows and authored placements can be added without hardcoding each packet in
-  the scene-entry handler.
+  the scene-entry handler. The compatibility default still emits only Death
+  Arms, while the opt-in `demo_cast` spawn mode serializes all seven verified
+  demonstration NPCs for controlled testing.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
   packet flow, starter roster, map-character packet generation, and stateful
   guide/teach/base-station/task/client-stat/world-telemetry exchanges.
@@ -120,8 +123,9 @@ Current limitations:
    reconstructed. Guide, teach-finish, base-station, city-level, world-map
    seed, and first task-list/update/sync handlers exist, but a full
    quest/tutorial progression path is not.
-3. Death Arms' protocol row is proven, but the current nearby placement is a
-   local demonstration coordinate rather than an archived authored placement.
+3. Seven map/NPC protocol rows are proven, but the current nearby placements
+   are local demonstration coordinates rather than archived authored
+   placements.
 4. The client previously performed a periodic reconnect while reporting that it
    was waiting for `c_time_ping`. The reconnect acknowledgment restores the
    session, after which ping traffic remains stable, but the original waiter

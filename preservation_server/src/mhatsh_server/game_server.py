@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .characters import (
-    INITIAL_MAP_SPAWNS,
     STARTER_CHARACTER,
+    map_spawns,
     playable_roster,
     scene_npc_from_spawn,
 )
@@ -74,8 +74,9 @@ class GameServer:
             "MHATSH_SEND_MAP_CHARACTERS", "1"
         ).lower() not in {"0", "false", "no"}
         self.roster_mode = os.environ.get("MHATSH_ROSTER_MODE", "starter")
+        self.map_spawn_mode = os.environ.get("MHATSH_MAP_SPAWN_MODE", "starter")
         self.playable_roster = playable_roster(self.roster_mode)
-        self.map_spawns = INITIAL_MAP_SPAWNS
+        self.map_spawns = map_spawns(self.map_spawn_mode)
         self.ping_response_delay = max(
             0.0, float(os.environ.get("MHATSH_PING_RESPONSE_DELAY", "0.05"))
         )
