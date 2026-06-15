@@ -62,6 +62,9 @@ The clean-room server now supports:
   markers after the new world-task seed packets.
 - World-task compatibility acknowledgments for city-level click, reward-rate,
   auto-finish-tip preference, auto-finish, and prestige-pick requests.
+- Empty-state replies for the first surrounding activity/task panels:
+  stage-activity info, activity-shop info, entrust-task list, secret-area task,
+  USJ task, offline-PVP task, battlefield-task info, and group-map opening.
 - Movement, frame-stat, and client-error telemetry is retained in world-session
   state for live validation and future quest conditions.
 - Time-ping replies and login-level reconnect acknowledgment.

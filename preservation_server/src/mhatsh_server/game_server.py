@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from .activity_state import ActivityState
 from .characters import (
     STARTER_CHARACTER,
     map_spawns,
@@ -46,6 +47,7 @@ class Session:
     tasks: TaskState = field(default_factory=TaskState)
     world: WorldState = field(default_factory=WorldState)
     world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
+    activities: ActivityState = field(default_factory=ActivityState)
     roster: RosterState | None = None
 
 
@@ -411,6 +413,64 @@ class GameServer:
                 session,
                 "c_task_enter_stage",
                 session.tasks.enter_stage(int(values.get("IsEnter") or 0)),
+            )
+        elif name == "s_stage_activity_info":
+            await self._send(
+                writer,
+                session,
+                "c_stage_activity_info",
+                session.activities.stage_activity_info(),
+            )
+        elif name == "s_activity_shop_info":
+            await self._send(
+                writer,
+                session,
+                "c_activity_shop_info",
+                session.activities.activity_shop_info(
+                    int(values.get("ActType") or 0)
+                ),
+            )
+        elif name == "s_entrust_task_list":
+            await self._send(
+                writer,
+                session,
+                "c_entrust_task_list",
+                session.activities.entrust_task_list(),
+            )
+        elif name == "s_secret_area_task":
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_task",
+                session.activities.secret_area_task(),
+            )
+        elif name == "s_usj_task":
+            await self._send(
+                writer,
+                session,
+                "c_usj_task",
+                session.activities.usj_task(),
+            )
+        elif name == "s_offlinepvp_task":
+            await self._send(
+                writer,
+                session,
+                "c_offlinepvp_task",
+                session.activities.offlinepvp_task(),
+            )
+        elif name == "s_battlefield_task_info":
+            await self._send(
+                writer,
+                session,
+                "c_battlefield_task_info",
+                session.activities.battlefield_task_info(),
+            )
+        elif name == "s_group_open_map":
+            await self._send(
+                writer,
+                session,
+                "c_group_open_map",
+                session.activities.group_open_map(),
             )
         elif name == "s_scene_move":
             session.world.record_move(list(values.get("Path") or []))

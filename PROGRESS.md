@@ -63,6 +63,10 @@ environment details are intentionally omitted from Git.
   world-task reward-rate requests, auto-finish-tip preference changes,
   world-task auto-finish requests, and prestige reward picks through recovered
   packet schemas.
+- Empty-state compatibility handlers now cover the first surrounding
+  activity/task panels that can be reached from world UI probes:
+  stage-activity info, activity-shop info, entrust-task list, secret-area task,
+  USJ task, offline-PVP task, battlefield-task info, and group-map opening.
 - World-session telemetry now records player movement (`s_scene_move`),
   frame-stat heartbeats (`s_client_stat_frame`), and client error reports
   (`s_client_error`) without sending unsafe extra replies.
@@ -120,9 +124,10 @@ Current limitations:
    validated in controlled client runs. All For One `h1039` and Best Jeanist
    `h1927` still lack matching playable `hero_cfg` rows in the recovered table.
 2. The broader initial activity and quest-state packet set has not been
-   reconstructed. Guide, teach-finish, base-station, city-level, world-map
-   seed, and first task-list/update/sync handlers exist, but a full
-   quest/tutorial progression path is not.
+   fully reconstructed. Guide, teach-finish, base-station, city-level,
+   world-map seed, first task-list/update/sync handlers, and several
+   empty-state activity/task-panel replies exist, but a full quest/tutorial
+   progression path is not.
 3. Seven map/NPC protocol rows are proven, but the current nearby placements
    are local demonstration coordinates rather than archived authored
    placements.
@@ -143,7 +148,8 @@ Current limitations:
    starting from the packet-tested roster-state handlers.
 5. Reconstruct enough quest/activity state to complete the archived tutorial,
    starting from the stateful guide, teach-finish, starter-task, and
-   client-stat handlers.
+   client-stat handlers, then filling in real activity/task state where live
+   UI probes prove the client needs more than empty compatibility payloads.
 
 ## Known Wire IDs
 

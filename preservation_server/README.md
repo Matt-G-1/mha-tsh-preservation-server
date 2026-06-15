@@ -23,8 +23,9 @@ completion, a stateful seven-hero card roster, first-pass character selection
 responses, verified map NPC packet generation, guide-finish acknowledgment,
 teach-finish acknowledgment, base-station initialization, city/world-task map
 seed packets, starter task listing and updates, observed first-guide
-client-stat tracking, world-session movement/frame/error tracking, time-ping
-replies, and the login-level reconnect acknowledgment.
+client-stat tracking, empty-state replies for early activity/task panels,
+world-session movement/frame/error tracking, time-ping replies, and the
+login-level reconnect acknowledgment.
 Unknown client messages are decoded and logged for iterative compatibility
 work.
 
@@ -51,8 +52,11 @@ Arms visibly rendered beside Midoriya, the active starter card state was
 accepted, and the map-marker guide step completed through the
 task/guide/base-station/world-task handlers in controlled on-device runs. The
 world map opens with visible markers after the city-level and open-map seed
-packets. The client still performs one initial ping-waiter reconnect, then
-remains stable through the implemented reconnect acknowledgment.
+packets. The server now also answers several early side-panel/task requests
+with schema-correct empty state so new UI probes fail less abruptly while real
+quest data is reconstructed. The client still performs one initial
+ping-waiter reconnect, then remains stable through the implemented reconnect
+acknowledgment.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.

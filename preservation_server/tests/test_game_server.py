@@ -5,6 +5,7 @@ import struct
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+from mhatsh_server.activity_state import ActivityState
 from mhatsh_server.game_server import (
     STARTER_CARD_UID,
     STARTER_HERO_ID,
@@ -265,6 +266,29 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert stat_state.observe_client_stat(
         {"StatId": 2, "NumData": [0, STARTER_GUIDE_ID, STARTER_GUIDE_STEP]}
     ) is None
+
+
+def test_activity_state_returns_empty_compatibility_payloads() -> None:
+    state = ActivityState()
+
+    assert state.stage_activity_info() == {"ProgressInfo": []}
+    assert state.activity_shop_info(7) == {"BuyInfo": []}
+    assert state.activity_shop_info(7) == {"BuyInfo": []}
+    assert state.requested_activity_types == [7]
+    assert state.entrust_task_list() == {"Version": 1, "EntrustTaskData": []}
+    assert state.secret_area_task() == {"TaskList": []}
+    assert state.usj_task() == {"TaskList": []}
+    assert state.offlinepvp_task() == {"TaskList": []}
+    assert state.battlefield_task_info() == {
+        "IsFightOver": 0,
+        "IsGetDayReward": 0,
+        "IsGetWeekReward": 0,
+        "ReplaceTimes": 0,
+        "FreshenTime": 0,
+        "Tasks": [],
+    }
+    assert state.group_open_map() == {"MapAttackArea": []}
+    assert state.requested_group_maps == 1
 
 
 def test_world_state_records_movement_frames_and_errors() -> None:
@@ -1260,6 +1284,86 @@ async def _run_world_map_task_requests() -> None:
         "RandomReward": [],
         "RandomItem": 0,
     }
+
+
+def test_activity_and_side_task_requests_receive_empty_state_replies() -> None:
+    asyncio.run(_run_activity_and_side_task_requests())
+
+
+async def _run_activity_and_side_task_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x22446688),
+    )
+
+    request_cases = [
+        ("s_stage_activity_info", {}),
+        ("s_activity_shop_info", {"ActType": 17}),
+        ("s_entrust_task_list", {}),
+        ("s_secret_area_task", {}),
+        ("s_usj_task", {}),
+        ("s_offlinepvp_task", {}),
+        ("s_battlefield_task_info", {}),
+        ("s_group_open_map", {}),
+    ]
+
+    for request_name, request_values in request_cases:
+        await game._dispatch(
+            session,
+            registry.protocol_ids[request_name],
+            codec.encode_message(request_name, request_values),
+            writer,
+        )
+
+    decoder = FrameDecoder(RollingXor(0x22446688))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_activity_info",
+        "c_activity_shop_info",
+        "c_entrust_task_list",
+        "c_secret_area_task",
+        "c_usj_task",
+        "c_offlinepvp_task",
+        "c_battlefield_task_info",
+        "c_group_open_map",
+    ]
+    assert codec.decode_message("c_stage_activity_info", replies[0][1]) == {
+        "ProgressInfo": []
+    }
+    assert codec.decode_message("c_activity_shop_info", replies[1][1]) == {
+        "BuyInfo": []
+    }
+    assert codec.decode_message("c_entrust_task_list", replies[2][1]) == {
+        "Version": 1,
+        "EntrustTaskData": [],
+    }
+    assert codec.decode_message("c_secret_area_task", replies[3][1]) == {
+        "TaskList": []
+    }
+    assert codec.decode_message("c_usj_task", replies[4][1]) == {"TaskList": []}
+    assert codec.decode_message("c_offlinepvp_task", replies[5][1]) == {
+        "TaskList": []
+    }
+    assert codec.decode_message("c_battlefield_task_info", replies[6][1]) == {
+        "IsFightOver": 0,
+        "IsGetDayReward": 0,
+        "IsGetWeekReward": 0,
+        "ReplaceTimes": 0,
+        "FreshenTime": 0,
+        "Tasks": [],
+    }
+    assert codec.decode_message("c_group_open_map", replies[7][1]) == {
+        "MapAttackArea": []
+    }
+    assert session.activities.requested_activity_types == [17]
+    assert session.activities.requested_group_maps == 1
 
 
 async def _run_time_ping() -> None:
