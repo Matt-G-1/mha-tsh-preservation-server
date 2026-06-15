@@ -49,6 +49,17 @@ from mhatsh_server.world import ScenePosition, WorldState
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def roster_card(
+    character,
+    card_uid: int,
+    *,
+    fighting: int = 0,
+) -> dict[str, object]:
+    values = playable_card(character, card_uid)
+    values["Fighting"] = fighting
+    return values
+
+
 def test_starter_identity_matches_archived_midoriya_config() -> None:
     assert STARTER_HERO_ID == 1011
     assert STARTER_SHAPE_ID == 1001
@@ -405,7 +416,11 @@ async def _run_player_responses() -> None:
     assert codec.decode_message("c_card_seeinfo", reply_body) == {
         "Uid": 4242,
         "CardInfo": [
-            playable_card(character, STARTER_CARD_UID + index)
+            roster_card(
+                character,
+                STARTER_CARD_UID + index,
+                fighting=int(index == 0),
+            )
             for index, character in enumerate(INITIAL_PLAYABLE_ROSTER)
         ],
     }
@@ -476,12 +491,164 @@ async def _run_expanded_roster_cards() -> None:
     assert registry.protocol_names[reply_id] == "c_card_seeinfo"
     card_info = codec.decode_message("c_card_seeinfo", reply_body)["CardInfo"]
     assert card_info == [
-        playable_card(character, STARTER_CARD_UID + index)
+        roster_card(
+            character,
+            STARTER_CARD_UID + index,
+            fighting=int(index == 0),
+        )
         for index, character in enumerate(VERIFIED_PLAYABLE_ROSTER)
     ]
     assert len(card_info) == 29
     assert card_info[0]["HeroId"] == STARTER_HERO_ID
     assert card_info[0]["ShapeId"] == STARTER_SHAPE_ID
+
+
+def test_character_roster_requests_are_stateful() -> None:
+    asyncio.run(_run_character_roster_requests())
+
+
+async def _run_character_roster_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x11223344),
+        uid=4242,
+    )
+
+    userinfo_heros = codec.encode_message(
+        "s_userinfo_heros",
+        {"Cid": [STARTER_HERO_ID, 9999, 1021]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_userinfo_heros"],
+        userinfo_heros,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x11223344))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_userinfo_hero_set"
+    assert codec.decode_message("c_userinfo_hero_set", reply_body) == {
+        "Heros": [STARTER_HERO_ID, 1021]
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x22334455)
+    card_fight = codec.encode_message(
+        "s_card_go_to_fight",
+        {"CardUid": STARTER_CARD_UID + 1, "IsShow": 1},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_card_go_to_fight"],
+        card_fight,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x22334455))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_card_go_to_fight"
+    assert codec.decode_message("c_card_go_to_fight", reply_body) == {
+        "CardUid": STARTER_CARD_UID + 1,
+        "IsShow": 1,
+    }
+    assert session.roster is not None
+    assert session.roster.active_hero_id == 1021
+    assert session.roster.active_shape_id == 1002
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x2A3B4C5D)
+    bridge_fight = codec.encode_message(
+        "s_card_go_to_bridge_fight",
+        {"HeroUid": STARTER_CARD_UID + 2},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_card_go_to_bridge_fight"],
+        bridge_fight,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x2A3B4C5D))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_card_go_to_bridge_fight"
+    assert codec.decode_message("c_card_go_to_bridge_fight", reply_body) == {
+        "HeroUid": STARTER_CARD_UID + 2
+    }
+    assert session.roster.active_hero_id == 1061
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x33445566)
+    team_change = codec.encode_message("s_team_change_hero", {"HeroId": 1061})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_team_change_hero"],
+        team_change,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x33445566))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_team_change_hero",
+        "c_scene_hero_change",
+    ]
+    assert codec.decode_message("c_team_change_hero", replies[0][1]) == {
+        "UserUId": 4242,
+        "HeroId": 1061,
+        "Fighting": 1,
+        "Vitality": 100,
+        "ShapeId": 1006,
+        "MLv": 1,
+    }
+    assert codec.decode_message("c_scene_hero_change", replies[1][1]) == {
+        "Uid": 4242,
+        "ShowHeroId": 1061,
+        "ShapeCacheId": 0,
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x44556677)
+    team_play = codec.encode_message(
+        "s_team_change_play",
+        {"PlayId": 7, "Extra": [11, 22]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_team_change_play"],
+        team_play,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x44556677))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_team_change_play"
+    assert codec.decode_message("c_team_change_play", reply_body) == {
+        "PlayId": 7,
+        "Extra": [{"Key": "1", "Val": 11}, {"Key": "2", "Val": 22}],
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55667788)
+    area_switch = codec.encode_message(
+        "s_area_event_switch_hero",
+        {"HeroUId": STARTER_CARD_UID + 3},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_area_event_switch_hero"],
+        area_switch,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55667788))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_area_event_switch_hero"
+    assert codec.decode_message("c_area_event_switch_hero", reply_body) == {
+        "ControlId": STARTER_CARD_UID + 3
+    }
+    assert session.roster.active_hero_id == 1071
 
 
 def test_scene_load_completion_response() -> None:

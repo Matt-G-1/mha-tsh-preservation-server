@@ -19,12 +19,13 @@ The original APK and OBB files are treated as read-only evidence.
 The TCP service implements the native five-byte seed handshake, rolling XOR,
 frame checksum, schema-driven payload codec, version/account responses, player
 creation response, login-check response, initial user/scene packets, scene-load
-completion, a seven-hero card roster, one verified map NPC, guide-finish
-acknowledgment, teach-finish acknowledgment, base-station initialization,
-starter task listing and updates, observed first-guide client-stat tracking,
-world-session movement/frame/error tracking, time-ping replies, and the
-login-level reconnect acknowledgment. Unknown client messages are decoded and
-logged for iterative compatibility work.
+completion, a stateful seven-hero card roster, first-pass character selection
+responses, one verified map NPC, guide-finish acknowledgment, teach-finish
+acknowledgment, base-station initialization, starter task listing and updates,
+observed first-guide client-stat tracking, world-session movement/frame/error
+tracking, time-ping replies, and the login-level reconnect acknowledgment.
+Unknown client messages are decoded and logged for iterative compatibility
+work.
 
 By default, the server advertises a minimal local role so the archived client
 constructs its required `clsUserData` record before `c_login_ok`. Set
@@ -40,10 +41,11 @@ Midoriya, Bakugo, Iida, Ochaco, Todoroki, Momo, and Denki. Death Arms is sent
 through `c_scene_npc_create` at an explicitly local demonstration position.
 The catalog contains 29 protocol-verified playable mappings; only All For One
 `h1039` and Best Jeanist `h1927` remain asset-only. The roster and NPC
-additions pass packet-level tests and were accepted in controlled on-device run
-`v45`; Death Arms visibly rendered beside Midoriya. The client still performs
-one initial ping-waiter reconnect, then remains stable through the implemented
-reconnect acknowledgment.
+additions pass packet-level tests. The roster now tracks active card and active
+visible hero state for user-info, card-fight, bridge-fight, team-change, and
+area-event switch requests. Death Arms visibly rendered beside Midoriya in a
+controlled on-device run. The client still performs one initial ping-waiter
+reconnect, then remains stable through the implemented reconnect acknowledgment.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.

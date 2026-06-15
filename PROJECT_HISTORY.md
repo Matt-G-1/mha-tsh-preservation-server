@@ -45,6 +45,10 @@ The clean-room server now supports:
 - Honei Urban Area scene entry.
 - Scene-load completion acknowledgment.
 - Starter owned-card inventory.
+- Session-level roster state for active card, active hero, and active shape.
+- Hero-list, card fight, bridge-card fight, team-hero, team-play, and
+  area-event hero-switch responses grounded on recovered schemas.
+- Scene visible-hero updates after team hero changes.
 - Guide-finish and base-station replies sufficient to open the world quest map.
 - Stateful guide, teach-finish, and base-station tracking for the first
   tutorial-practice exchanges.
@@ -79,7 +83,8 @@ The next build series is focused on characters and tutorial completion:
 
 1. Keep the starter roster stable as the default compatibility path.
 2. Add an opt-in expanded roster for protocol-verified playable characters.
-3. Add tests for expanded card serialization and active-avatar stability.
+3. Add tests for expanded card serialization, active-avatar stability, and
+   the first playable character-selection packet family.
 4. Expand map-character support using recovered NPC rows and sanitized
    placement metadata.
 5. Reconstruct enough quest/activity state to complete the archived tutorial,

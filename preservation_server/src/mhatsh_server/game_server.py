@@ -13,11 +13,11 @@ from typing import Any
 from .characters import (
     INITIAL_MAP_SPAWNS,
     STARTER_CHARACTER,
-    playable_card,
     playable_roster,
     scene_npc_from_spawn,
 )
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
+from .roster import RosterState
 from .schema import SchemaRegistry
 from .tasks import TaskState
 from .tutorial import TutorialState
@@ -44,6 +44,7 @@ class Session:
     tutorial: TutorialState = field(default_factory=TutorialState)
     tasks: TaskState = field(default_factory=TaskState)
     world: WorldState = field(default_factory=WorldState)
+    roster: RosterState | None = None
 
 
 class GameServer:
@@ -238,6 +239,84 @@ class GameServer:
                     int(values.get("iClientVersion") or 0)
                 ),
             )
+        elif name == "s_userinfo_heros":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_hero_set",
+                {"Heros": roster.hero_set(list(values.get("Cid") or []))},
+            )
+        elif name == "s_card_go_to_fight":
+            roster = self._ensure_roster(session)
+            try:
+                response = roster.card_fight_response(
+                    int(values.get("CardUid") or 0),
+                    int(values.get("IsShow") or 0),
+                )
+            except KeyError:
+                response = {
+                    "CardUid": roster.active_card_uid,
+                    "IsShow": roster.active_show,
+                }
+            await self._send(writer, session, "c_card_go_to_fight", response)
+        elif name == "s_card_go_to_bridge_fight":
+            roster = self._ensure_roster(session)
+            try:
+                response = roster.card_fight_response(
+                    int(values.get("HeroUid") or 0),
+                    1,
+                )
+            except KeyError:
+                response = {
+                    "CardUid": roster.active_card_uid,
+                    "IsShow": roster.active_show,
+                }
+            await self._send(
+                writer,
+                session,
+                "c_card_go_to_bridge_fight",
+                {"HeroUid": response["CardUid"]},
+            )
+        elif name == "s_team_change_hero":
+            roster = self._ensure_roster(session)
+            try:
+                team_response = roster.team_hero_response(
+                    session.uid,
+                    int(values.get("HeroId") or 0),
+                )
+            except KeyError:
+                team_response = roster.team_hero_response(
+                    session.uid,
+                    roster.active_hero_id,
+                )
+            await self._send(writer, session, "c_team_change_hero", team_response)
+            await self._send(
+                writer,
+                session,
+                "c_scene_hero_change",
+                roster.scene_hero_change(session.uid),
+            )
+        elif name == "s_team_change_play":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_team_change_play",
+                roster.team_play_response(
+                    int(values.get("PlayId") or 0),
+                    [int(item) for item in list(values.get("Extra") or [])],
+                ),
+            )
+        elif name == "s_area_event_switch_hero":
+            roster = self._ensure_roster(session)
+            try:
+                response = roster.area_event_switch_response(
+                    int(values.get("HeroUId") or 0)
+                )
+            except KeyError:
+                response = {"ControlId": roster.active_card_uid}
+            await self._send(writer, session, "c_area_event_switch_hero", response)
         elif name == "s_task_get_tasklist_bytype":
             await self._send(
                 writer,
@@ -343,6 +422,7 @@ class GameServer:
     async def _send_initial_user(
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
+        roster = self._ensure_roster(session)
         await self._send(
             writer,
             session,
@@ -355,22 +435,22 @@ class GameServer:
                     "TopLevel": 0,
                     "Gold": 0,
                     "BindGold": 0,
-                    "HeroId": STARTER_HERO_ID,
-                    "CardUid": STARTER_CARD_UID,
+                    "HeroId": roster.active_hero_id,
+                    "CardUid": roster.active_card_uid,
                     "Fighting": 0,
                     "ReNameTimes": 0,
                     "FirstRename": 0,
                     "TotalLoginDays": 1,
                     "PayZoneId": 1,
                     "CreateTime": int(time.time()),
-                    "ShowHeroId": STARTER_HERO_ID,
+                    "ShowHeroId": roster.active_hero_id,
                 },
-                "shape": STARTER_SHAPE_ID,
+                "shape": roster.active_shape_id,
                 "attach": [],
                 "shape_cache_id": 0,
                 "version": 1,
                 "operator": 0,
-                "ShowShapeId": STARTER_SHAPE_ID,
+                "ShowShapeId": roster.active_shape_id,
                 "ShowShapeCacheId": 0,
             },
         )
@@ -378,6 +458,7 @@ class GameServer:
     async def _send_initial_scene(
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
+        roster = self._ensure_roster(session)
         await self._send(
             writer,
             session,
@@ -388,7 +469,7 @@ class GameServer:
                 "Name": "Local Hero",
                 "Level": 1,
                 "TopLevel": 0,
-                "ShowHeroId": STARTER_HERO_ID,
+                "ShowHeroId": roster.active_hero_id,
                 "LeagueId": 0,
                 "LeagueName": "",
                 "TitleId": 0,
@@ -432,18 +513,24 @@ class GameServer:
     async def _send_initial_cards(
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
+        roster = self._ensure_roster(session)
         await self._send(
             writer,
             session,
             "c_card_seeinfo",
             {
                 "Uid": session.uid,
-                "CardInfo": [
-                    playable_card(character, STARTER_CARD_UID + index)
-                    for index, character in enumerate(self.playable_roster)
-                ],
+                "CardInfo": roster.card_info(),
             },
         )
+
+    def _ensure_roster(self, session: Session) -> RosterState:
+        if session.roster is None:
+            session.roster = RosterState(
+                self.playable_roster,
+                first_card_uid=STARTER_CARD_UID,
+            )
+        return session.roster
 
     async def _send(
         self,

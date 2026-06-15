@@ -67,10 +67,19 @@ environment details are intentionally omitted from Git.
 - The recovered tables correct two tentative names in the supplied list:
   `h1032` is Mirio Togata, and `h1998` is an All Might variant.
 - The initial `c_card_seeinfo` roster contains a validated starter set while
-  Midoriya remains the active world avatar.
+  Midoriya remains the active world avatar. The first owned card is now marked
+  as the active fighting card in the serialized roster state.
 - An opt-in expanded roster path serializes all 29 protocol-verified playable
   characters in `c_card_seeinfo` while preserving Midoriya as the first active
   card.
+- The server now keeps a session-level playable roster state and answers the
+  first character-selection packet family:
+  `s_userinfo_heros`, `s_card_go_to_fight`, `s_card_go_to_bridge_fight`,
+  `s_team_change_hero`, `s_team_change_play`, and
+  `s_area_event_switch_hero`.
+- Card, bridge-card, team-hero, team-play, and area-event switch requests are
+  packet-tested against the recovered schemas. Team hero changes also emit a
+  matching `c_scene_hero_change` for the active visible avatar.
 - The archived `npc_cfg` table verifies Death Arms at row `5007` with
   `ShapeId=5007`. The server can emit it through `c_scene_npc_create` at a
   clearly labeled local demonstration position near the player spawn.
@@ -90,9 +99,9 @@ Current limitations:
 
 1. Twenty-nine playable mappings are cataloged and packet-tested through the
    expanded roster path. The default emitted starter roster is still
-   intentionally conservative until larger card sets are validated in
-   controlled client runs. All For One `h1039` and Best Jeanist `h1927` still
-   lack matching playable `hero_cfg` rows in the recovered table.
+   intentionally conservative until larger card sets and switch flows are
+   validated in controlled client runs. All For One `h1039` and Best Jeanist
+   `h1927` still lack matching playable `hero_cfg` rows in the recovered table.
 2. The broader initial activity and quest-state packet set has not been
    reconstructed. Guide, teach-finish, and base-station exchanges are now
    stateful, and the first task-list/update/sync handlers exist, but a full
@@ -112,7 +121,8 @@ Current limitations:
 1. Keep the validated starter roster as the compatibility default.
 2. Validate the expanded 29-character roster in a controlled client run.
 3. Add more verified NPC rows and sanitized authored-placement metadata.
-4. Validate character selection and avatar swapping in controlled client runs.
+4. Validate character selection and avatar swapping in controlled client runs,
+   starting from the packet-tested roster-state handlers.
 5. Reconstruct enough quest/activity state to complete the archived tutorial,
    starting from the stateful guide, teach-finish, starter-task, and
    client-stat handlers.
@@ -126,29 +136,41 @@ The recovered CSV IDs are one greater than the actual wire IDs.
 | `s_login_version` | 1 |
 | `s_login_reconnect` | 2 |
 | `c_login_version` | 3 |
-| `s_guide_finish` | 38 |
 | `c_data_begin` | 5 |
 | `c_data_fragment` | 6 |
 | `c_data_end` | 7 |
 | `c_chunk` | 8 |
+| `s_guide_finish` | 38 |
+| `c_team_change_hero` | 142 |
 | `c_time_ping` | 215 |
-| `c_base_station_all_info` | 573 |
 | `s_login_account_enter` | 275 |
+| `c_userinfo_hero_set` | 350 |
+| `c_card_go_to_fight` | 390 |
 | `s_login_player_enter` | 465 |
 | `c_reconnect_flag` | 502 |
+| `c_base_station_all_info` | 573 |
+| `s_card_go_to_fight` | 617 |
 | `c_login_player_info` | 654 |
+| `s_userinfo_heros` | 744 |
 | `c_card_seeinfo` | 780 |
+| `s_team_change_play` | 805 |
 | `s_scene_enter_end` | 879 |
+| `s_area_event_switch_hero` | 903 |
 | `s_time_ping` | 989 |
 | `s_login_player_add` | 1008 |
+| `c_card_go_to_bridge_fight` | 1036 |
 | `c_scene_enter_end` | 1077 |
 | `c_login_checkstr` | 1138 |
 | `c_guide_finish` | 1214 |
+| `s_card_go_to_bridge_fight` | 1276 |
 | `c_scene_npc_create` | 1292 |
+| `c_team_change_play` | 1297 |
 | `c_scene_enter` | 1369 |
 | `c_login_account_info` | 1378 |
+| `c_area_event_switch_hero` | 1419 |
 | `c_data_merge_to` | 1564 |
 | `c_scene_player_info` | 1569 |
+| `c_scene_hero_change` | 1644 |
 
 ## Client Record
 
