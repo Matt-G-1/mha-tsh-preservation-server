@@ -11,11 +11,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from .characters import (
-    DEATH_ARMS,
+    INITIAL_MAP_SPAWNS,
     STARTER_CHARACTER,
     playable_card,
     playable_roster,
-    scene_npc,
+    scene_npc_from_spawn,
 )
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .schema import SchemaRegistry
@@ -30,13 +30,6 @@ STARTER_SCENE_ID = 1000
 STARTER_SCENE_X = 4221
 STARTER_SCENE_Y = 19931
 STARTER_SCENE_Z = 0
-DEATH_ARMS_UID = 20001
-# This is a local demonstration position, not a recovered authored placement.
-DEATH_ARMS_DEMO_X = STARTER_SCENE_X + 200
-DEATH_ARMS_DEMO_Y = STARTER_SCENE_Y
-DEATH_ARMS_DEMO_Z = STARTER_SCENE_Z
-
-
 @dataclass(slots=True)
 class Session:
     seed: int
@@ -73,6 +66,7 @@ class GameServer:
         ).lower() not in {"0", "false", "no"}
         self.roster_mode = os.environ.get("MHATSH_ROSTER_MODE", "starter")
         self.playable_roster = playable_roster(self.roster_mode)
+        self.map_spawns = INITIAL_MAP_SPAWNS
         self.ping_response_delay = max(
             0.0, float(os.environ.get("MHATSH_PING_RESPONSE_DELAY", "0.05"))
         )
@@ -336,14 +330,8 @@ class GameServer:
                 "c_scene_npc_create",
                 {
                     "NpcList": [
-                        scene_npc(
-                            DEATH_ARMS,
-                            uid=DEATH_ARMS_UID,
-                            x=DEATH_ARMS_DEMO_X,
-                            y=DEATH_ARMS_DEMO_Y,
-                            z=DEATH_ARMS_DEMO_Z,
-                            face=180,
-                        )
+                        scene_npc_from_spawn(spawn)
+                        for spawn in self.map_spawns
                     ]
                 },
             )

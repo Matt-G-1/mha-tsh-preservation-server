@@ -62,6 +62,9 @@ environment details are intentionally omitted from Git.
 - The archived `npc_cfg` table verifies Death Arms at row `5007` with
   `ShapeId=5007`. The server can emit it through `c_scene_npc_create` at a
   clearly labeled local demonstration position near the player spawn.
+- Initial map-character emission now uses a typed spawn catalog, so future NPC
+  rows and authored placements can be added without hardcoding each packet in
+  the scene-entry handler.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
   packet flow, starter roster, and map-character packet generation.
 
@@ -93,8 +96,7 @@ Current limitations:
 
 1. Keep the validated starter roster as the compatibility default.
 2. Validate the expanded 29-character roster in a controlled client run.
-3. Add map-character placement metadata in a sanitized form, starting with
-   verified NPC rows before authored map placements.
+3. Add more verified NPC rows and sanitized authored-placement metadata.
 4. Validate character selection and avatar swapping in controlled client runs.
 5. Reconstruct enough quest/activity state to complete the archived tutorial.
 

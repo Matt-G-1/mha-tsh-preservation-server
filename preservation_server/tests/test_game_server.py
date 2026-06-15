@@ -6,10 +6,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from mhatsh_server.game_server import (
-    DEATH_ARMS_DEMO_X,
-    DEATH_ARMS_DEMO_Y,
-    DEATH_ARMS_DEMO_Z,
-    DEATH_ARMS_UID,
     STARTER_CARD_UID,
     STARTER_HERO_ID,
     STARTER_SCENE_ID,
@@ -24,6 +20,8 @@ from mhatsh_server.characters import (
     CATALOG_SOURCE,
     CHIBI_MODEL_ASSETS,
     DEATH_ARMS,
+    DEATH_ARMS_DEMO_SPAWN,
+    INITIAL_MAP_SPAWNS,
     INITIAL_PLAYABLE_ROSTER,
     MAP_CHARACTERS,
     PLAYABLE_CHARACTERS,
@@ -32,6 +30,7 @@ from mhatsh_server.characters import (
     playable_card,
     playable_roster,
     scene_npc,
+    scene_npc_from_spawn,
 )
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
 from mhatsh_server.schema import SchemaRegistry
@@ -79,6 +78,15 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert MAP_CHARACTERS[5007].is_spawn_verified
 
 
+def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
+    assert INITIAL_MAP_SPAWNS == (DEATH_ARMS_DEMO_SPAWN,)
+    assert DEATH_ARMS_DEMO_SPAWN.label == "death_arms_demo_near_honei_spawn"
+    assert DEATH_ARMS_DEMO_SPAWN.character == DEATH_ARMS
+    assert DEATH_ARMS_DEMO_SPAWN.uid == 20001
+    assert DEATH_ARMS_DEMO_SPAWN.face == 180
+    assert not DEATH_ARMS_DEMO_SPAWN.is_authored_placement
+
+
 def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
     assert playable_roster() == INITIAL_PLAYABLE_ROSTER
     assert playable_roster("starter") == INITIAL_PLAYABLE_ROSTER
@@ -99,7 +107,7 @@ def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
 
 
 def test_death_arms_scene_npc_uses_verified_protocol_row() -> None:
-    assert scene_npc(DEATH_ARMS, uid=20001, x=1, y=2) == {
+    expected = {
         "Uid": 20001,
         "Id": 5007,
         "X": 1,
@@ -114,6 +122,13 @@ def test_death_arms_scene_npc_uses_verified_protocol_row() -> None:
         "StartAnim": "",
         "BTName": "",
         "ForceShow": 0,
+    }
+    assert scene_npc(DEATH_ARMS, uid=20001, x=1, y=2) == expected
+    assert scene_npc_from_spawn(DEATH_ARMS_DEMO_SPAWN) == {
+        **expected,
+        "X": DEATH_ARMS_DEMO_SPAWN.x,
+        "Y": DEATH_ARMS_DEMO_SPAWN.y,
+        "Face": DEATH_ARMS_DEMO_SPAWN.face,
     }
 
 
@@ -298,16 +313,7 @@ async def _run_player_responses() -> None:
     }
     reply_id, reply_body = replies[5]
     assert codec.decode_message("c_scene_npc_create", reply_body) == {
-        "NpcList": [
-            scene_npc(
-                DEATH_ARMS,
-                uid=DEATH_ARMS_UID,
-                x=DEATH_ARMS_DEMO_X,
-                y=DEATH_ARMS_DEMO_Y,
-                z=DEATH_ARMS_DEMO_Z,
-                face=180,
-            )
-        ]
+        "NpcList": [scene_npc_from_spawn(spawn) for spawn in INITIAL_MAP_SPAWNS]
     }
     reply_id, reply_body = replies[6]
     assert codec.decode_message("c_data_merge_to", reply_body) == {

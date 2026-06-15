@@ -29,6 +29,19 @@ class MapCharacter:
         return self.npc_id is not None
 
 
+@dataclass(frozen=True, slots=True)
+class MapSpawn:
+    label: str
+    character: MapCharacter
+    uid: int
+    x: int
+    y: int
+    z: int = 0
+    face: int = 0
+    area_id: int = 0
+    is_authored_placement: bool = False
+
+
 PLAYABLE_CHARACTERS = {
     model_id: PlayableCharacter(name, model_id)
     for model_id, name in {
@@ -183,6 +196,16 @@ MAP_CHARACTERS[5007] = MapCharacter(
     npc_id=5007,
 )
 DEATH_ARMS = MAP_CHARACTERS[5007]
+DEATH_ARMS_DEMO_SPAWN = MapSpawn(
+    label="death_arms_demo_near_honei_spawn",
+    character=DEATH_ARMS,
+    uid=20001,
+    x=4421,
+    y=19931,
+    z=0,
+    face=180,
+)
+INITIAL_MAP_SPAWNS = (DEATH_ARMS_DEMO_SPAWN,)
 
 
 CHIBI_MODEL_ASSETS = {
@@ -248,3 +271,15 @@ def scene_npc(
         "BTName": "",
         "ForceShow": 0,
     }
+
+
+def scene_npc_from_spawn(spawn: MapSpawn) -> dict[str, object]:
+    return scene_npc(
+        spawn.character,
+        uid=spawn.uid,
+        x=spawn.x,
+        y=spawn.y,
+        z=spawn.z,
+        face=spawn.face,
+        area_id=spawn.area_id,
+    )
