@@ -70,6 +70,9 @@ environment details are intentionally omitted from Git.
 - World-session telemetry now records player movement (`s_scene_move`),
   frame-stat heartbeats (`s_client_stat_frame`), and client error reports
   (`s_client_error`) without sending unsafe extra replies.
+- Unhandled decoded client messages are retained in the session world state,
+  giving controlled live runs a concrete protocol to-do list without sending
+  speculative responses.
 - The world HUD, minimap, controls, tutorial prompt, and local ping indicator
   render on-device during controlled testing.
 - `s_time_ping` receives an echoed `c_time_ping` response.

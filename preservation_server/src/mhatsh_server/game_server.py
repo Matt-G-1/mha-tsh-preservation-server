@@ -626,6 +626,9 @@ class GameServer:
                     "ServerTime": int(time.time()),
                 },
             )
+        else:
+            session.world.record_unhandled_message(name, protocol_id, values)
+            LOG.warning("unhandled %d %s %s", protocol_id, name, rendered)
 
     def _apply_verify_identity(self, session: Session, raw_verify: Any) -> None:
         if not isinstance(raw_verify, str):

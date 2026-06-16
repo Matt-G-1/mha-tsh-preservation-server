@@ -334,6 +334,11 @@ def test_world_state_records_movement_frames_and_errors() -> None:
     state.record_client_error("local-guest:wait[c_time_ping]")
     assert state.client_errors == ["local-guest:wait[c_time_ping]"]
 
+    state.record_unhandled_message("s_future_probe", 9999, {"Value": 1})
+    assert state.unhandled_messages == [
+        {"Name": "s_future_probe", "ProtocolId": 9999, "Values": {"Value": 1}}
+    ]
+
 
 def test_version_and_account_login_exchange() -> None:
     asyncio.run(_run_login_exchange())
@@ -1333,6 +1338,12 @@ async def _run_world_telemetry() -> None:
     )
     assert writer.data == bytearray()
     assert session.world.client_errors == ["wait[c_time_ping]"]
+
+    await game._dispatch(session, 9999, b"", writer)
+    assert writer.data == bytearray()
+    assert session.world.unhandled_messages == [
+        {"Name": "unknown_9999", "ProtocolId": 9999, "Values": {}}
+    ]
 
 
 async def _run_task_requests() -> None:

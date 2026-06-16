@@ -42,6 +42,7 @@ class WorldState:
         self.move_count = 0
         self.frame_stats: list[ClientFrameStat] = []
         self.client_errors: list[str] = []
+        self.unhandled_messages: list[dict[str, object]] = []
 
     def record_move(self, path: list[dict[str, object]]) -> ScenePosition | None:
         if not path:
@@ -64,3 +65,10 @@ class WorldState:
 
     def record_client_error(self, message: str) -> None:
         self.client_errors.append(message)
+
+    def record_unhandled_message(
+        self, name: str, protocol_id: int, values: dict[str, object]
+    ) -> None:
+        self.unhandled_messages.append(
+            {"Name": name, "ProtocolId": protocol_id, "Values": values}
+        )
