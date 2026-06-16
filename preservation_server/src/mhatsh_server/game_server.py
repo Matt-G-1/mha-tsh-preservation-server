@@ -119,6 +119,9 @@ class GameServer:
         self.intro_stage_drama = int(
             os.environ.get("MHATSH_INTRO_STAGE_DRAMA", STARTER_INTRO_STAGE_DRAMA)
         )
+        self.intro_stage_trigger = os.environ.get(
+            "MHATSH_INTRO_STAGE_TRIGGER", "task_enter"
+        ).lower()
         self.stage_report_response = os.environ.get(
             "MHATSH_STAGE_REPORT_RESPONSE", "record"
         ).lower()
@@ -259,6 +262,10 @@ class GameServer:
                     and session.tasks.should_spawn_beginner_npc(STARTER_TASK_ID)
                 ):
                     await self._send_beginner_npc(writer, session)
+                if int(guide_id) == STARTER_TASK_ID:
+                    await self._maybe_send_starter_intro_stage(
+                        writer, session, "starter_guide"
+                    )
                 task_update = session.tasks.complete_guide(int(guide_id))
                 if task_update is not None:
                     await self._send_task_progression(
@@ -280,6 +287,10 @@ class GameServer:
             ) and session.tasks.should_spawn_beginner_npc(STARTER_TASK_ID)
             if should_spawn_beginner_npc:
                 await self._send_beginner_npc(writer, session)
+            if self._is_starter_guide_stat(stat):
+                await self._maybe_send_starter_intro_stage(
+                    writer, session, "starter_guide"
+                )
             task_update = session.tasks.observe_client_stat(stat)
             if task_update is not None:
                 await self._send_task_progression(writer, session, task_update)
@@ -603,8 +614,10 @@ class GameServer:
                 "c_task_enter_stage",
                 session.tasks.enter_stage(int(values.get("IsEnter") or 0)),
             )
-            if self.intro_stage_enabled and int(values.get("IsEnter") or 0):
-                await self._send_starter_intro_stage(writer, session)
+            if int(values.get("IsEnter") or 0):
+                await self._maybe_send_starter_intro_stage(
+                    writer, session, "task_enter"
+                )
         elif name == "s_stage_finish_loading":
             await self._send(
                 writer,
@@ -926,6 +939,15 @@ class GameServer:
                 drama=self.intro_stage_drama,
             ),
         )
+
+    async def _maybe_send_starter_intro_stage(
+        self, writer: asyncio.StreamWriter, session: Session, trigger: str
+    ) -> None:
+        if not self.intro_stage_enabled or self.intro_stage_trigger != trigger:
+            return
+        if session.stage.current_stage_id == self.intro_stage_id:
+            return
+        await self._send_starter_intro_stage(writer, session)
 
     async def _send(
         self,

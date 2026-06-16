@@ -69,8 +69,10 @@ then remains stable through the implemented reconnect acknowledgment.
 
 Set `MHATSH_INTRO_STAGE_MODE=starter` for controlled testing of the current
 starter-intro battle candidate. This sends `c_stage_enter` for candidate stage
-`299301` with drama enabled after the client asks to enter a starter task
-stage. The default remains disabled until the candidate is validated on-device.
+`299301` with drama enabled. By default it waits for a task-stage request; set
+`MHATSH_INTRO_STAGE_TRIGGER=starter_guide` to probe from the observed guide
+`1301` completion telemetry instead. The default remains disabled until the
+candidate is validated on-device.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.

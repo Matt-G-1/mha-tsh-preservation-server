@@ -140,6 +140,10 @@ environment details are intentionally omitted from Git.
   The strongest current starter-battle candidate is the `zx_battle*` /
   `zx_lvb_*` cluster around stage-like ID `299301`; the server now has an
   opt-in `c_stage_enter` probe for this path via `MHATSH_INTRO_STAGE_MODE`.
+- Live testing showed the current starter-map route does not send
+  `s_task_enter_stage`; it completes guide `1301` through `s_client_stat` and
+  `s_guide_finish`. The intro-stage probe can therefore be configured to fire
+  on the starter-guide signal with `MHATSH_INTRO_STAGE_TRIGGER=starter_guide`.
 - Stage lifecycle handling now covers `s_stage_finish_loading` with
   `c_stage_finish_loading`, records `s_stage_report`, and can optionally emit
   empty drop/result/end packets for controlled post-battle testing.

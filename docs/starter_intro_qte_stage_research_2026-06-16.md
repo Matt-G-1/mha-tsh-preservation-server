@@ -46,13 +46,19 @@ own intro drama/QTE/battle scripts.
 ## Implemented Probe Defaults
 
 - `MHATSH_INTRO_STAGE_MODE=starter` enables the probe.
+- `MHATSH_INTRO_STAGE_TRIGGER` defaults to `task_enter`; use `starter_guide`
+  to send the candidate stage when guide `1301` completion telemetry appears.
 - `MHATSH_INTRO_STAGE_ID` defaults to `299301`.
 - `MHATSH_INTRO_STAGE_UID` defaults to `2993010001`.
 - `MHATSH_INTRO_STAGE_DRAMA` defaults to `1`.
 - `MHATSH_STAGE_REPORT_RESPONSE=record` records reports without immediately
   ending the stage. Use `complete` only when testing post-battle completion.
 
+The first controlled run after adding the task-enter probe reached the starter
+city and completed guide `1301`, but the client did not send
+`s_task_enter_stage`; it used `s_client_stat` and `s_guide_finish` for that
+route. The `starter_guide` trigger was added from that live evidence.
+
 These defaults are a candidate, not a final claim. Controlled on-device testing
 must confirm whether `299301` displays the expected intro/QTE/All Might battle
 or whether the next candidate stage should be tried.
-

@@ -1377,6 +1377,10 @@ def test_stage_loading_and_report_lifecycle_packets() -> None:
     asyncio.run(_run_stage_lifecycle_packets())
 
 
+def test_starter_guide_can_trigger_intro_stage_probe() -> None:
+    asyncio.run(_run_starter_guide_intro_stage_probe())
+
+
 def test_world_telemetry_packets_update_session_without_reply() -> None:
     asyncio.run(_run_world_telemetry())
 
@@ -1683,6 +1687,66 @@ async def _run_stage_lifecycle_packets() -> None:
 
     assert writer.data == bytearray()
     assert session.stage.reports == [{}]
+
+
+async def _run_starter_guide_intro_stage_probe() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    game.intro_stage_enabled = True
+    game.intro_stage_trigger = "starter_guide"
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x3344AABB),
+    )
+    stat = codec.encode_message(
+        "s_client_stat",
+        {"StatId": 2, "NumData": [1, 1301, 10011], "StrData": ["", ""]},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_client_stat"],
+        stat,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x3344AABB))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_scene_npc_create",
+        "c_stage_enter",
+        "c_task_info_update",
+        "c_city_level_add_exp",
+        "c_city_level_up",
+        "c_city_level_info",
+        "c_world_task_info",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == (
+        STARTER_INTRO_STAGE_ID
+    )
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x3344AACC)
+    guide_finish = codec.encode_message(
+        "s_guide_finish",
+        {"setIdList": [9], "guideIdList": [STARTER_GUIDE_ID]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_guide_finish"],
+        guide_finish,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x3344AACC))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_guide_finish"
+    ]
 
 
 async def _run_login_drama_packets() -> None:
