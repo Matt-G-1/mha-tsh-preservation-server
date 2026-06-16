@@ -31,6 +31,21 @@ def test_existing_player_mode_advertises_local_player() -> None:
     assert server_list["data"]["srv_list"][0]["player_list"] == [player]
 
 
+def test_health_response_exposes_bootstrap_mode() -> None:
+    server = BootstrapServer("192.0.2.10", 19000, has_player=True)
+    payload = json.loads(server.response_for("/health"))
+
+    assert payload == {
+        "code": 0,
+        "data": {
+            "service": "mhatsh-bootstrap",
+            "has_player": 1,
+            "game_host": "192.0.2.10",
+            "game_port": 19000,
+        },
+    }
+
+
 def test_player_creation_report_returns_sdk_success_code() -> None:
     server = BootstrapServer("127.0.0.1", 19000)
     payload = json.loads(server.response_for("/v/1/report/player/create"))

@@ -96,7 +96,17 @@ class BootstrapServer:
             "flagTips": "",
             "player_list": [self._player_summary()] if self.has_player else [],
         }
-        if path.endswith("/client/config"):
+        if path.endswith("/health"):
+            data = {
+                "code": 0,
+                "data": {
+                    "service": "mhatsh-bootstrap",
+                    "has_player": 1 if self.has_player else 0,
+                    "game_host": self.game_host,
+                    "game_port": self.game_port,
+                },
+            }
+        elif path.endswith("/client/config"):
             base = f"http://{self.game_host}:{self.bootstrap_port}"
             config_info = {
                 "hot_url": [f"{base}/assets"],
