@@ -45,7 +45,7 @@ and opens the world quest map. The server's initial owned-card roster contains
 Midoriya, Bakugo, Iida, Ochaco, Todoroki, Momo, and Denki. Death Arms is sent
 through `c_scene_npc_create` at an explicitly local demonstration position by
 default; the opt-in demo-cast mode serializes Death Arms plus six additional
-verified NPC rows. The catalog contains 29 protocol-verified playable
+verified NPC rows. The catalog contains 30 protocol-verified playable
 mappings; only All For One `h1039` and Best Jeanist `h1927` remain
 asset-only. The roster and NPC additions pass packet-level tests. The roster
 now tracks active card and active visible hero state for user-info,

@@ -71,7 +71,8 @@ def test_starter_identity_matches_archived_midoriya_config() -> None:
 
 def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert "AXMD raw-rip" in CATALOG_SOURCE
-    assert len(PLAYABLE_CHARACTERS) == 31
+    assert "en_hero_cfg" in CATALOG_SOURCE
+    assert len(PLAYABLE_CHARACTERS) == 32
     assert len(MAP_CHARACTERS) == 40
     assert len(CHIBI_MODEL_ASSETS) == 3
     assert STARTER_CHARACTER == PLAYABLE_CHARACTERS["h1001"]
@@ -80,11 +81,14 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert sum(
         character.is_protocol_verified
         for character in PLAYABLE_CHARACTERS.values()
-    ) == 29
+    ) == 30
+    assert PLAYABLE_CHARACTERS["h1031"].name == "Tamaki Amajiki"
+    assert PLAYABLE_CHARACTERS["h1031"].hero_id == 1311
+    assert PLAYABLE_CHARACTERS["h1031"].shape_id == 1031
     assert PLAYABLE_CHARACTERS["h1032"].name == "Mirio Togata"
     assert PLAYABLE_CHARACTERS["h1032"].hero_id == 1321
     assert PLAYABLE_CHARACTERS["h1110"].shape_id == 1011
-    assert PLAYABLE_CHARACTERS["h1998"].name == "All Might (Variant)"
+    assert PLAYABLE_CHARACTERS["h1998"].name == "All Might (Art Test Variant)"
     assert PLAYABLE_CHARACTERS["h1998"].shape_id == 9051
     assert [
         (character.hero_id, character.shape_id)
@@ -154,7 +158,7 @@ def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
     assert playable_roster("starter") == INITIAL_PLAYABLE_ROSTER
     assert playable_roster("expanded") == VERIFIED_PLAYABLE_ROSTER
     assert playable_roster("verified") == VERIFIED_PLAYABLE_ROSTER
-    assert len(VERIFIED_PLAYABLE_ROSTER) == 29
+    assert len(VERIFIED_PLAYABLE_ROSTER) == 30
     assert {character.model_asset_id for character in VERIFIED_PLAYABLE_ROSTER} == {
         model_id
         for model_id, character in PLAYABLE_CHARACTERS.items()
@@ -620,7 +624,7 @@ async def _run_expanded_roster_cards() -> None:
         )
         for index, character in enumerate(VERIFIED_PLAYABLE_ROSTER)
     ]
-    assert len(card_info) == 29
+    assert len(card_info) == 30
     assert card_info[0]["HeroId"] == STARTER_HERO_ID
     assert card_info[0]["ShapeId"] == STARTER_SHAPE_ID
     assert codec.decode_message("c_card_show_info", replies[1][1]) == {

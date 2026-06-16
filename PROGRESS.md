@@ -78,19 +78,20 @@ environment details are intentionally omitted from Git.
 - `s_time_ping` receives an echoed `c_time_ping` response.
 - A replacement TCP session receives `c_reconnect_flag` after
   `s_login_reconnect`, restoring the local account and player identity.
-- The supplied AXMD raw-rip list is represented in a typed catalog covering 31
-  playable models, 40 map/NPC models, and 3 chibi models.
-- Twenty-nine of the 31 supplied playable model entries have recovered
-  `hero_cfg` rows and independently matched `shape_info` model paths. The two
-  remaining asset-only entries are All For One `h1039` and Best Jeanist
-  `h1927`.
+- The supplied AXMD raw-rip list plus `en_hero_cfg` evidence is represented in
+  a typed catalog covering 32 playable models, 40 map/NPC models, and 3 chibi
+  models.
+- Thirty of the 32 playable model entries have recovered `hero_cfg` rows and
+  independently matched `shape_info` model paths. The two remaining asset-only
+  entries are All For One `h1039` and Best Jeanist `h1927`.
 - The recovered tables correct two tentative names in the supplied list:
-  `h1032` is Mirio Togata, and `h1998` is an All Might variant.
+  `h1031` is Tamaki Amajiki, `h1032` is Mirio Togata, and `h1998` is an All
+  Might art-test variant.
 - The initial `c_card_seeinfo` roster contains a validated starter set while
   Midoriya remains the active world avatar. The first owned card is now marked
   as the active fighting card in the serialized roster state and was accepted
   by the client in controlled on-device validation.
-- An opt-in expanded roster path serializes all 29 protocol-verified playable
+- An opt-in expanded roster path serializes all 30 protocol-verified playable
   characters in `c_card_seeinfo` while preserving Midoriya as the first active
   card.
 - The server now keeps a session-level playable roster state and answers the
@@ -154,7 +155,7 @@ Current limitations:
 ## Character Roadmap
 
 1. Keep the validated starter roster as the compatibility default.
-2. Validate the expanded 29-character roster in a controlled client run.
+2. Validate the expanded 30-character roster in a controlled client run.
 3. Add more verified NPC rows and sanitized authored-placement metadata.
 4. Validate character selection and avatar swapping in controlled client runs,
    starting from the packet-tested roster-state handlers.

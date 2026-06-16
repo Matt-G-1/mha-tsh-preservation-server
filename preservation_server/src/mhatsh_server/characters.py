@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-CATALOG_SOURCE = "User-supplied AXMD raw-rip list, 2026-06-14"
+CATALOG_SOURCE = (
+    "User-supplied AXMD raw-rip list plus en_hero_cfg evidence, 2026-06-15"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,7 @@ PLAYABLE_CHARACTERS = {
         "h1028": "Bakugo WHM",
         "h1029": "Todoroki WHM",
         "h1030": "Nejire",
+        "h1031": "Tamaki",
         "h1032": "Todoroki WHM 2",
         "h1039": "All For One",
         "h1110": "Stain",
@@ -108,9 +111,10 @@ for model_id, name, hero_id, shape_id in (
     ("h1028", "WHM Katsuki Bakugo", 1281, 1028),
     ("h1029", "WHM Shoto Todoroki", 1291, 1029),
     ("h1030", "Nejire Hado", 1301, 1030),
+    ("h1031", "Tamaki Amajiki", 1311, 1031),
     ("h1032", "Mirio Togata", 1321, 1032),
     ("h1110", "Stain", 1111, 1011),
-    ("h1998", "All Might (Variant)", 1981, 9051),
+    ("h1998", "All Might (Art Test Variant)", 1981, 9051),
 ):
     PLAYABLE_CHARACTERS[model_id] = PlayableCharacter(
         name=name,
