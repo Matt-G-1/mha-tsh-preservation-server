@@ -72,6 +72,10 @@ The clean-room server now supports:
 - An opt-in verified map/NPC demo cast covering Death Arms, Mei Hatsume,
   Kamui Woods, Naomasa Tsukauchi, Mt. Lady, Shota Aizawa, and a U.A.
   Mei Hatsume row.
+- Live validation confirmed the demo cast serializes and renders in-world;
+  its temporary coordinates are crowded, so the starter map spawn remains the
+  compatibility default. The validation cast is deliberately not tied to broad
+  map-spawn aliases such as `expanded`.
 
 ## Character Catalog
 

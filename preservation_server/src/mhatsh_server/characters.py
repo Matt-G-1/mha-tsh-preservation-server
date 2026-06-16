@@ -197,8 +197,8 @@ MAP_CHARACTERS[5007] = MapCharacter(
 )
 
 # npc_cfg constants verify these row IDs and names near the recovered table's
-# map-system NPC block. The IDs also match the supplied AXMD model IDs, so they
-# can be packet-serialized as optional local demonstration NPCs.
+# map-system NPC block. These are packet-validation rows, not starter-area
+# placement data.
 for model_id, name in (
     (5001, "Mei Hatsume (Story)"),
     (5008, "Kamui Woods"),
@@ -227,7 +227,7 @@ INITIAL_MAP_SPAWNS = (DEATH_ARMS_DEMO_SPAWN,)
 DEMO_CAST_MAP_SPAWNS = (
     DEATH_ARMS_DEMO_SPAWN,
     MapSpawn(
-        label="mei_story_demo_near_honei_spawn",
+        label="validation_only_mei_story_near_honei_spawn",
         character=MAP_CHARACTERS[5001],
         uid=20002,
         x=4321,
@@ -235,7 +235,7 @@ DEMO_CAST_MAP_SPAWNS = (
         face=90,
     ),
     MapSpawn(
-        label="kamui_woods_demo_near_honei_spawn",
+        label="validation_only_kamui_woods_near_honei_spawn",
         character=MAP_CHARACTERS[5008],
         uid=20003,
         x=4521,
@@ -243,7 +243,7 @@ DEMO_CAST_MAP_SPAWNS = (
         face=270,
     ),
     MapSpawn(
-        label="tsukauchi_demo_near_honei_spawn",
+        label="validation_only_tsukauchi_near_honei_spawn",
         character=MAP_CHARACTERS[5009],
         uid=20004,
         x=4221,
@@ -251,7 +251,7 @@ DEMO_CAST_MAP_SPAWNS = (
         face=0,
     ),
     MapSpawn(
-        label="mt_lady_demo_near_honei_spawn",
+        label="validation_only_mt_lady_near_honei_spawn",
         character=MAP_CHARACTERS[5011],
         uid=20005,
         x=4621,
@@ -259,7 +259,7 @@ DEMO_CAST_MAP_SPAWNS = (
         face=180,
     ),
     MapSpawn(
-        label="aizawa_demo_near_honei_spawn",
+        label="validation_only_aizawa_near_honei_spawn",
         character=MAP_CHARACTERS[5035],
         uid=20006,
         x=4121,
@@ -267,7 +267,7 @@ DEMO_CAST_MAP_SPAWNS = (
         face=0,
     ),
     MapSpawn(
-        label="mei_ua_demo_near_honei_spawn",
+        label="validation_only_mei_ua_near_honei_spawn",
         character=MAP_CHARACTERS[5041],
         uid=20007,
         x=4421,
@@ -279,9 +279,9 @@ DEMO_CAST_MAP_SPAWNS = (
 
 def map_spawns(mode: str | None = None) -> tuple[MapSpawn, ...]:
     normalized = (mode or "starter").strip().lower()
-    if normalized in {"starter", "initial", "default"}:
+    if normalized in {"starter", "initial", "default", "tutorial"}:
         return INITIAL_MAP_SPAWNS
-    if normalized in {"demo_cast", "demo-cast", "verified", "expanded"}:
+    if normalized in {"demo_cast", "demo-cast", "validation", "lab"}:
         return DEMO_CAST_MAP_SPAWNS
     if normalized in {"none", "off", "disabled"}:
         return ()

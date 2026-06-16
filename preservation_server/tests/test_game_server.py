@@ -122,8 +122,16 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
 def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
     assert INITIAL_MAP_SPAWNS == (DEATH_ARMS_DEMO_SPAWN,)
     assert map_spawns("starter") == INITIAL_MAP_SPAWNS
+    assert map_spawns("tutorial") == INITIAL_MAP_SPAWNS
     assert map_spawns("none") == ()
     assert map_spawns("demo_cast") == DEMO_CAST_MAP_SPAWNS
+    assert map_spawns("validation") == DEMO_CAST_MAP_SPAWNS
+    try:
+        map_spawns("expanded")
+    except ValueError as exc:
+        assert "unknown map spawn mode" in str(exc)
+    else:  # pragma: no cover - the guardrail is the behavior under test.
+        raise AssertionError("expanded must not enable validation-only map spawns")
     assert DEATH_ARMS_DEMO_SPAWN.label == "death_arms_demo_near_honei_spawn"
     assert DEATH_ARMS_DEMO_SPAWN.character == DEATH_ARMS
     assert DEATH_ARMS_DEMO_SPAWN.uid == 20001

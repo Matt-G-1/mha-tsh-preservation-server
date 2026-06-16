@@ -36,7 +36,9 @@ constructs its required `clsUserData` record before `c_login_ok`. Set
 callback-registration race in the archived client. It defaults to `0.05`
 seconds. `MHATSH_SEND_MAP_CHARACTERS=0` disables local demonstration NPC
 spawns without disabling scene entry. `MHATSH_MAP_SPAWN_MODE=demo_cast`
-enables the opt-in seven-NPC demonstration cast for controlled testing.
+enables the opt-in seven-NPC packet-validation cast for controlled testing.
+This mode is not starter-area-authored content and is intentionally separate
+from expanded playable roster testing.
 
 The client now reaches Honei Urban Area, renders Midoriya and its world HUD,
 and opens the world quest map. The server's initial owned-card roster contains
@@ -48,15 +50,17 @@ mappings; only All For One `h1039` and Best Jeanist `h1927` remain
 asset-only. The roster and NPC additions pass packet-level tests. The roster
 now tracks active card and active visible hero state for user-info,
 card-fight, bridge-fight, team-change, and area-event switch requests. Death
-Arms visibly rendered beside Midoriya, the active starter card state was
-accepted, and the map-marker guide step completed through the
-task/guide/base-station/world-task handlers in controlled on-device runs. The
-world map opens with visible markers after the city-level and open-map seed
-packets. The server now also answers several early side-panel/task requests
-with schema-correct empty state so new UI probes fail less abruptly while real
-quest data is reconstructed. The client still performs one initial
-ping-waiter reconnect, then remains stable through the implemented reconnect
-acknowledgment.
+Arms visibly rendered beside Midoriya, the seven-NPC demo-cast mode rendered
+in controlled validation, the active starter card state was accepted, and the
+map-marker guide step completed through the task/guide/base-station/world-task
+handlers in controlled on-device runs. The demo-cast coordinates are crowded
+and should be treated as temporary validation data, not starter-area placement.
+The world map opens with visible markers after the city-level and open-map seed
+packets. The server now also answers
+several early side-panel/task requests with schema-correct empty state so new
+UI probes fail less abruptly while real quest data is reconstructed. The
+client still performs one initial ping-waiter reconnect, then remains stable
+through the implemented reconnect acknowledgment.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.

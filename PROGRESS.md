@@ -107,6 +107,13 @@ environment details are intentionally omitted from Git.
   the scene-entry handler. The compatibility default still emits only Death
   Arms, while the opt-in `demo_cast` spawn mode serializes all seven verified
   demonstration NPCs for controlled testing.
+- Controlled on-device validation of `demo_cast` confirmed that all seven
+  verified NPC rows can be serialized through `c_scene_npc_create` and render
+  in-world. The current demo coordinates are intentionally temporary and are
+  too crowded for normal play, so `starter` remains the default spawn mode.
+  Broad names such as `expanded` are intentionally not accepted for map-spawn
+  mode; expanded playable rosters must not implicitly add validation-only
+  NPCs to the starter area.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
   packet flow, starter roster, map-character packet generation, and stateful
   guide/teach/base-station/task/client-stat/world-telemetry exchanges.
@@ -128,9 +135,11 @@ Current limitations:
    world-map seed, first task-list/update/sync handlers, and several
    empty-state activity/task-panel replies exist, but a full quest/tutorial
    progression path is not.
-3. Seven map/NPC protocol rows are proven, but the current nearby placements
-   are local demonstration coordinates rather than archived authored
-   placements.
+3. Seven map/NPC protocol rows are proven and render in the client, but the
+   current nearby placements are local demonstration coordinates rather than
+   archived authored placements. The `demo_cast` placement is visibly crowded,
+   is not starter-area-authored content, and should not be used for broader
+   tutorial/UI validation.
 4. The client previously performed a periodic reconnect while reporting that it
    was waiting for `c_time_ping`. The reconnect acknowledgment restores the
    session, after which ping traffic remains stable, but the original waiter
