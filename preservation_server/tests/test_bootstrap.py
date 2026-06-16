@@ -12,6 +12,25 @@ def test_empty_player_list_response_has_legacy_success_shape() -> None:
     assert payload == {"code": 1, "data": {"player_list": []}}
 
 
+def test_existing_player_mode_advertises_local_player() -> None:
+    server = BootstrapServer("127.0.0.1", 19000, has_player=True)
+
+    login_payload = json.loads(
+        server.response_for("/ssssssssssssssssssssssss/v/1/visitor/user/login")
+    )
+    assert login_payload["data"]["is_player"] == 1
+
+    player_list = json.loads(server.response_for("/g/1/v/1/gcli/player/list"))
+    [player] = player_list["data"]["player_list"]
+    assert player["uid"] == 10001
+    assert player["name"] == "Local Hero"
+    assert player["srv_id"] == 1
+
+    server_list = json.loads(server.response_for("/g/1/v/1/gcli/server/list"))
+    assert server_list["data"]["player_list"] == [player]
+    assert server_list["data"]["srv_list"][0]["player_list"] == [player]
+
+
 def test_player_creation_report_returns_sdk_success_code() -> None:
     server = BootstrapServer("127.0.0.1", 19000)
     payload = json.loads(server.response_for("/v/1/report/player/create"))

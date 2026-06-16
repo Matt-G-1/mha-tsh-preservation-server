@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import time
 from urllib.parse import urlsplit
 
@@ -12,11 +13,26 @@ LOG = logging.getLogger("mhatsh.bootstrap")
 
 class BootstrapServer:
     def __init__(
-        self, game_host: str, game_port: int, bootstrap_port: int = 18080
+        self,
+        game_host: str,
+        game_port: int,
+        bootstrap_port: int = 18080,
+        *,
+        has_player: bool | None = None,
     ) -> None:
         self.game_host = game_host
         self.game_port = game_port
         self.bootstrap_port = bootstrap_port
+        if has_player is None:
+            has_player = os.environ.get(
+                "MHATSH_BOOTSTRAP_HAS_PLAYER", "0"
+            ).lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+        self.has_player = has_player
 
     async def serve(self, host: str, port: int) -> None:
         server = await asyncio.start_server(self.handle_client, host, port)
@@ -78,7 +94,7 @@ class BootstrapServer:
             "GcloudSvrId": 1,
             "maintain_notice": "",
             "flagTips": "",
-            "player_list": [],
+            "player_list": [self._player_summary()] if self.has_player else [],
         }
         if path.endswith("/client/config"):
             base = f"http://{self.game_host}:{self.bootstrap_port}"
@@ -110,12 +126,25 @@ class BootstrapServer:
             data = {
                 "code": 0,
                 "status": 1,
-                "data": {"srv_list": [server], "player_list": [], "group_list": []},
+                "data": {
+                    "srv_list": [server],
+                    "player_list": [self._player_summary()]
+                    if self.has_player
+                    else [],
+                    "group_list": [],
+                },
             }
         elif path.endswith("/player/list"):
             # GMSReqRoleList uses the legacy success code and requires the
             # player_list key even when the account has no characters.
-            data = {"code": 1, "data": {"player_list": []}}
+            data = {
+                "code": 1,
+                "data": {
+                    "player_list": [self._player_summary()]
+                    if self.has_player
+                    else []
+                },
+            }
         elif path.endswith("/visitor/user/register") or path.endswith(
             "/visitor/user/login"
         ):
@@ -125,7 +154,7 @@ class BootstrapServer:
                     "user_id": "local-guest",
                     "user_sid": "local-session",
                     "time": int(time.time()),
-                    "is_player": 0,
+                    "is_player": 1 if self.has_player else 0,
                 },
             }
         elif path.endswith("/f/herosdk/ch/0/user/login"):
@@ -146,3 +175,15 @@ class BootstrapServer:
         else:
             data = {"code": 1, "data": {}}
         return json.dumps(data, separators=(",", ":")).encode()
+
+    def _player_summary(self) -> dict[str, object]:
+        return {
+            "uid": 10001,
+            "user_id": "local-guest",
+            "name": "Local Hero",
+            "level": 1,
+            "srv_id": 1,
+            "server_id": 1,
+            "srv_name": "Local Preservation Server",
+            "last_login_time": int(time.time()),
+        }
