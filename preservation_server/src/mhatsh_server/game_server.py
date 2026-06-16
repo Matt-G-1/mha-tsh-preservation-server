@@ -202,6 +202,11 @@ class GameServer:
                 guide_response,
             )
             for guide_id in guide_response["Ids"]:
+                if (
+                    int(guide_id) == STARTER_TASK_ID
+                    and session.tasks.should_spawn_beginner_npc(STARTER_TASK_ID)
+                ):
+                    await self._send_beginner_npc(writer, session)
                 task_update = session.tasks.complete_guide(int(guide_id))
                 if task_update is not None:
                     await self._send_task_progression(
@@ -218,6 +223,11 @@ class GameServer:
                 [int(item) for item in list(values.get("NumData") or [])],
                 [str(item) for item in list(values.get("StrData") or [])],
             )
+            should_spawn_beginner_npc = self._is_starter_guide_stat(
+                stat
+            ) and session.tasks.should_spawn_beginner_npc(STARTER_TASK_ID)
+            if should_spawn_beginner_npc:
+                await self._send_beginner_npc(writer, session)
             task_update = session.tasks.observe_client_stat(stat)
             if task_update is not None:
                 await self._send_task_progression(writer, session, task_update)
@@ -516,17 +526,7 @@ class GameServer:
             if session.tasks.should_spawn_beginner_npc(
                 int(values.get("task_id") or 0)
             ):
-                await self._send(
-                    writer,
-                    session,
-                    "c_scene_npc_create",
-                    {
-                        "NpcList": [
-                            scene_npc_from_spawn(spawn)
-                            for spawn in TUTORIAL_MAP_SPAWNS
-                        ]
-                    },
-                )
+                await self._send_beginner_npc(writer, session)
         elif name == "s_task_submit":
             await self._send_task_progression(
                 writer,
@@ -799,6 +799,27 @@ class GameServer:
                 first_card_uid=STARTER_CARD_UID,
             )
         return session.roster
+
+    def _is_starter_guide_stat(self, stat: dict[str, object]) -> bool:
+        nums = list(stat.get("NumData") or [])
+        if len(nums) < 2:
+            return False
+        return int(nums[0]) == 1 and int(nums[1]) == STARTER_TASK_ID
+
+    async def _send_beginner_npc(
+        self, writer: asyncio.StreamWriter, session: Session
+    ) -> None:
+        await self._send(
+            writer,
+            session,
+            "c_scene_npc_create",
+            {
+                "NpcList": [
+                    scene_npc_from_spawn(spawn)
+                    for spawn in TUTORIAL_MAP_SPAWNS
+                ]
+            },
+        )
 
     async def _send_task_progression(
         self,

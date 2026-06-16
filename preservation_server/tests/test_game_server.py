@@ -1119,6 +1119,7 @@ async def _run_guide_finish() -> None:
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_guide_finish",
+        "c_scene_npc_create",
         "c_task_info_update",
         "c_city_level_add_exp",
         "c_city_level_up",
@@ -1132,20 +1133,25 @@ async def _run_guide_finish() -> None:
         "Ids": [1301],
     }
     reply_id, reply_body = replies[1]
+    assert registry.protocol_names[reply_id] == "c_scene_npc_create"
+    assert codec.decode_message("c_scene_npc_create", reply_body) == {
+        "NpcList": [scene_npc_from_spawn(spawn) for spawn in TUTORIAL_MAP_SPAWNS]
+    }
+    reply_id, reply_body = replies[2]
     task_update = codec.decode_message("c_task_info_update", reply_body)
     assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
     assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
-    assert codec.decode_message("c_city_level_add_exp", replies[2][1]) == {
+    assert codec.decode_message("c_city_level_add_exp", replies[3][1]) == {
         "Exp": BEGINNER_QUEST_CITY_EXP
     }
-    assert codec.decode_message("c_city_level_up", replies[3][1]) == {
+    assert codec.decode_message("c_city_level_up", replies[4][1]) == {
         "Level": BEGINNER_QUEST_CITY_LEVEL
     }
-    assert codec.decode_message("c_city_level_info", replies[4][1]) == {
+    assert codec.decode_message("c_city_level_info", replies[5][1]) == {
         "Level": BEGINNER_QUEST_CITY_LEVEL,
         "ClickList": [],
     }
-    assert codec.decode_message("c_world_task_info", replies[5][1])["FinishList"] == [
+    assert codec.decode_message("c_world_task_info", replies[6][1])["FinishList"] == [
         {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": STARTER_GUIDE_ID}
     ]
 
@@ -1235,6 +1241,7 @@ async def _run_client_stat() -> None:
     decoder = FrameDecoder(RollingXor(0x31415926))
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_scene_npc_create",
         "c_task_info_update",
         "c_city_level_add_exp",
         "c_city_level_up",
@@ -1242,14 +1249,19 @@ async def _run_client_stat() -> None:
         "c_world_task_info",
     ]
     reply_id, reply_body = replies[0]
+    assert registry.protocol_names[reply_id] == "c_scene_npc_create"
+    assert codec.decode_message("c_scene_npc_create", reply_body) == {
+        "NpcList": [scene_npc_from_spawn(spawn) for spawn in TUTORIAL_MAP_SPAWNS]
+    }
+    reply_id, reply_body = replies[1]
     assert registry.protocol_names[reply_id] == "c_task_info_update"
     task_update = codec.decode_message("c_task_info_update", reply_body)
     assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
     assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
-    assert codec.decode_message("c_city_level_add_exp", replies[1][1]) == {
+    assert codec.decode_message("c_city_level_add_exp", replies[2][1]) == {
         "Exp": BEGINNER_QUEST_CITY_EXP
     }
-    assert codec.decode_message("c_city_level_up", replies[2][1]) == {
+    assert codec.decode_message("c_city_level_up", replies[3][1]) == {
         "Level": BEGINNER_QUEST_CITY_LEVEL
     }
     assert session.tutorial.client_stats == [
