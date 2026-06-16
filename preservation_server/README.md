@@ -23,7 +23,8 @@ completion, a stateful seven-hero card roster, first-pass character selection
 responses, verified map NPC packet generation, guide-finish acknowledgment,
 teach-finish acknowledgment, base-station initialization, city/world-task map
 seed packets, starter task listing and updates, observed first-guide
-client-stat tracking, beginner quest city-level progression, empty-state
+client-stat tracking, optional starter intro stage-entry probing, stage loading
+and report handling, beginner quest city-level progression, empty-state
 replies for early activity/task panels, world-session movement/frame/error
 tracking, time-ping replies, and the login-level reconnect acknowledgment.
 Unknown client messages are decoded and logged for iterative compatibility
@@ -65,6 +66,11 @@ character-menu requests with schema-correct empty state so new UI probes fail
 less abruptly while real quest, skill, gear, rank, and support-card data is
 reconstructed. The client still performs one initial ping-waiter reconnect,
 then remains stable through the implemented reconnect acknowledgment.
+
+Set `MHATSH_INTRO_STAGE_MODE=starter` for controlled testing of the current
+starter-intro battle candidate. This sends `c_stage_enter` for candidate stage
+`299301` with drama enabled after the client asks to enter a starter task
+stage. The default remains disabled until the candidate is validated on-device.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.

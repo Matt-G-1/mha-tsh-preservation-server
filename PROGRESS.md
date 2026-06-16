@@ -1,6 +1,6 @@
 # MHA TSH Preservation Progress
 
-Last updated: 2026-06-15
+Last updated: 2026-06-16
 
 ## Goal
 
@@ -135,9 +135,17 @@ environment details are intentionally omitted from Git.
   `DramaFlag`/`DramaStep`, `s_login_drama` is recorded and can return
   `c_scene_play_drama` when a recovered `DramaName` is configured, and
   `s_login_drama_finish` records completed intro stages.
+- Local client asset research confirms the QTE buttons are driven by drama
+  scripts, with `CreateQte` available in the recovered drama configuration.
+  The strongest current starter-battle candidate is the `zx_battle*` /
+  `zx_lvb_*` cluster around stage-like ID `299301`; the server now has an
+  opt-in `c_stage_enter` probe for this path via `MHATSH_INTRO_STAGE_MODE`.
+- Stage lifecycle handling now covers `s_stage_finish_loading` with
+  `c_stage_finish_loading`, records `s_stage_report`, and can optionally emit
+  empty drop/result/end packets for controlled post-battle testing.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
   packet flow, starter roster, map-character packet generation, and stateful
-  guide/teach/base-station/task/client-stat/world-telemetry exchanges.
+  guide/teach/base-station/task/client-stat/stage/world-telemetry exchanges.
 
 ## Remaining Compatibility Work
 
@@ -156,8 +164,9 @@ Current limitations:
    world-map seed, first task-list/update/sync handlers, and several
    empty-state activity/task-panel replies exist, but a full quest/tutorial
    progression path is not.
-   The earlier login-drama intro path is only probe-ready until controlled
-   client logs recover the exact `StageId` and drama asset name.
+   The earlier login-drama path and the newer stage-enter intro probe are still
+   candidate-driven until controlled client logs confirm the exact intro stage
+   and transition behavior.
 3. Seven map/NPC protocol rows are proven and render in the client, but the
    current nearby placements are local demonstration coordinates rather than
    archived authored placements. The `demo_cast` placement is visibly crowded,

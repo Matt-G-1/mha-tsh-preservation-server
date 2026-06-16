@@ -76,6 +76,10 @@ The clean-room server now supports:
   its temporary coordinates are crowded, so the starter map spawn remains the
   compatibility default. The validation cast is deliberately not tied to broad
   map-spawn aliases such as `expanded`.
+- An opt-in starter intro stage probe that acknowledges starter task-stage
+  entry and sends `c_stage_enter` for the current `zx_battle*` candidate stage,
+  plus minimal stage loading/report lifecycle handling for controlled battle
+  validation.
 
 ## Character Catalog
 
@@ -105,6 +109,6 @@ The next build series is focused on characters and tutorial completion:
    placement metadata.
 5. Reconstruct enough quest/activity state to complete the archived tutorial,
    starting from stateful guide, teach-finish, starter-task, and client-stat
-   handling.
+   handling, then validating the candidate intro stage/QTE battle path.
 
 Private deployment notes are deliberately kept outside this repository.

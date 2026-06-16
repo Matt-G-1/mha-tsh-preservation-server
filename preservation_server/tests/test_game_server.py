@@ -40,6 +40,14 @@ from mhatsh_server.characters import (
 )
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
 from mhatsh_server.schema import SchemaRegistry
+from mhatsh_server.stages import (
+    STARTER_INTRO_STAGE_DRAMA,
+    STARTER_INTRO_STAGE_ID,
+    STARTER_INTRO_STAGE_LEVEL,
+    STARTER_INTRO_STAGE_TIME,
+    STARTER_INTRO_STAGE_UID,
+    StageState,
+)
 from mhatsh_server.tasks import (
     STARTER_GUIDE_ID,
     STARTER_GUIDE_STEP,
@@ -1222,6 +1230,24 @@ def test_client_stat_can_complete_starter_task_once() -> None:
     asyncio.run(_run_client_stat())
 
 
+def test_starter_intro_stage_payload_matches_recovered_schema() -> None:
+    state = StageState()
+
+    assert state.enter_stage() == {
+        "StageId": STARTER_INTRO_STAGE_ID,
+        "StageUid": STARTER_INTRO_STAGE_UID,
+        "Level": STARTER_INTRO_STAGE_LEVEL,
+        "Time": STARTER_INTRO_STAGE_TIME,
+        "Drama": STARTER_INTRO_STAGE_DRAMA,
+        "IsReconnect": 0,
+        "NeedLagLog": 0,
+        "IsRecord": 0,
+        "Extra": [],
+    }
+    assert state.finish_loading(10001) == {"Uid": 10001}
+    assert state.finished_loading_count == 1
+
+
 async def _run_client_stat() -> None:
     registry = SchemaRegistry.from_files(
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
@@ -1341,6 +1367,14 @@ def test_account_info_can_request_login_drama_when_enabled() -> None:
 
 def test_task_requests_receive_stateful_protocol_responses() -> None:
     asyncio.run(_run_task_requests())
+
+
+def test_starter_intro_stage_probe_packets() -> None:
+    asyncio.run(_run_starter_intro_stage_probe())
+
+
+def test_stage_loading_and_report_lifecycle_packets() -> None:
+    asyncio.run(_run_stage_lifecycle_packets())
 
 
 def test_world_telemetry_packets_update_session_without_reply() -> None:
@@ -1559,6 +1593,96 @@ async def _run_task_requests() -> None:
     [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
     assert registry.protocol_names[reply_id] == "c_task_enter_stage"
     assert codec.decode_message("c_task_enter_stage", reply_body) == {"IsEnter": 1}
+
+
+async def _run_starter_intro_stage_probe() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    game.intro_stage_enabled = True
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0xCAFE1234),
+    )
+    enter_stage = codec.encode_message(
+        "s_task_enter_stage",
+        {"IsEnter": 1, "x": 12, "y": 34},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_enter_stage"],
+        enter_stage,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0xCAFE1234))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_enter_stage",
+        "c_stage_enter",
+    ]
+    assert codec.decode_message("c_task_enter_stage", replies[0][1]) == {
+        "IsEnter": 1
+    }
+    assert codec.decode_message("c_stage_enter", replies[1][1]) == {
+        "StageId": STARTER_INTRO_STAGE_ID,
+        "StageUid": STARTER_INTRO_STAGE_UID,
+        "Level": STARTER_INTRO_STAGE_LEVEL,
+        "Time": STARTER_INTRO_STAGE_TIME,
+        "Drama": STARTER_INTRO_STAGE_DRAMA,
+        "IsReconnect": 0,
+        "NeedLagLog": 0,
+        "IsRecord": 0,
+        "Extra": [],
+    }
+    assert session.stage.current_stage_id == STARTER_INTRO_STAGE_ID
+
+
+async def _run_stage_lifecycle_packets() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x1234CAFE),
+    )
+    finish_loading = codec.encode_message("s_stage_finish_loading", {})
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_stage_finish_loading"],
+        finish_loading,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x1234CAFE))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_stage_finish_loading"
+    assert codec.decode_message("c_stage_finish_loading", reply_body) == {
+        "Uid": 10001
+    }
+    assert session.stage.finished_loading_count == 1
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xBEEF1234)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_stage_report"],
+        b"",
+        writer,
+    )
+
+    assert writer.data == bytearray()
+    assert session.stage.reports == [{}]
 
 
 async def _run_login_drama_packets() -> None:

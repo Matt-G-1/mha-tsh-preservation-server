@@ -23,6 +23,14 @@ from .characters import (
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .roster import RosterState
 from .schema import SchemaRegistry
+from .stages import (
+    STARTER_INTRO_STAGE_DRAMA,
+    STARTER_INTRO_STAGE_ID,
+    STARTER_INTRO_STAGE_LEVEL,
+    STARTER_INTRO_STAGE_TIME,
+    STARTER_INTRO_STAGE_UID,
+    StageState,
+)
 from .tasks import TaskState
 from .tutorial import TutorialState
 from .world import WorldState
@@ -58,6 +66,7 @@ class Session:
     world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
     activities: ActivityState = field(default_factory=ActivityState)
     character_menu: CharacterMenuState = field(default_factory=CharacterMenuState)
+    stage: StageState = field(default_factory=StageState)
     roster: RosterState | None = None
 
 
@@ -94,6 +103,25 @@ class GameServer:
         self.map_spawn_mode = os.environ.get("MHATSH_MAP_SPAWN_MODE", "starter")
         self.playable_roster = playable_roster(self.roster_mode)
         self.map_spawns = map_spawns(self.map_spawn_mode)
+        self.intro_stage_enabled = _env_enabled("MHATSH_INTRO_STAGE_MODE", "skip")
+        self.intro_stage_id = int(
+            os.environ.get("MHATSH_INTRO_STAGE_ID", STARTER_INTRO_STAGE_ID)
+        )
+        self.intro_stage_uid = int(
+            os.environ.get("MHATSH_INTRO_STAGE_UID", STARTER_INTRO_STAGE_UID)
+        )
+        self.intro_stage_level = int(
+            os.environ.get("MHATSH_INTRO_STAGE_LEVEL", STARTER_INTRO_STAGE_LEVEL)
+        )
+        self.intro_stage_time = int(
+            os.environ.get("MHATSH_INTRO_STAGE_TIME", STARTER_INTRO_STAGE_TIME)
+        )
+        self.intro_stage_drama = int(
+            os.environ.get("MHATSH_INTRO_STAGE_DRAMA", STARTER_INTRO_STAGE_DRAMA)
+        )
+        self.stage_report_response = os.environ.get(
+            "MHATSH_STAGE_REPORT_RESPONSE", "record"
+        ).lower()
         self.ping_response_delay = max(
             0.0, float(os.environ.get("MHATSH_PING_RESPONSE_DELAY", "0.05"))
         )
@@ -575,6 +603,27 @@ class GameServer:
                 "c_task_enter_stage",
                 session.tasks.enter_stage(int(values.get("IsEnter") or 0)),
             )
+            if self.intro_stage_enabled and int(values.get("IsEnter") or 0):
+                await self._send_starter_intro_stage(writer, session)
+        elif name == "s_stage_finish_loading":
+            await self._send(
+                writer,
+                session,
+                "c_stage_finish_loading",
+                session.stage.finish_loading(session.uid),
+            )
+        elif name == "s_stage_report":
+            session.stage.record_report(values)
+            if self.stage_report_response in {"complete", "result"}:
+                await self._send(
+                    writer, session, "c_stage_drop", session.stage.empty_drop()
+                )
+                await self._send(
+                    writer, session, "c_stage_result", session.stage.result()
+                )
+                await self._send(
+                    writer, session, "c_stage_end_gm", session.stage.end_gm()
+                )
         elif name == "s_stage_activity_info":
             await self._send(
                 writer,
@@ -861,6 +910,22 @@ class GameServer:
             return
         for packet_name, packet_values in session.world_tasks.complete_beginner_quest():
             await self._send(writer, session, packet_name, packet_values)
+
+    async def _send_starter_intro_stage(
+        self, writer: asyncio.StreamWriter, session: Session
+    ) -> None:
+        await self._send(
+            writer,
+            session,
+            "c_stage_enter",
+            session.stage.enter_stage(
+                self.intro_stage_id,
+                stage_uid=self.intro_stage_uid,
+                level=self.intro_stage_level,
+                time_limit=self.intro_stage_time,
+                drama=self.intro_stage_drama,
+            ),
+        )
 
     async def _send(
         self,
