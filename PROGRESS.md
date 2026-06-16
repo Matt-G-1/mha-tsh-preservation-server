@@ -129,6 +129,12 @@ environment details are intentionally omitted from Git.
   Broad names such as `expanded` are intentionally not accepted for map-spawn
   mode; expanded playable rosters must not implicitly add validation-only
   NPCs to the starter area.
+- Intro-video research confirms the current world-entry path starts after the
+  archived game's pre-city intro/tutorial material. The server now has opt-in
+  login-drama probing support: `c_login_account_info` can request drama via
+  `DramaFlag`/`DramaStep`, `s_login_drama` is recorded and can return
+  `c_scene_play_drama` when a recovered `DramaName` is configured, and
+  `s_login_drama_finish` records completed intro stages.
 - Automated tests cover the protocol codec, bootstrap responses, login/world
   packet flow, starter roster, map-character packet generation, and stateful
   guide/teach/base-station/task/client-stat/world-telemetry exchanges.
@@ -150,6 +156,8 @@ Current limitations:
    world-map seed, first task-list/update/sync handlers, and several
    empty-state activity/task-panel replies exist, but a full quest/tutorial
    progression path is not.
+   The earlier login-drama intro path is only probe-ready until controlled
+   client logs recover the exact `StageId` and drama asset name.
 3. Seven map/NPC protocol rows are proven and render in the client, but the
    current nearby placements are local demonstration coordinates rather than
    archived authored placements. The `demo_cast` placement is visibly crowded,

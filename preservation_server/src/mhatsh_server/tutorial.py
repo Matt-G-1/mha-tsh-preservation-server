@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 class TutorialState:
     completed_guide_sets: set[int] = field(default_factory=set)
     completed_guide_ids: set[int] = field(default_factory=set)
+    requested_login_drama_stages: list[int] = field(default_factory=list)
+    finished_login_drama_stages: dict[int, int] = field(default_factory=dict)
     guide_drama_steps: dict[int, int] = field(default_factory=dict)
     client_stats: list[dict[str, object]] = field(default_factory=list)
     teach_skill_counts: dict[int, dict[int, int]] = field(default_factory=dict)
@@ -23,6 +25,17 @@ class TutorialState:
             "Sets": sorted(self.completed_guide_sets),
             "Ids": sorted(self.completed_guide_ids),
         }
+
+    def record_login_drama_request(
+        self, stage_id: int, drama_name: str, loop: int
+    ) -> dict[str, object] | None:
+        self.requested_login_drama_stages.append(stage_id)
+        if not drama_name:
+            return None
+        return {"DramaName": drama_name, "Loop": loop}
+
+    def finish_login_drama(self, uid: int, stage_id: int) -> None:
+        self.finished_login_drama_stages[stage_id] = uid
 
     def record_guide_drama(self, guide_id: int, step: int) -> None:
         self.guide_drama_steps[guide_id] = step

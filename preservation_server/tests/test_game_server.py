@@ -220,6 +220,14 @@ def test_tutorial_state_accumulates_guides_teach_and_base_station() -> None:
         "Sets": [9, 10],
         "Ids": [1301, 1302],
     }
+    assert state.record_login_drama_request(101, "", 0) is None
+    assert state.requested_login_drama_stages == [101]
+    assert state.record_login_drama_request(102, "login_intro_drama", 0) == {
+        "DramaName": "login_intro_drama",
+        "Loop": 0,
+    }
+    state.finish_login_drama(10001, 102)
+    assert state.finished_login_drama_stages == {102: 10001}
     state.record_guide_drama(20001301, 10011)
     assert state.guide_drama_steps == {20001301: 10011}
     assert state.record_client_stat(2, [1, 1301, 10011], ["", ""]) == {
@@ -1323,6 +1331,14 @@ def test_base_station_info_preserves_client_version() -> None:
     asyncio.run(_run_base_station_info())
 
 
+def test_login_drama_packets_record_stage_and_can_play_configured_drama() -> None:
+    asyncio.run(_run_login_drama_packets())
+
+
+def test_account_info_can_request_login_drama_when_enabled() -> None:
+    asyncio.run(_run_account_info_login_drama_flags())
+
+
 def test_task_requests_receive_stateful_protocol_responses() -> None:
     asyncio.run(_run_task_requests())
 
@@ -1543,6 +1559,79 @@ async def _run_task_requests() -> None:
     [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
     assert registry.protocol_names[reply_id] == "c_task_enter_stage"
     assert codec.decode_message("c_task_enter_stage", reply_body) == {"IsEnter": 1}
+
+
+async def _run_login_drama_packets() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    game.login_drama_name = "login_intro_drama"
+    game.login_drama_loop = 0
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x10203040),
+    )
+
+    request = codec.encode_message("s_login_drama", {"StageId": 101})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_login_drama"],
+        request,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x10203040))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_scene_play_drama"
+    assert codec.decode_message("c_scene_play_drama", reply_body) == {
+        "DramaName": "login_intro_drama",
+        "Loop": 0,
+    }
+    assert session.tutorial.requested_login_drama_stages == [101]
+
+    finish = codec.encode_message(
+        "s_login_drama_finish",
+        {"Uid": 10001, "StageId": 101},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_login_drama_finish"],
+        finish,
+        writer,
+    )
+    assert session.tutorial.finished_login_drama_stages == {101: 10001}
+
+
+async def _run_account_info_login_drama_flags() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    game.login_drama_enabled = True
+    game.login_drama_flag = 1
+    game.login_drama_step = 7
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x90807060),
+        urs="intro-user",
+    )
+
+    await game._send_account_info(writer, session)
+
+    decoder = FrameDecoder(RollingXor(0x90807060))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_login_account_info"
+    values = codec.decode_message("c_login_account_info", reply_body)
+    assert values["DramaFlag"] == 1
+    assert values["DramaStep"] == 7
+    assert values["Uid"] == 10001
 
 
 async def _run_base_station_info() -> None:

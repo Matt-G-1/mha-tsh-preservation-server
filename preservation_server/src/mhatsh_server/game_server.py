@@ -38,6 +38,12 @@ STARTER_SCENE_ID = 1000
 STARTER_SCENE_X = 4221
 STARTER_SCENE_Y = 19931
 STARTER_SCENE_Z = 0
+
+
+def _env_enabled(name: str, default: str) -> bool:
+    return os.environ.get(name, default).lower() not in {"0", "false", "no", "skip"}
+
+
 @dataclass(slots=True)
 class Session:
     seed: int
@@ -70,6 +76,11 @@ class GameServer:
         self.auto_provision_role = os.environ.get(
             "MHATSH_AUTO_PROVISION_ROLE", "1"
         ).lower() not in {"0", "false", "no"}
+        self.login_drama_enabled = _env_enabled("MHATSH_LOGIN_DRAMA_MODE", "skip")
+        self.login_drama_flag = int(os.environ.get("MHATSH_LOGIN_DRAMA_FLAG", "1"))
+        self.login_drama_step = int(os.environ.get("MHATSH_LOGIN_DRAMA_STEP", "0"))
+        self.login_drama_name = os.environ.get("MHATSH_LOGIN_DRAMA_NAME", "")
+        self.login_drama_loop = int(os.environ.get("MHATSH_LOGIN_DRAMA_LOOP", "0"))
         self.send_initial_user = os.environ.get(
             "MHATSH_SEND_INITIAL_USER", "1"
         ).lower() not in {"0", "false", "no"}
@@ -151,6 +162,19 @@ class GameServer:
             session.urs = str(values.get("Urs") or session.urs)
             session.uid = int(values.get("Uid") or session.uid)
             await self._send(writer, session, "c_reconnect_flag", {"Falg": 1})
+        elif name == "s_login_drama":
+            response = session.tutorial.record_login_drama_request(
+                int(values.get("StageId") or 0),
+                self.login_drama_name,
+                self.login_drama_loop,
+            )
+            if response is not None:
+                await self._send(writer, session, "c_scene_play_drama", response)
+        elif name == "s_login_drama_finish":
+            session.tutorial.finish_login_drama(
+                int(values.get("Uid") or 0),
+                int(values.get("StageId") or 0),
+            )
         elif name == "s_login_player_add":
             self.roles[session.urs] = session.uid
             await self._send(
@@ -667,8 +691,8 @@ class GameServer:
             {
                 "URS": session.urs,
                 "Uid": 0 if role_uid is None else role_uid,
-                "DramaFlag": 0,
-                "DramaStep": 0,
+                "DramaFlag": self.login_drama_flag if self.login_drama_enabled else 0,
+                "DramaStep": self.login_drama_step if self.login_drama_enabled else 0,
                 "RoleList": [] if role_uid is None else [{"Uid": role_uid}],
                 "IsNewAccount": int(role_uid is None),
             },
