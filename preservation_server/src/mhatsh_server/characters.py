@@ -21,6 +21,12 @@ class PlayableCharacter:
 
 
 @dataclass(frozen=True, slots=True)
+class SupportCharacter:
+    name: str
+    model_asset_id: str
+
+
+@dataclass(frozen=True, slots=True)
 class MapCharacter:
     name: str
     model_asset_id: int
@@ -77,9 +83,12 @@ PLAYABLE_CHARACTERS = {
         "h1032": "Todoroki WHM 2",
         "h1039": "All For One",
         "h1110": "Stain",
-        "h1927": "Best Jeanist",
         "h1998": "Momo?",
     }.items()
+}
+
+SUPPORT_CHARACTERS = {
+    "h1927": SupportCharacter("Best Jeanist", "h1927"),
 }
 
 # hero_cfg verifies the hero rows and ShapeId values; shape_info independently

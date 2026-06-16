@@ -28,6 +28,7 @@ from mhatsh_server.characters import (
     MAP_CHARACTERS,
     PLAYABLE_CHARACTERS,
     STARTER_CHARACTER,
+    SUPPORT_CHARACTERS,
     VERIFIED_PLAYABLE_ROSTER,
     map_spawns,
     playable_card,
@@ -72,9 +73,11 @@ def test_starter_identity_matches_archived_midoriya_config() -> None:
 def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert "AXMD raw-rip" in CATALOG_SOURCE
     assert "en_hero_cfg" in CATALOG_SOURCE
-    assert len(PLAYABLE_CHARACTERS) == 32
+    assert len(PLAYABLE_CHARACTERS) == 31
+    assert len(SUPPORT_CHARACTERS) == 1
     assert len(MAP_CHARACTERS) == 40
     assert len(CHIBI_MODEL_ASSETS) == 3
+    assert SUPPORT_CHARACTERS["h1927"].name == "Best Jeanist"
     assert STARTER_CHARACTER == PLAYABLE_CHARACTERS["h1001"]
     assert STARTER_CHARACTER.hero_id == 1011
     assert STARTER_CHARACTER.shape_id == 1001
@@ -167,6 +170,7 @@ def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
     assert "h1039" not in {
         character.model_asset_id for character in VERIFIED_PLAYABLE_ROSTER
     }
+    assert "h1927" not in PLAYABLE_CHARACTERS
     assert "h1927" not in {
         character.model_asset_id for character in VERIFIED_PLAYABLE_ROSTER
     }

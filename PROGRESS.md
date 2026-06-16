@@ -79,11 +79,12 @@ environment details are intentionally omitted from Git.
 - A replacement TCP session receives `c_reconnect_flag` after
   `s_login_reconnect`, restoring the local account and player identity.
 - The supplied AXMD raw-rip list plus `en_hero_cfg` evidence is represented in
-  a typed catalog covering 32 playable models, 40 map/NPC models, and 3 chibi
-  models.
-- Thirty of the 32 playable model entries have recovered `hero_cfg` rows and
-  independently matched `shape_info` model paths. The two remaining asset-only
-  entries are All For One `h1039` and Best Jeanist `h1927`.
+  a typed catalog covering 31 playable models, 1 support model, 40 map/NPC
+  models, and 3 chibi models.
+- Thirty of the 31 playable model entries have recovered `hero_cfg` rows and
+  independently matched `shape_info` model paths. The remaining asset-only
+  playable entry is All For One `h1039`; Best Jeanist `h1927` is tracked
+  separately as support-only.
 - The recovered tables correct two tentative names in the supplied list:
   `h1031` is Tamaki Amajiki, `h1032` is Mirio Togata, and `h1998` is an All
   Might art-test variant.
@@ -132,8 +133,8 @@ Current limitations:
 1. Twenty-nine playable mappings are cataloged and packet-tested through the
    expanded roster path. The default emitted starter roster is still
    intentionally conservative until larger card sets and switch flows are
-   validated in controlled client runs. All For One `h1039` and Best Jeanist
-   `h1927` still lack matching playable `hero_cfg` rows in the recovered table.
+   validated in controlled client runs. All For One `h1039` still lacks a
+   matching playable `hero_cfg` row in the recovered table.
 2. The broader initial activity and quest-state packet set has not been
    fully reconstructed. Guide, teach-finish, base-station, city-level,
    world-map seed, first task-list/update/sync handlers, and several
