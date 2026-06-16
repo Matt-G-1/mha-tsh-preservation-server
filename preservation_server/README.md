@@ -56,11 +56,11 @@ map-marker guide step completed through the task/guide/base-station/world-task
 handlers in controlled on-device runs. The demo-cast coordinates are crowded
 and should be treated as temporary validation data, not starter-area placement.
 The world map opens with visible markers after the city-level and open-map seed
-packets. The server now also answers
-several early side-panel/task requests with schema-correct empty state so new
-UI probes fail less abruptly while real quest data is reconstructed. The
-client still performs one initial ping-waiter reconnect, then remains stable
-through the implemented reconnect acknowledgment.
+packets. The server now also answers several early side-panel/task requests and
+character-menu requests with schema-correct empty state so new UI probes fail
+less abruptly while real quest, skill, gear, rank, and support-card data is
+reconstructed. The client still performs one initial ping-waiter reconnect,
+then remains stable through the implemented reconnect acknowledgment.
 
 See `../PROGRESS.md` for the exact verified state and remaining compatibility
 work.

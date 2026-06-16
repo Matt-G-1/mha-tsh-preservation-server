@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .activity_state import ActivityState
+from .character_menu import CharacterMenuState
 from .characters import (
     STARTER_CHARACTER,
     map_spawns,
@@ -48,6 +49,7 @@ class Session:
     world: WorldState = field(default_factory=WorldState)
     world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
     activities: ActivityState = field(default_factory=ActivityState)
+    character_menu: CharacterMenuState = field(default_factory=CharacterMenuState)
     roster: RosterState | None = None
 
 
@@ -375,6 +377,134 @@ class GameServer:
             except KeyError:
                 response = {"ControlId": roster.active_card_uid}
             await self._send(writer, session, "c_area_event_switch_hero", response)
+        elif name == "s_card_show_oper":
+            await self._send(
+                writer,
+                session,
+                "c_card_show_oper",
+                session.character_menu.card_show_oper(int(values.get("Id") or 0)),
+            )
+        elif name == "s_card_lock":
+            await self._send(
+                writer,
+                session,
+                "c_card_lock",
+                session.character_menu.card_lock(
+                    int(values.get("Uid") or 0),
+                    int(values.get("IsLock") or 0),
+                ),
+            )
+        elif name == "s_card_lock_skill":
+            await self._send(
+                writer,
+                session,
+                "c_card_lock_skill",
+                session.character_menu.card_lock_skill(
+                    int(values.get("HeroCId") or 0),
+                    int(values.get("Index") or 0),
+                    int(values.get("IsLock") or 0),
+                ),
+            )
+        elif name == "s_skill_get_skill_level_list":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_skill_level_list",
+                session.character_menu.skill_level_list(
+                    [int(item) for item in list(values.get("HeroUidList") or [])],
+                    roster,
+                ),
+            )
+        elif name == "s_skill_get_spec_level_list":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_skill_spec_level_list",
+                session.character_menu.spec_level_list(
+                    [int(item) for item in list(values.get("HeroUidList") or [])],
+                    roster,
+                ),
+            )
+        elif name == "s_hero_rank_info":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_hero_rank_info",
+                session.character_menu.hero_rank_info(roster),
+            )
+        elif name == "s_training_hero_info":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_training_hero_info",
+                session.character_menu.training_hero_info(roster),
+            )
+        elif name == "s_attached_card_book":
+            await self._send(
+                writer,
+                session,
+                "c_attached_card_book",
+                session.character_menu.attached_card_book(),
+            )
+        elif name == "s_attached_card_oper":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_attached_card_info",
+                session.character_menu.attached_card_info(roster),
+            )
+        elif name == "s_equip_on":
+            await self._send(
+                writer,
+                session,
+                "c_equip_list",
+                session.character_menu.equip_list(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_equip_attr",
+                session.character_menu.equip_attr(int(values.get("EquipUid") or 0)),
+            )
+        elif name == "s_equip_off":
+            await self._send(
+                writer,
+                session,
+                "c_equip_list",
+                session.character_menu.equip_list(),
+            )
+        elif name == "s_equip_lock":
+            await self._send(
+                writer,
+                session,
+                "c_equip_attr",
+                session.character_menu.equip_attr(int(values.get("EquipUid") or 0)),
+            )
+        elif name == "s_area_event_hero_list":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_area_event_hero_list",
+                session.character_menu.area_event_hero_list(
+                    int(values.get("Type") or 0),
+                    [int(item) for item in list(values.get("Lineup") or [])],
+                    roster,
+                ),
+            )
+        elif name == "s_league_pvp_self_hero_list":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_league_pvp_self_hero_list",
+                session.character_menu.league_pvp_self_hero_list(roster),
+            )
         elif name == "s_task_get_tasklist_bytype":
             await self._send(
                 writer,
@@ -638,6 +768,18 @@ class GameServer:
                 "Uid": session.uid,
                 "CardInfo": roster.card_info(),
             },
+        )
+        await self._send(
+            writer,
+            session,
+            "c_card_show_info",
+            session.character_menu.card_show_info(),
+        )
+        await self._send(
+            writer,
+            session,
+            "c_card_hero_bio_info",
+            session.character_menu.card_hero_bio_info(roster),
         )
 
     def _ensure_roster(self, session: Session) -> RosterState:

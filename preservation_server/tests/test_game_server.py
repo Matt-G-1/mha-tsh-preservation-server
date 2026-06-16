@@ -439,6 +439,8 @@ async def _run_player_responses() -> None:
         "c_login_checkstr",
         "c_user_create",
         "c_card_seeinfo",
+        "c_card_show_info",
+        "c_card_hero_bio_info",
         "c_scene_player_info",
         "c_scene_enter",
         "c_scene_npc_create",
@@ -489,6 +491,17 @@ async def _run_player_responses() -> None:
         ],
     }
     reply_id, reply_body = replies[3]
+    assert codec.decode_message("c_card_show_info", reply_body) == {
+        "ActiveAttachedCardIdList": []
+    }
+    reply_id, reply_body = replies[4]
+    assert codec.decode_message("c_card_hero_bio_info", reply_body) == {
+        "HeroBiographyList": [
+            {"CardUid": STARTER_CARD_UID + index, "BiographyIdList": []}
+            for index, _ in enumerate(INITIAL_PLAYABLE_ROSTER)
+        ]
+    }
+    reply_id, reply_body = replies[5]
     assert codec.decode_message("c_scene_player_info", reply_body) == {
         "Uid": 4242,
         "Camp": 0,
@@ -502,7 +515,7 @@ async def _run_player_responses() -> None:
         "MoodId": 0,
         "Version": 1,
     }
-    reply_id, reply_body = replies[4]
+    reply_id, reply_body = replies[6]
     assert codec.decode_message("c_scene_enter", reply_body) == {
         "SceneUid": STARTER_SCENE_ID,
         "X": STARTER_SCENE_X,
@@ -518,11 +531,11 @@ async def _run_player_responses() -> None:
         },
         "Extra": [],
     }
-    reply_id, reply_body = replies[5]
+    reply_id, reply_body = replies[7]
     assert codec.decode_message("c_scene_npc_create", reply_body) == {
         "NpcList": [scene_npc_from_spawn(spawn) for spawn in INITIAL_MAP_SPAWNS]
     }
-    reply_id, reply_body = replies[6]
+    reply_id, reply_body = replies[8]
     assert codec.decode_message("c_data_merge_to", reply_body) == {
         "str": "c_login_ok"
     }
@@ -585,7 +598,13 @@ async def _run_expanded_roster_cards() -> None:
     await game._send_initial_cards(writer, session)
 
     decoder = FrameDecoder(RollingXor(0x13572468))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_card_seeinfo",
+        "c_card_show_info",
+        "c_card_hero_bio_info",
+    ]
+    reply_id, reply_body = replies[0]
     assert registry.protocol_names[reply_id] == "c_card_seeinfo"
     card_info = codec.decode_message("c_card_seeinfo", reply_body)["CardInfo"]
     assert card_info == [
@@ -599,10 +618,23 @@ async def _run_expanded_roster_cards() -> None:
     assert len(card_info) == 29
     assert card_info[0]["HeroId"] == STARTER_HERO_ID
     assert card_info[0]["ShapeId"] == STARTER_SHAPE_ID
+    assert codec.decode_message("c_card_show_info", replies[1][1]) == {
+        "ActiveAttachedCardIdList": []
+    }
+    assert codec.decode_message("c_card_hero_bio_info", replies[2][1]) == {
+        "HeroBiographyList": [
+            {"CardUid": STARTER_CARD_UID + index, "BiographyIdList": []}
+            for index, _ in enumerate(VERIFIED_PLAYABLE_ROSTER)
+        ]
+    }
 
 
 def test_character_roster_requests_are_stateful() -> None:
     asyncio.run(_run_character_roster_requests())
+
+
+def test_character_menu_requests_return_roster_backed_empty_state() -> None:
+    asyncio.run(_run_character_menu_requests())
 
 
 async def _run_character_roster_requests() -> None:
@@ -747,6 +779,252 @@ async def _run_character_roster_requests() -> None:
         "ControlId": STARTER_CARD_UID + 3
     }
     assert session.roster.active_hero_id == 1071
+
+
+async def _run_character_menu_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x66778899),
+        uid=4242,
+    )
+
+    skill_level = codec.encode_message(
+        "s_skill_get_skill_level_list",
+        {"HeroUidList": [STARTER_CARD_UID, STARTER_CARD_UID + 99]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_skill_get_skill_level_list"],
+        skill_level,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x66778899))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_skill_level_list"
+    assert codec.decode_message("c_skill_level_list", reply_body) == {
+        "SkillInfoList": [{"HeroUid": STARTER_CARD_UID, "SkillLevelInfo": []}]
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x778899AA)
+    spec_level = codec.encode_message(
+        "s_skill_get_spec_level_list",
+        {"HeroUidList": [STARTER_CARD_UID + 1]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_skill_get_spec_level_list"],
+        spec_level,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x778899AA))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_skill_spec_level_list"
+    assert codec.decode_message("c_skill_spec_level_list", reply_body) == {
+        "SpecInfoList": [
+            {"HeroUid": STARTER_CARD_UID + 1, "SpecLevelInfo": []}
+        ]
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x8899AABB)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_hero_rank_info"],
+        codec.encode_message("s_hero_rank_info", {}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x8899AABB))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_hero_rank_info"
+    rank_info = codec.decode_message("c_hero_rank_info", reply_body)
+    assert rank_info["TotalStar"] == 0
+    assert rank_info["HeroStar"] == [
+        {"Cid": character.hero_id, "Star": 0}
+        for character in INITIAL_PLAYABLE_ROSTER
+    ]
+    assert rank_info["TaskList"] == []
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x99AABBCC)
+    show_oper = codec.encode_message("s_card_show_oper", {"Id": 17})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_card_show_oper"],
+        show_oper,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x99AABBCC))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_card_show_oper"
+    assert codec.decode_message("c_card_show_oper", reply_body) == {"Id": 17}
+    assert session.character_menu.opened_show_ids == [17]
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xAABBCCDD)
+    card_lock = codec.encode_message(
+        "s_card_lock", {"Uid": STARTER_CARD_UID, "IsLock": 1}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_card_lock"],
+        card_lock,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xAABBCCDD))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_card_lock"
+    assert codec.decode_message("c_card_lock", reply_body) == {
+        "Uid": STARTER_CARD_UID,
+        "IsLock": 1,
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xBBCCDDEE)
+    skill_lock = codec.encode_message(
+        "s_card_lock_skill", {"HeroCId": STARTER_HERO_ID, "Index": 2, "IsLock": 1}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_card_lock_skill"],
+        skill_lock,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xBBCCDDEE))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_card_lock_skill"
+    assert codec.decode_message("c_card_lock_skill", reply_body) == {
+        "HeroCId": STARTER_HERO_ID,
+        "Index": 2,
+        "IsLock": 1,
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xCCDDEEFF)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_attached_card_book"],
+        codec.encode_message("s_attached_card_book", {}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xCCDDEEFF))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_attached_card_book"
+    assert codec.decode_message("c_attached_card_book", reply_body) == {
+        "Page": 0,
+        "Book": [],
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xDDEEFF11)
+    attached_oper = codec.encode_message(
+        "s_attached_card_oper",
+        {"HeroId": STARTER_HERO_ID, "Index": 1, "Oper": 0, "ACardUid": 0},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_attached_card_oper"],
+        attached_oper,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xDDEEFF11))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_attached_card_info"
+    assert codec.decode_message("c_attached_card_info", reply_body) == {
+        "AttachedCardInfo": [
+            {"HeroId": character.hero_id, "SlotInfo": []}
+            for character in INITIAL_PLAYABLE_ROSTER
+        ]
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xEEFF1122)
+    equip_on = codec.encode_message("s_equip_on", {"EquipUid": 1234})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_equip_on"],
+        equip_on,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xEEFF1122))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_equip_list",
+        "c_equip_attr",
+    ]
+    assert codec.decode_message("c_equip_list", replies[0][1]) == {"UidList": []}
+    assert codec.decode_message("c_equip_attr", replies[1][1]) == {
+        "EquipAttrList": {"Uid": 1234, "ExtraAttr": [], "HideAttr": []}
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xFF112233)
+    area_list = codec.encode_message(
+        "s_area_event_hero_list",
+        {"Type": 2, "Lineup": [STARTER_CARD_UID + 2]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_area_event_hero_list"],
+        area_list,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xFF112233))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_area_event_hero_list"
+    assert codec.decode_message("c_area_event_hero_list", reply_body) == {
+        "Type": 2,
+        "NormalLineup": [STARTER_CARD_UID + 2],
+        "ActLineup": [],
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x11224488)
+    training = codec.encode_message("s_training_hero_info", {"HeroId": 0})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_training_hero_info"],
+        training,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x11224488))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_training_hero_info"
+    training_info = codec.decode_message("c_training_hero_info", reply_body)
+    assert training_info["TrainingData"]["HeroId"] == STARTER_HERO_ID
+    assert training_info["TrainingData"]["CardUid"] == STARTER_CARD_UID
+    assert training_info["TrainingData"]["CardSkillLevel"] == []
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x22448811)
+    league_heroes = codec.encode_message("s_league_pvp_self_hero_list", {"Uid": 4242})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_league_pvp_self_hero_list"],
+        league_heroes,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x22448811))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_league_pvp_self_hero_list"
+    assert codec.decode_message("c_league_pvp_self_hero_list", reply_body) == {
+        "HeroList": [
+            {
+                "HeroCId": character.hero_id,
+                "Hp": 100,
+                "BuffLayer": 0,
+                "CdTime": 0,
+            }
+            for character in INITIAL_PLAYABLE_ROSTER
+        ]
+    }
 
 
 def test_scene_load_completion_response() -> None:
