@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .beginner_quest import BEGINNER_QUEST_DEATH_ARMS_UID
+
 
 CATALOG_SOURCE = (
     "User-supplied AXMD raw-rip list plus en_hero_cfg evidence, 2026-06-15"
@@ -227,17 +229,18 @@ for model_id, name in (
     )
 
 DEATH_ARMS = MAP_CHARACTERS[5007]
-DEATH_ARMS_DEMO_SPAWN = MapSpawn(
-    label="death_arms_demo_near_honei_spawn",
+BEGINNER_QUEST_DEATH_ARMS_SPAWN = MapSpawn(
+    label="beginner_quest_death_arms_honei_objective",
     character=DEATH_ARMS,
-    uid=20001,
+    uid=BEGINNER_QUEST_DEATH_ARMS_UID,
     x=6421,
     y=21931,
     z=0,
     face=180,
 )
+DEATH_ARMS_DEMO_SPAWN = BEGINNER_QUEST_DEATH_ARMS_SPAWN
 INITIAL_MAP_SPAWNS: tuple[MapSpawn, ...] = ()
-TUTORIAL_MAP_SPAWNS = (DEATH_ARMS_DEMO_SPAWN,)
+TUTORIAL_MAP_SPAWNS = (BEGINNER_QUEST_DEATH_ARMS_SPAWN,)
 DEMO_CAST_MAP_SPAWNS = (
     DEATH_ARMS_DEMO_SPAWN,
     MapSpawn(

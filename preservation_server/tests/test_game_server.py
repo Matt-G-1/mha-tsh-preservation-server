@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from mhatsh_server.activity_state import ActivityState
+from mhatsh_server.beginner_quest import BEGINNER_QUEST_DEATH_ARMS_UID
 from mhatsh_server.game_server import (
     STARTER_CARD_UID,
     STARTER_HERO_ID,
@@ -146,9 +147,9 @@ def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
         assert "unknown map spawn mode" in str(exc)
     else:  # pragma: no cover - the guardrail is the behavior under test.
         raise AssertionError("expanded must not enable validation-only map spawns")
-    assert DEATH_ARMS_DEMO_SPAWN.label == "death_arms_demo_near_honei_spawn"
+    assert DEATH_ARMS_DEMO_SPAWN.label == "beginner_quest_death_arms_honei_objective"
     assert DEATH_ARMS_DEMO_SPAWN.character == DEATH_ARMS
-    assert DEATH_ARMS_DEMO_SPAWN.uid == 20001
+    assert DEATH_ARMS_DEMO_SPAWN.uid == BEGINNER_QUEST_DEATH_ARMS_UID
     assert DEATH_ARMS_DEMO_SPAWN.x == 6421
     assert DEATH_ARMS_DEMO_SPAWN.y == 21931
     assert DEATH_ARMS_DEMO_SPAWN.face == 180
@@ -1451,6 +1452,23 @@ async def _run_task_requests() -> None:
     assert codec.decode_message("c_scene_npc_create", replies[1][1]) == {
         "NpcList": [scene_npc_from_spawn(spawn) for spawn in TUTORIAL_MAP_SPAWNS]
     }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x7A8B9CAD)
+    repeated_accept = codec.encode_message(
+        "s_task_accept", {"task_id": STARTER_TASK.id}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_accept"],
+        repeated_accept,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x7A8B9CAD))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_info_update"
+    ]
 
     writer.data.clear()
     session.outbound = RollingXor(0x8899AABB)

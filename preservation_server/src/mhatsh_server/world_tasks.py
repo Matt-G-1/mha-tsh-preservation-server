@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .beginner_quest import (
+    BEGINNER_QUEST_CITY_EXP,
+    BEGINNER_QUEST_CITY_LEVEL,
+    STARTER_TASK_ID,
+    STARTER_WORLD_AREA_ID,
+    STARTER_WORLD_MAP_ID,
+)
 
-STARTER_WORLD_MAP_ID = 1000
 STARTER_CITY_LEVEL = 1
-BEGINNER_QUEST_CITY_EXP = 100
-BEGINNER_QUEST_CITY_LEVEL = 2
 
 
 @dataclass(slots=True)
@@ -31,7 +35,11 @@ class WorldTaskState:
     def world_task_info(self) -> dict[str, object]:
         return {
             "FinishList": [
-                {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": 1301}
+                {
+                    "Map": STARTER_WORLD_MAP_ID,
+                    "Area": STARTER_WORLD_AREA_ID,
+                    "TaskId": STARTER_TASK_ID,
+                }
             ]
             if self.completed_beginner_quest
             else [],

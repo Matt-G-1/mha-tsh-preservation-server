@@ -2,12 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .beginner_quest import (
+    STARTER_GUIDE_STEP,
+    STARTER_TASK_CONDITION_ID,
+    STARTER_TASK_ID,
+    STARTER_TASK_TYPE,
+)
+
 
 TASK_STATUS_AVAILABLE = 1
 TASK_STATUS_ACCEPTED = 2
 TASK_STATUS_FINISHED = 3
-STARTER_GUIDE_ID = 1301
-STARTER_GUIDE_STEP = 10011
+STARTER_GUIDE_ID = STARTER_TASK_ID
 
 
 @dataclass(slots=True)
@@ -62,6 +68,7 @@ class TaskState:
     def __init__(self) -> None:
         self.tasks: dict[int, TaskRecord] = {STARTER_TASK.id: STARTER_TASK.clone()}
         self.finished: set[int] = set()
+        self.spawned_task_npcs: set[int] = set()
 
     def task_info(self, task_type: int | None = None) -> dict[str, object]:
         tasks = [
@@ -107,6 +114,14 @@ class TaskState:
             return None
         return self.complete_guide(guide_id)
 
+    def should_spawn_beginner_npc(self, task_id: int) -> bool:
+        if task_id != STARTER_TASK.id:
+            return False
+        if task_id in self.finished or task_id in self.spawned_task_npcs:
+            return False
+        self.spawned_task_npcs.add(task_id)
+        return True
+
     def sync_info(
         self, task_id: int, sync_type: str, params: list[str]
     ) -> dict[str, object]:
@@ -141,11 +156,11 @@ class TaskState:
 
 STARTER_TASK = TaskRecord(
     id=STARTER_GUIDE_ID,
-    type=1,
+    type=STARTER_TASK_TYPE,
     status=TASK_STATUS_AVAILABLE,
     conditions=(
         TaskCondition(
-            id=1,
+            id=STARTER_TASK_CONDITION_ID,
             completed_count=0,
             params=(STARTER_GUIDE_ID, STARTER_GUIDE_STEP),
         ),

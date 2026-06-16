@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .activity_state import ActivityState
+from .beginner_quest import STARTER_TASK_ID
 from .character_menu import CharacterMenuState
 from .characters import (
     STARTER_CHARACTER,
@@ -512,7 +513,9 @@ class GameServer:
                 "c_task_info_update",
                 session.tasks.accept(int(values.get("task_id") or 0)),
             )
-            if int(values.get("task_id") or 0) == 1301:
+            if session.tasks.should_spawn_beginner_npc(
+                int(values.get("task_id") or 0)
+            ):
                 await self._send(
                     writer,
                     session,
@@ -807,7 +810,7 @@ class GameServer:
         task_info = task_update.get("task_info")
         if not isinstance(task_info, dict):
             return
-        if int(task_info.get("Id") or 0) != 1301:
+        if int(task_info.get("Id") or 0) != STARTER_TASK_ID:
             return
         if int(task_info.get("Status") or 0) != 3:
             return
