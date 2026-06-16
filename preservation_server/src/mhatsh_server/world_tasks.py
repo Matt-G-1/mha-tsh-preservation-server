@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 
 STARTER_WORLD_MAP_ID = 1000
 STARTER_CITY_LEVEL = 1
+BEGINNER_QUEST_CITY_EXP = 100
+BEGINNER_QUEST_CITY_LEVEL = 2
 
 
 @dataclass(slots=True)
@@ -13,10 +15,12 @@ class WorldTaskState:
         default_factory=lambda: {STARTER_WORLD_MAP_ID}
     )
     city_level: int = STARTER_CITY_LEVEL
+    city_exp: int = 0
     clicked_city_levels: set[int] = field(default_factory=set)
     reward_rate: int = 0
     ignore_auto_finish_tips: int = 0
     auto_finished_tasks: set[int] = field(default_factory=set)
+    completed_beginner_quest: bool = False
 
     def city_level_info(self) -> dict[str, object]:
         return {
@@ -26,7 +30,11 @@ class WorldTaskState:
 
     def world_task_info(self) -> dict[str, object]:
         return {
-            "FinishList": [],
+            "FinishList": [
+                {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": 1301}
+            ]
+            if self.completed_beginner_quest
+            else [],
             "OpenWorldMap": [
                 {"MapId": map_id} for map_id in sorted(self.open_world_maps)
             ],
@@ -42,6 +50,25 @@ class WorldTaskState:
         if level > 0:
             self.clicked_city_levels.add(level)
         return {"Level": level}
+
+    def complete_beginner_quest(self) -> list[tuple[str, dict[str, object]]]:
+        if self.completed_beginner_quest:
+            return []
+        self.completed_beginner_quest = True
+        self.city_exp += BEGINNER_QUEST_CITY_EXP
+        if self.city_level < BEGINNER_QUEST_CITY_LEVEL:
+            self.city_level = BEGINNER_QUEST_CITY_LEVEL
+            return [
+                ("c_city_level_add_exp", {"Exp": self.city_exp}),
+                ("c_city_level_up", {"Level": self.city_level}),
+                ("c_city_level_info", self.city_level_info()),
+                ("c_world_task_info", self.world_task_info()),
+            ]
+        return [
+            ("c_city_level_add_exp", {"Exp": self.city_exp}),
+            ("c_city_level_info", self.city_level_info()),
+            ("c_world_task_info", self.world_task_info()),
+        ]
 
     def world_task_reward_rate(self, rate: int) -> dict[str, object]:
         self.reward_rate = max(0, rate)

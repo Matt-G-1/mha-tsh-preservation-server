@@ -231,12 +231,13 @@ DEATH_ARMS_DEMO_SPAWN = MapSpawn(
     label="death_arms_demo_near_honei_spawn",
     character=DEATH_ARMS,
     uid=20001,
-    x=4421,
-    y=19931,
+    x=6421,
+    y=21931,
     z=0,
     face=180,
 )
-INITIAL_MAP_SPAWNS = (DEATH_ARMS_DEMO_SPAWN,)
+INITIAL_MAP_SPAWNS: tuple[MapSpawn, ...] = ()
+TUTORIAL_MAP_SPAWNS = (DEATH_ARMS_DEMO_SPAWN,)
 DEMO_CAST_MAP_SPAWNS = (
     DEATH_ARMS_DEMO_SPAWN,
     MapSpawn(
@@ -292,8 +293,10 @@ DEMO_CAST_MAP_SPAWNS = (
 
 def map_spawns(mode: str | None = None) -> tuple[MapSpawn, ...]:
     normalized = (mode or "starter").strip().lower()
-    if normalized in {"starter", "initial", "default", "tutorial"}:
+    if normalized in {"starter", "initial", "default"}:
         return INITIAL_MAP_SPAWNS
+    if normalized in {"tutorial", "beginner", "quest"}:
+        return TUTORIAL_MAP_SPAWNS
     if normalized in {"demo_cast", "demo-cast", "validation", "lab"}:
         return DEMO_CAST_MAP_SPAWNS
     if normalized in {"none", "off", "disabled"}:

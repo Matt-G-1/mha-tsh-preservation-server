@@ -29,6 +29,7 @@ from mhatsh_server.characters import (
     PLAYABLE_CHARACTERS,
     STARTER_CHARACTER,
     SUPPORT_CHARACTERS,
+    TUTORIAL_MAP_SPAWNS,
     VERIFIED_PLAYABLE_ROSTER,
     map_spawns,
     playable_card,
@@ -48,7 +49,12 @@ from mhatsh_server.tasks import (
 )
 from mhatsh_server.tutorial import TutorialState
 from mhatsh_server.world import ScenePosition, WorldState
-from mhatsh_server.world_tasks import STARTER_WORLD_MAP_ID, WorldTaskState
+from mhatsh_server.world_tasks import (
+    BEGINNER_QUEST_CITY_EXP,
+    BEGINNER_QUEST_CITY_LEVEL,
+    STARTER_WORLD_MAP_ID,
+    WorldTaskState,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -127,9 +133,10 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
 
 
 def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
-    assert INITIAL_MAP_SPAWNS == (DEATH_ARMS_DEMO_SPAWN,)
+    assert INITIAL_MAP_SPAWNS == ()
+    assert TUTORIAL_MAP_SPAWNS == (DEATH_ARMS_DEMO_SPAWN,)
     assert map_spawns("starter") == INITIAL_MAP_SPAWNS
-    assert map_spawns("tutorial") == INITIAL_MAP_SPAWNS
+    assert map_spawns("tutorial") == TUTORIAL_MAP_SPAWNS
     assert map_spawns("none") == ()
     assert map_spawns("demo_cast") == DEMO_CAST_MAP_SPAWNS
     assert map_spawns("validation") == DEMO_CAST_MAP_SPAWNS
@@ -142,6 +149,8 @@ def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
     assert DEATH_ARMS_DEMO_SPAWN.label == "death_arms_demo_near_honei_spawn"
     assert DEATH_ARMS_DEMO_SPAWN.character == DEATH_ARMS
     assert DEATH_ARMS_DEMO_SPAWN.uid == 20001
+    assert DEATH_ARMS_DEMO_SPAWN.x == 6421
+    assert DEATH_ARMS_DEMO_SPAWN.y == 21931
     assert DEATH_ARMS_DEMO_SPAWN.face == 180
     assert not DEATH_ARMS_DEMO_SPAWN.is_authored_placement
     assert [spawn.uid for spawn in DEMO_CAST_MAP_SPAWNS] == list(range(20001, 20008))
@@ -1110,6 +1119,10 @@ async def _run_guide_finish() -> None:
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_guide_finish",
         "c_task_info_update",
+        "c_city_level_add_exp",
+        "c_city_level_up",
+        "c_city_level_info",
+        "c_world_task_info",
     ]
     reply_id, reply_body = replies[0]
     assert registry.protocol_names[reply_id] == "c_guide_finish"
@@ -1121,6 +1134,19 @@ async def _run_guide_finish() -> None:
     task_update = codec.decode_message("c_task_info_update", reply_body)
     assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
     assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert codec.decode_message("c_city_level_add_exp", replies[2][1]) == {
+        "Exp": BEGINNER_QUEST_CITY_EXP
+    }
+    assert codec.decode_message("c_city_level_up", replies[3][1]) == {
+        "Level": BEGINNER_QUEST_CITY_LEVEL
+    }
+    assert codec.decode_message("c_city_level_info", replies[4][1]) == {
+        "Level": BEGINNER_QUEST_CITY_LEVEL,
+        "ClickList": [],
+    }
+    assert codec.decode_message("c_world_task_info", replies[5][1])["FinishList"] == [
+        {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": STARTER_GUIDE_ID}
+    ]
 
     writer.data.clear()
     session.outbound = RollingXor(0x20304050)
@@ -1206,11 +1232,25 @@ async def _run_client_stat() -> None:
     )
 
     decoder = FrameDecoder(RollingXor(0x31415926))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_info_update",
+        "c_city_level_add_exp",
+        "c_city_level_up",
+        "c_city_level_info",
+        "c_world_task_info",
+    ]
+    reply_id, reply_body = replies[0]
     assert registry.protocol_names[reply_id] == "c_task_info_update"
     task_update = codec.decode_message("c_task_info_update", reply_body)
     assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
     assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert codec.decode_message("c_city_level_add_exp", replies[1][1]) == {
+        "Exp": BEGINNER_QUEST_CITY_EXP
+    }
+    assert codec.decode_message("c_city_level_up", replies[2][1]) == {
+        "Level": BEGINNER_QUEST_CITY_LEVEL
+    }
     assert session.tutorial.client_stats == [
         {"StatId": 2, "NumData": [1, 1301, 10011], "StrData": ["", ""]}
     ]
@@ -1397,12 +1437,20 @@ async def _run_task_requests() -> None:
         writer,
     )
     decoder = FrameDecoder(RollingXor(0x778899AA))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_info_update",
+        "c_scene_npc_create",
+    ]
+    reply_id, reply_body = replies[0]
     assert registry.protocol_names[reply_id] == "c_task_info_update"
     accepted = codec.decode_message("c_task_info_update", reply_body)
     assert accepted["action_type"] == 1
     assert accepted["task_info"]["Id"] == STARTER_TASK.id
     assert accepted["task_info"]["Status"] == TASK_STATUS_ACCEPTED
+    assert codec.decode_message("c_scene_npc_create", replies[1][1]) == {
+        "NpcList": [scene_npc_from_spawn(spawn) for spawn in TUTORIAL_MAP_SPAWNS]
+    }
 
     writer.data.clear()
     session.outbound = RollingXor(0x8899AABB)
@@ -1414,7 +1462,15 @@ async def _run_task_requests() -> None:
         writer,
     )
     decoder = FrameDecoder(RollingXor(0x8899AABB))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_info_update",
+        "c_city_level_add_exp",
+        "c_city_level_up",
+        "c_city_level_info",
+        "c_world_task_info",
+    ]
+    reply_id, reply_body = replies[0]
     assert registry.protocol_names[reply_id] == "c_task_info_update"
     submitted = codec.decode_message("c_task_info_update", reply_body)
     assert submitted["action_type"] == 2
@@ -1519,6 +1575,34 @@ def test_world_task_state_tracks_map_compatibility_values() -> None:
 
     assert world_tasks.city_level_click(3) == {"Level": 3}
     assert world_tasks.city_level_info() == {"Level": 1, "ClickList": [3]}
+    assert world_tasks.complete_beginner_quest() == [
+        ("c_city_level_add_exp", {"Exp": BEGINNER_QUEST_CITY_EXP}),
+        ("c_city_level_up", {"Level": BEGINNER_QUEST_CITY_LEVEL}),
+        (
+            "c_city_level_info",
+            {"Level": BEGINNER_QUEST_CITY_LEVEL, "ClickList": [3]},
+        ),
+        (
+            "c_world_task_info",
+            {
+                "FinishList": [
+                    {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": 1301}
+                ],
+                "OpenWorldMap": [{"MapId": STARTER_WORLD_MAP_ID}],
+                "PrestigeMap": 0,
+                "PrestigeTaskStatus": 0,
+                "IsFirstRewardSign": 0,
+                "RewardBase": 0,
+                "ExtraReward": [],
+                "IgnoreAutoFinishTips": 0,
+            },
+        ),
+    ]
+    assert world_tasks.complete_beginner_quest() == []
+    assert world_tasks.city_level_info() == {
+        "Level": BEGINNER_QUEST_CITY_LEVEL,
+        "ClickList": [3],
+    }
     assert world_tasks.world_task_reward_rate(15) == {"Rate": 15}
     assert world_tasks.ignore_auto_finish_tips_response(7) == {"Flag": 1}
     assert world_tasks.auto_finish_response(1301) == {"IsSuccess": 1}

@@ -52,6 +52,14 @@ environment details are intentionally omitted from Git.
   acknowledgment.
 - Observed first-guide telemetry (`s_client_stat` guide `1301`, step `10011`)
   is recorded in tutorial state and can complete the starter task exactly once.
+- Starter scene entry no longer emits the local Death Arms validation spawn by
+  default. Accepting starter task `1301` now sends the verified Death Arms quest
+  NPC through `c_scene_npc_create`, keeping the city spawn clean until the
+  beginner quest is active.
+- Completing beginner guide/task `1301` now emits `c_city_level_add_exp`,
+  `c_city_level_up`, refreshed `c_city_level_info`, and refreshed
+  `c_world_task_info`, marking map `1000` task `1301` finished and moving the
+  local city-level state to level 2.
 - A controlled on-device run of the current server code validated the starter
   task bridge live: tapping the highlighted map marker produced
   `s_client_stat` `[1, 1301, 10011]`, `s_guide_finish` for guide `1301`,

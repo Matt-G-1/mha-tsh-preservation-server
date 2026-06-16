@@ -14,6 +14,7 @@ from .activity_state import ActivityState
 from .character_menu import CharacterMenuState
 from .characters import (
     STARTER_CHARACTER,
+    TUTORIAL_MAP_SPAWNS,
     map_spawns,
     playable_roster,
     scene_npc_from_spawn,
@@ -202,11 +203,8 @@ class GameServer:
             for guide_id in guide_response["Ids"]:
                 task_update = session.tasks.complete_guide(int(guide_id))
                 if task_update is not None:
-                    await self._send(
-                        writer,
-                        session,
-                        "c_task_info_update",
-                        task_update,
+                    await self._send_task_progression(
+                        writer, session, task_update
                     )
         elif name == "s_guide_drama":
             session.tutorial.record_guide_drama(
@@ -221,12 +219,7 @@ class GameServer:
             )
             task_update = session.tasks.observe_client_stat(stat)
             if task_update is not None:
-                await self._send(
-                    writer,
-                    session,
-                    "c_task_info_update",
-                    task_update,
-                )
+                await self._send_task_progression(writer, session, task_update)
         elif name == "s_teach_finish":
             await self._send(
                 writer,
@@ -519,11 +512,22 @@ class GameServer:
                 "c_task_info_update",
                 session.tasks.accept(int(values.get("task_id") or 0)),
             )
+            if int(values.get("task_id") or 0) == 1301:
+                await self._send(
+                    writer,
+                    session,
+                    "c_scene_npc_create",
+                    {
+                        "NpcList": [
+                            scene_npc_from_spawn(spawn)
+                            for spawn in TUTORIAL_MAP_SPAWNS
+                        ]
+                    },
+                )
         elif name == "s_task_submit":
-            await self._send(
+            await self._send_task_progression(
                 writer,
                 session,
-                "c_task_info_update",
                 session.tasks.submit(int(values.get("task_id") or 0)),
             )
         elif name == "s_task_sync_info":
@@ -792,6 +796,23 @@ class GameServer:
                 first_card_uid=STARTER_CARD_UID,
             )
         return session.roster
+
+    async def _send_task_progression(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        task_update: dict[str, Any],
+    ) -> None:
+        await self._send(writer, session, "c_task_info_update", task_update)
+        task_info = task_update.get("task_info")
+        if not isinstance(task_info, dict):
+            return
+        if int(task_info.get("Id") or 0) != 1301:
+            return
+        if int(task_info.get("Status") or 0) != 3:
+            return
+        for packet_name, packet_values in session.world_tasks.complete_beginner_quest():
+            await self._send(writer, session, packet_name, packet_values)
 
     async def _send(
         self,

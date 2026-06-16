@@ -23,9 +23,9 @@ completion, a stateful seven-hero card roster, first-pass character selection
 responses, verified map NPC packet generation, guide-finish acknowledgment,
 teach-finish acknowledgment, base-station initialization, city/world-task map
 seed packets, starter task listing and updates, observed first-guide
-client-stat tracking, empty-state replies for early activity/task panels,
-world-session movement/frame/error tracking, time-ping replies, and the
-login-level reconnect acknowledgment.
+client-stat tracking, beginner quest city-level progression, empty-state
+replies for early activity/task panels, world-session movement/frame/error
+tracking, time-ping replies, and the login-level reconnect acknowledgment.
 Unknown client messages are decoded and logged for iterative compatibility
 work.
 
@@ -34,18 +34,21 @@ constructs its required `clsUserData` record before `c_login_ok`. Set
 `MHATSH_AUTO_PROVISION_ROLE=0` to exercise the empty-account creation branch.
 `MHATSH_PING_RESPONSE_DELAY` controls the small delay that avoids a
 callback-registration race in the archived client. It defaults to `0.05`
-seconds. `MHATSH_SEND_MAP_CHARACTERS=0` disables local demonstration NPC
-spawns without disabling scene entry. `MHATSH_MAP_SPAWN_MODE=demo_cast`
-enables the opt-in seven-NPC packet-validation cast for controlled testing.
-This mode is not starter-area-authored content and is intentionally separate
-from expanded playable roster testing.
+seconds. Starter scene entry sends no NPCs by default; accepting starter task
+`1301` sends the verified Death Arms quest NPC. `MHATSH_SEND_MAP_CHARACTERS=0`
+disables scene-entry map-character packets without disabling scene entry.
+`MHATSH_MAP_SPAWN_MODE=tutorial` restores the Death Arms quest spawn at scene
+entry for controlled testing, and `MHATSH_MAP_SPAWN_MODE=demo_cast` enables the
+opt-in seven-NPC packet-validation cast. These modes are not
+starter-area-authored content and are intentionally separate from expanded
+playable roster testing.
 
 The client now reaches Honei Urban Area, renders Midoriya and its world HUD,
 and opens the world quest map. The server's initial owned-card roster contains
-Midoriya, Bakugo, Iida, Ochaco, Todoroki, Momo, and Denki. Death Arms is sent
-through `c_scene_npc_create` at an explicitly local demonstration position by
-default; the opt-in demo-cast mode serializes Death Arms plus six additional
-verified NPC rows. The catalog contains 30 protocol-verified playable
+Midoriya, Bakugo, Iida, Ochaco, Todoroki, Momo, and Denki. Death Arms is now
+quest-gated behind starter task acceptance; the opt-in demo-cast mode
+serializes Death Arms plus six additional verified NPC rows. The catalog
+contains 30 protocol-verified playable
 mappings; only All For One `h1039` remains asset-only in the playable list.
 Best Jeanist `h1927` is tracked separately as a support character. The roster
 and NPC additions pass packet-level tests. The roster
