@@ -859,6 +859,47 @@ STAGE_CFG_SCRIPT_ROUTE_GROUPS: dict[int, tuple[str, ...]] = {
 }
 
 
+STAGE_CFG_ROUTE_LABELS: dict[int, str] = {
+    160001: "All Might's guidance",
+    201005: "检查信号塔",
+    201006: "调查信号源",
+    300301: "Quirk Mastery Test",
+    300401: "聚集的敌人",
+    300502: "It's a Robo Inferno!",
+    300505: "Become the best cavalry there is!",
+    310403: "Respective Battleground 01",
+    400115: "Boss Stage 1",
+    400118: "Boss Stage 3",
+    404105: "研究所袭击事件上5",
+    404201: "研究所袭击事件下",
+    404205: "区域事件4-2-幕后黑手",
+    405103: "突出重围3（现6-1）",
+    405252: "区域事件5-2Boss",
+    405302: "夜间突袭2",
+    406205: "区域事件5-2-幕后黑手",
+    406305: "脑无",
+    406502: "区域事件6-5修复电力",
+    406505: "突出重围5",
+    406506: "突出重围6",
+    561002: "支线任务2",
+    561112: "yyk-李季田等院战斗3",
+    561113: "yyk-李季田等院战斗4",
+    561203: "世界任务复制2-3（临时）",
+    561211: "yhc-信号塔2支线抓狗关卡1",
+    561223: "限时救援",
+    561224: "昊程塔2-1支线1-烈火克星后续",
+    561304: "李季塔3-4",
+    562406: "雄英塔4-2级-子弹追踪-战斗1",
+    562407: "雄英塔4-2级-子弹追踪-战斗2",
+    562504: "sr-塔5—1支线4-沙滩救狗",
+    562610: "芷晴塔1-1级-独立支线1-战斗",
+    563701: "芷晴塔2-1级-独立支线3-战斗",
+    563901: "新城区9塔1级-独立支线1-战斗",
+    563903: "新城区9塔1级-独立支线2-战斗",
+    571101: "本英町",
+}
+
+
 STAGE_CFG_ENCOUNTER_GROUPS: dict[int, tuple[int, ...]] = {
     160001: (16000101,),
     201005: (20100502,),
@@ -1351,7 +1392,10 @@ def _stage_cfg_script_route_definitions() -> tuple[BattleStageDefinition, ...]:
     return tuple(
         BattleStageDefinition(
             key=f"stage_cfg_route_{stage_id}",
-            label=f"stage_cfg routed drama stage {stage_id}",
+            label=STAGE_CFG_ROUTE_LABELS.get(
+                stage_id,
+                f"stage_cfg routed drama stage {stage_id}",
+            ),
             stage_id=stage_id,
             scripts=scripts,
             enemy_group_ids=STAGE_CFG_ENCOUNTER_GROUPS.get(stage_id, ()),

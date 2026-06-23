@@ -204,6 +204,8 @@ The clean-room server now supports:
   script-to-stage groups are represented as `stage_cfg_route_*` definitions
   where they do not conflict with stronger explicit stage entries, including
   `901008 -> 563903`, `101201_1 -> 571101`, and `zx_touqiu -> 300301`.
+  Nearby original route labels are now parsed too, so promoted route stages can
+  use recovered names instead of generic numeric labels.
 - The English `monster_cfg` asset now contributes parsed enemy evidence through
   `scripts/derive_monster_cfg_hints.py`. High-confidence animation/display-name
   associations are promoted into the stage layer for Nomu, Twice, Faux Villain,

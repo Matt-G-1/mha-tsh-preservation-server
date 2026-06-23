@@ -310,7 +310,10 @@ environment details are intentionally omitted from Git.
   script-to-stage groups into the runtime catalog where they do not conflict
   with stronger explicit definitions. This corrects several numeric-looking
   script assumptions: for example, `901008` routes to real stage `563903`,
-  `101201_1` routes to `571101`, and `zx_touqiu` routes to `300301`.
+  `101201_1` routes to `571101`, and `zx_touqiu` routes to `300301`. The same
+  extractor now recovers nearby original route labels, and promoted
+  `stage_cfg_route_*` definitions use those labels when no stronger stage
+  definition already owns the ID.
 - The same packed `stage_cfg.lua` data now has an encounter-group extractor:
   `scripts/derive_stage_cfg_encounter_hints.py`. It recovers 32
   stage-to-encounter group links from script neighborhoods, adds the

@@ -23,6 +23,15 @@ DEFAULT_STAGE_CFG_ASSET = (
 LUA_HEADER = b"\x1bLua"
 STRING_TAGS = {4, 0x37}
 STAGE_REF_RE = re.compile(r"^stage(\d{3,6})(?:[a-z]|_\d+|_[a-z]+)?$")
+CONTROL_LABELS = {
+    "EndDrama",
+    "FailDrama",
+    "HideGroupIdList",
+    "PreloadNPCList",
+    "StageBuffAmount",
+    "StageBuffTypeId",
+    "TimeType",
+}
 
 
 class _RootConstantReader:
@@ -115,13 +124,44 @@ def _candidate_score(
     return score
 
 
-def _route_for_script(script: str, index: int, constants: list[object]) -> dict[str, object]:
+def _is_probable_route_label(value: str, drama_scripts: set[str]) -> bool:
+    if not value or value in drama_scripts or value in CONTROL_LABELS:
+        return False
+    if value.isdigit() or value.endswith(".flv"):
+        return False
+    if value.startswith(('"', "'")) or "..." in value or value.startswith("Unlock Lv."):
+        return False
+    if len(value) > 72:
+        return False
+    return True
+
+
+def _route_label_for_script(
+    index: int,
+    constants: list[object],
+    drama_scripts: set[str],
+) -> str:
+    for cursor in range(index - 1, max(-1, index - 10), -1):
+        value = constants[cursor]
+        if isinstance(value, str) and _is_probable_route_label(value, drama_scripts):
+            return value
+    return ""
+
+
+def _route_for_script(
+    script: str,
+    index: int,
+    constants: list[object],
+    drama_scripts: set[str],
+) -> dict[str, object]:
+    route_label = _route_label_for_script(index, constants, drama_scripts)
     embedded = STAGE_REF_RE.match(script)
     if embedded:
         return {
             "route_stage_id": int(embedded.group(1)),
             "confidence": "embedded",
             "constant_index": index,
+            "route_label": route_label,
         }
 
     start = max(0, index - 12)
@@ -134,12 +174,18 @@ def _route_for_script(script: str, index: int, constants: list[object]) -> dict[
         score = _candidate_score(value, constants, position, end)
         candidates.append((score, -abs(index - position), value))
     if not candidates:
-        return {"route_stage_id": None, "confidence": "none", "constant_index": index}
+        return {
+            "route_stage_id": None,
+            "confidence": "none",
+            "constant_index": index,
+            "route_label": route_label,
+        }
     score, _, stage_id = max(candidates)
     return {
         "route_stage_id": stage_id,
         "confidence": "prefix-neighborhood" if score else "nearby",
         "constant_index": index,
+        "route_label": route_label,
     }
 
 
@@ -157,7 +203,7 @@ def collect_stage_cfg_route_hints(
     for index, value in enumerate(constants):
         if not isinstance(value, str) or value not in drama_scripts:
             continue
-        routes[value] = _route_for_script(value, index, constants)
+        routes[value] = _route_for_script(value, index, constants, drama_scripts)
     return {
         "constant_count": len(constants),
         "script_route_count": len(routes),

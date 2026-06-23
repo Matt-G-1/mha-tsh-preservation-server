@@ -96,6 +96,7 @@ from mhatsh_server.stages import (
     STAGE_CFG_AI_PROFILE_OVERRIDES_BY_ENEMY_ID,
     STAGE_CFG_COMBAT_ENEMY_IDS_BY_STAGE,
     STAGE_CFG_ENCOUNTER_GROUPS,
+    STAGE_CFG_ROUTE_LABELS,
     StageState,
     STAGE_CFG_SCRIPT_ROUTE_GROUPS,
     ZX_NUMERIC_STAGE_SCRIPT_GROUPS,
@@ -497,6 +498,7 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
 
     stage_cfg_route = stage_candidate_by_id(563903)
     assert stage_cfg_route.key == "stage_cfg_route_563903"
+    assert stage_cfg_route.label == "新城区9塔1级-独立支线2-战斗"
     assert stage_cfg_route.scripts == ("901008",)
     assert stage_cfg_route.enemy_group_ids == (
         56390301,
@@ -508,6 +510,10 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     )
     assert stage_cfg_route.combat_enemy_ids == (56390301, 56390302, 56390303)
     assert stage_cfg_route.source == "parsed from packed stage_cfg constant routes, 2026-06-23"
+    assert STAGE_CFG_ROUTE_LABELS[160001] == "All Might's guidance"
+    assert STAGE_CFG_ROUTE_LABELS[300401] == "聚集的敌人"
+    assert stage_candidate_by_id(300401).label == "聚集的敌人"
+    assert stage_candidate_by_id(571101).label == "本英町"
     assert stage_candidate_by_id(571101).scripts == ("101201_1",)
     assert stage_candidate_by_id(571101).enemy_group_ids == (
         57110101,
@@ -698,11 +704,15 @@ def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
         "route_stage_id": 160001,
         "confidence": "embedded",
         "constant_index": 1542,
+        "route_label": "All Might's guidance",
     }
     assert hints["routes"]["901008"]["route_stage_id"] == 563903
     assert hints["routes"]["901008"]["confidence"] == "prefix-neighborhood"
+    assert hints["routes"]["901008"]["route_label"] == "新城区9塔1级-独立支线2-战斗"
     assert hints["routes"]["101201_1"]["route_stage_id"] == 571101
+    assert hints["routes"]["101201_1"]["route_label"] == "本英町"
     assert hints["routes"]["zx_touqiu"]["route_stage_id"] == 300301
+    assert hints["routes"]["zx_touqiu"]["route_label"] == "Quirk Mastery Test"
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
