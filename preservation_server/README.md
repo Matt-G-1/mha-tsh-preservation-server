@@ -50,9 +50,11 @@ and opens the world quest map. The server's initial owned-card roster contains
 Midoriya, Bakugo, Iida, Ochaco, Todoroki, Momo, and Denki. Death Arms is now
 quest-gated behind starter task acceptance; the opt-in demo-cast mode
 serializes Death Arms plus six additional verified NPC rows. The catalog
-contains 30 protocol-verified playable
-mappings; only All For One `h1039` remains asset-only in the playable list.
-Best Jeanist `h1927` is tracked separately as a support character. The roster
+contains 30 protocol-verified hero/config mappings, with 26 currently exposed
+as public playable roster cards. Small-form/variant/internal rows such as Jiro
+remain excluded from the public roster; only All For One `h1039` remains
+asset-only in the raw playable list. Best Jeanist `h1927` is tracked
+separately as a support character. The roster
 and NPC additions pass packet-level tests. The roster
 now tracks active card and active visible hero state for user-info,
 card-fight, bridge-fight, team-change, and area-event switch requests. Death
@@ -72,10 +74,12 @@ For post-tutorial restoration testing, the server also has an opt-in unlocked
 profile. Set `MHATSH_ROSTER_MODE=verified`, `MHATSH_PLAYER_LEVEL=70`,
 `MHATSH_HERO_LEVEL=70`, `MHATSH_CITY_LEVEL=60`,
 `MHATSH_SKIP_STARTER_QUEST=1`, and `MHATSH_UNLOCK_ALL_FUNCTIONS=1`. This sends
-all 30 protocol-verified playable cards, seeds starter task and guide `1301` as
-finished, seeds map guide `1410`/set `12`, suppresses its tutorial NPC and map
-overlay, reports the starter world-task finish row, and answers function-open
-queries as unlocked. Level 70 and city level 60
+all 26 public playable cards, seeds starter task and guide `1301` as finished,
+seeds map guide `1410`/set `12`, suppresses its tutorial NPC and map overlay,
+reports the starter world-task finish row, and answers function-open queries
+as unlocked. Internal/variant rows such as Jiro and art-test All Might are
+kept out of the public roster until direct playable evidence is proven. Level
+70 and city level 60
 come from the recovered client configuration; `TopLevel` remains zero because
 it is separate post-cap progression. The level-1 path remains the default for
 intro and quest reconstruction.
