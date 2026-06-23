@@ -211,12 +211,14 @@ The clean-room server now supports:
   entries with generated encounters pending authored spawn recovery.
 - The English `stage_cfg.lua` constant pool now feeds
   `scripts/derive_stage_cfg_route_hints.py`, recovering 10,440 root constants
-  and 215 drama-script route references. Thirty-six high-confidence
+  and 217 drama/script route references. Thirty-seven high-confidence
   script-to-stage groups are represented as `stage_cfg_route_*` definitions
   where they do not conflict with stronger explicit stage entries, including
-  `901008 -> 563903`, `101201_1 -> 571101`, and `zx_touqiu -> 300301`.
-  Nearby original route labels are now parsed too, so promoted route stages can
-  use recovered names instead of generic numeric labels.
+  `901008 -> 563903`, `101201_1 -> 571101`, `zx_touqiu -> 300301`, and
+  `zx_501101_1 -> 561115`. Nearby original route labels are now parsed too, so
+  promoted route stages can use recovered names instead of generic numeric
+  labels. Direct packed stage/zx script strings are now included in route
+  recovery, closing the last unrepresented packed `stage_cfg` script string.
 - The English `monster_cfg` asset now contributes parsed enemy evidence through
   `scripts/derive_monster_cfg_hints.py`. High-confidence animation/display-name
   associations are promoted into the stage layer for Nomu, Twice, Faux Villain,
@@ -262,20 +264,20 @@ The clean-room server now supports:
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.
-- Packed `stage_cfg` route neighborhoods now contribute 32 recovered
+- Packed `stage_cfg` route neighborhoods now contribute 33 recovered
   stage-to-encounter-group links. Routed stages such as `563903`, `571101`,
-  `300401`, and newly promoted `310403` now carry authored enemy group IDs as
-  metadata, while exact group-to-monster spawn mapping remains the next
-  recovery layer.
+  `300401`, newly promoted `310403`, and `561115` now carry authored enemy
+  group IDs as metadata, while exact group-to-monster spawn mapping remains the
+  next recovery layer.
 - The encounter-group extractor now emits both raw `enemy_group_ids` and
   filtered `combat_enemy_ids`, using recovered `monster_cfg` combat markers to
-  separate 73 combat targets from 60 NPC/object/helper IDs across the 133 raw
+  separate 75 combat targets from 62 NPC/object/helper IDs across the 137 raw
   group IDs. `BattleStageDefinition` now exposes those filtered combat IDs as
   runtime metadata, and routed encounter generation consumes them before
   falling back to generic probe enemies.
 - The next recovery layer now cross-checks those encounter IDs against packed
   `monster_cfg` constants. `scripts/derive_stage_monster_evidence.py` recovers
-  133 stage encounter target IDs, marks 73 as combat candidates, filters out
+  137 stage encounter target IDs, marks 75 as combat candidates, filters out
   NPC/object helpers, and lets routed stage candidates spawn recovered enemy
   IDs before using generated fallback encounters.
 - Authored spawn-position recovery has started with
@@ -309,10 +311,11 @@ The clean-room server now supports:
   placements across 25 stages, including runtime coordinates for `160001`,
   `201006`, `310403`, `400118`, and the completed `561211` combat trio.
 - A lower-priority `MonsterInfo` X/Y-only fallback now recovers `40650603` and
-  `56111303`, bringing authored placement recovery to 71 hints across 26
+  `56111303`, and the `561115` route promotion adds compact-table placement
+  for `56111505`, bringing authored placement recovery to 72 hints across 27
   stages while preserving stronger compact/table/Times evidence when present.
 - Enemy AI assignment now uses parser-backed `monster_cfg` name markers through
-  `scripts/derive_enemy_ai_profile_hints.py`. Thirty-three recovered stage
+  `scripts/derive_enemy_ai_profile_hints.py`. Thirty-five recovered stage
   enemies receive boss, elite, ranged/gun, mechanical, or Nomu profile
   overrides, adding `elite_chaser` and `mechanical_patrol` behaviors alongside
   the existing melee, ranged, boss, Nomu, sludge, and training profiles.

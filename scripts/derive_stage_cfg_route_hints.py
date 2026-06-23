@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from derive_asset_drama_stage_hints import DEFAULT_ASSET_ROOT, collect_drama_stage_hints
+from derive_stage_cfg_string_hints import collect_stage_cfg_string_hints
 
 
 DEFAULT_STAGE_CFG_ASSET = (
@@ -199,11 +200,16 @@ def collect_stage_cfg_route_hints(
         for item in collect_drama_stage_hints(asset_root)["scripts"]
         if isinstance(item.get("script"), str)
     }
+    stage_cfg_strings = collect_stage_cfg_string_hints((stage_cfg_asset,))
+    stage_cfg_scripts = set(stage_cfg_strings["stage_scripts"]) | set(
+        stage_cfg_strings["zx_scripts"]
+    )
+    candidate_scripts = drama_scripts | stage_cfg_scripts
     routes: dict[str, dict[str, object]] = {}
     for index, value in enumerate(constants):
-        if not isinstance(value, str) or value not in drama_scripts:
+        if not isinstance(value, str) or value not in candidate_scripts:
             continue
-        routes[value] = _route_for_script(value, index, constants, drama_scripts)
+        routes[value] = _route_for_script(value, index, constants, candidate_scripts)
     return {
         "constant_count": len(constants),
         "script_route_count": len(routes),

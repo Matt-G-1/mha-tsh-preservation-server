@@ -737,6 +737,25 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         (spawn.x, spawn.y, spawn.z)
         for spawn in stage_candidate_by_id(561211).encounter_spawns
     } == {(15186, 14578, 2034)}
+    route_only_signal_stage = stage_candidate_by_id(561115)
+    assert route_only_signal_stage.scripts == ("zx_501101_1",)
+    assert route_only_signal_stage.label == "training signal tower 5 branch battle 1"
+    assert tuple(
+        spawn.enemy_id for spawn in route_only_signal_stage.encounter_spawns
+    ) == (56111503, 56111505)
+    assert [
+        spawn.ai_profile_key for spawn in route_only_signal_stage.encounter_spawns
+    ] == ["mechanical_patrol", "mechanical_patrol"]
+    assert route_only_signal_stage.encounter_spawns[0].label == (
+        "stage_cfg_561115_enemy_56111503"
+    )
+    assert route_only_signal_stage.encounter_spawns[1].label == (
+        "stage_cfg_authored_561115_enemy_56111505"
+    )
+    assert (
+        route_only_signal_stage.encounter_spawns[1].x,
+        route_only_signal_stage.encounter_spawns[1].y,
+    ) == (31319, 25275)
 
     assert all(
         stage.encounter_target_count > 0
@@ -792,7 +811,7 @@ def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
     )
 
     assert hints["constant_count"] == 10440
-    assert hints["script_route_count"] == 215
+    assert hints["script_route_count"] == 217
     assert hints["routes"]["stage160001_start"] == {
         "route_stage_id": 160001,
         "confidence": "embedded",
@@ -806,6 +825,12 @@ def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
     assert hints["routes"]["101201_1"]["route_label"] == "本英町"
     assert hints["routes"]["zx_touqiu"]["route_stage_id"] == 300301
     assert hints["routes"]["zx_touqiu"]["route_label"] == "Quirk Mastery Test"
+    assert hints["routes"]["zx_501101_1"] == {
+        "route_stage_id": 561115,
+        "confidence": "prefix-neighborhood",
+        "constant_index": 7472,
+        "route_label": "yhc-训练场信号塔5支线战斗1",
+    }
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
@@ -815,7 +840,7 @@ def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
         ROOT / module.DEFAULT_ASSET_ROOT,
     )
 
-    assert hints["stage_count"] == 32
+    assert hints["stage_count"] == 33
     assert hints["encounters"]["160001"]["enemy_group_ids"] == [16000101]
     assert hints["encounters"]["300401"]["enemy_group_ids"] == [
         30040101,
@@ -865,6 +890,12 @@ def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
         57110102,
         57110104,
     ]
+    assert hints["encounters"]["561115"] == {
+        "stage_id": 561115,
+        "scripts": ["zx_501101_1"],
+        "enemy_group_ids": [56111501, 56111502, 56111503, 56111505],
+        "combat_enemy_ids": [56111503, 56111505],
+    }
 
 
 def test_stage_monster_evidence_parser_filters_combat_candidates() -> None:
@@ -875,13 +906,15 @@ def test_stage_monster_evidence_parser_filters_combat_candidates() -> None:
         asset_root=ROOT / module.DEFAULT_ASSET_ROOT,
     )
 
-    assert hints["target_count"] == 133
-    assert hints["evidence_count"] == 133
-    assert hints["combat_candidate_count"] == 73
+    assert hints["target_count"] == 137
+    assert hints["evidence_count"] == 137
+    assert hints["combat_candidate_count"] == 75
     assert hints["evidence"]["30040101"]["combat_candidate"] is True
     assert hints["evidence"]["31040301"]["combat_candidate"] is True
     assert hints["evidence"]["56390301"]["combat_candidate"] is True
     assert hints["evidence"]["57110101"]["combat_candidate"] is True
+    assert hints["evidence"]["56111503"]["combat_candidate"] is True
+    assert hints["evidence"]["56111505"]["combat_candidate"] is True
     assert hints["evidence"]["56390304"]["combat_candidate"] is False
     assert hints["evidence"]["56390305"]["combat_candidate"] is False
     assert hints["evidence"]["56390306"]["combat_candidate"] is False
@@ -896,9 +929,9 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
         monster_cfg_asset=ROOT / module.DEFAULT_MONSTER_CFG_ASSET,
     )
 
-    assert hints["target_count"] == 73
-    assert hints["stage_count"] == 26
-    assert hints["spawn_count"] == 71
+    assert hints["target_count"] == 75
+    assert hints["stage_count"] == 27
+    assert hints["spawn_count"] == 72
     assert hints["stages"]["160001"] == [
         {
             "enemy_id": 16000101,
@@ -958,6 +991,17 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
             "face": -8,
             "pattern": "drama_monster_command",
             "source_asset": "0QIU/2692ecef6794dc44",
+        },
+    ]
+    assert hints["stages"]["561115"] == [
+        {
+            "enemy_id": 56111505,
+            "x": 31319,
+            "y": 25275,
+            "z": 0,
+            "face": 0,
+            "pattern": "compact_enemy_table",
+            "source_asset": "3BAO/e0343be05671e895",
         },
     ]
     assert hints["stages"]["563701"] == [
@@ -1244,6 +1288,8 @@ def test_enemy_ai_profiles_can_seed_battle_npcs_and_monster_frames() -> None:
     assert generated_enemy_profile_key(40650205) == "ranged_pressure"
     assert generated_enemy_profile_key(40011801) == "nomu_brute"
     assert generated_enemy_profile_key(40650603) == "boss_brute"
+    assert generated_enemy_profile_key(56111503) == "mechanical_patrol"
+    assert generated_enemy_profile_key(56111505) == "mechanical_patrol"
     assert generated_enemy_profile_key(56121103) == "boss_brute"
 
     sludge_spawn = stage_candidate_by_key("starter_intro_299301").enemy_spawns[0]
@@ -1301,8 +1347,8 @@ def test_enemy_ai_profile_hint_parser_tracks_monster_name_markers() -> None:
         asset_root=ROOT / module.DEFAULT_ASSET_ROOT,
     )
 
-    assert hints["source_combat_candidate_count"] == 73
-    assert hints["profile_override_count"] == 33
+    assert hints["source_combat_candidate_count"] == 75
+    assert hints["profile_override_count"] == 35
     assert {
         int(enemy_id): item["profile"]
         for enemy_id, item in hints["profiles"].items()
@@ -1310,6 +1356,8 @@ def test_enemy_ai_profile_hint_parser_tracks_monster_name_markers() -> None:
     assert hints["profiles"]["30040108"]["profile"] == "boss_brute"
     assert hints["profiles"]["40525202"]["profile"] == "mechanical_patrol"
     assert hints["profiles"]["40650205"]["profile"] == "ranged_pressure"
+    assert hints["profiles"]["56111503"]["profile"] == "mechanical_patrol"
+    assert hints["profiles"]["56111505"]["profile"] == "mechanical_patrol"
     assert hints["profiles"]["56390303"]["profile"] == "elite_chaser"
 
 

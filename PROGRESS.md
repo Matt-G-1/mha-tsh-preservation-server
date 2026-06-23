@@ -327,29 +327,32 @@ environment details are intentionally omitted from Git.
   authored enemy placements are recovered.
 - The packed English `stage_cfg.lua` constant pool now has a route extractor:
   `scripts/derive_stage_cfg_route_hints.py`. It recovers 10,440 root constants
-  and 215 drama-script route references, then promotes 36 high-confidence
+  and 217 drama/script route references, then promotes 37 high-confidence
   script-to-stage groups into the runtime catalog where they do not conflict
   with stronger explicit definitions. This corrects several numeric-looking
   script assumptions: for example, `901008` routes to real stage `563903`,
-  `101201_1` routes to `571101`, and `zx_touqiu` routes to `300301`. The same
-  extractor now recovers nearby original route labels, and promoted
-  `stage_cfg_route_*` definitions use those labels when no stronger stage
-  definition already owns the ID.
+  `101201_1` routes to `571101`, `zx_touqiu` routes to `300301`, and the
+  direct packed string `zx_501101_1` routes to `561115`. The same extractor now
+  recovers nearby original route labels, and promoted `stage_cfg_route_*`
+  definitions use those labels when no stronger stage definition already owns
+  the ID. Runtime coverage now represents every parsed packed `stage_cfg`
+  stage/zx script string; `561115` now uses parsed mechanical combat rows with
+  one authored placement and one generated fallback placement.
 - The same packed `stage_cfg.lua` data now has an encounter-group extractor:
-  `scripts/derive_stage_cfg_encounter_hints.py`. It recovers 32
+  `scripts/derive_stage_cfg_encounter_hints.py`. It recovers 33
   stage-to-encounter group links from script neighborhoods, adds the
   `310403`/`zx_usj_03002` route, and attaches authored enemy group IDs to
   runtime candidates such as `300401`, `563903`, and `571101`. The extractor
   now also emits parser-backed `combat_enemy_ids` by cross-checking the raw
   group IDs against recovered `monster_cfg` combat markers; current output
-  separates 73 combat IDs from 60 NPC/object/helper IDs across 133 raw group
+  separates 75 combat IDs from 62 NPC/object/helper IDs across 137 raw group
   IDs. Runtime `BattleStageDefinition` entries now expose that filtered
   `combat_enemy_ids` layer separately from raw `enemy_group_ids`, and
   encounter generation uses the filtered combat list first so helper rows do
   not become accidental battle targets.
 - Those stage encounter IDs are now cross-checked against packed
   `monster_cfg` evidence through `scripts/derive_stage_monster_evidence.py`.
-  The extractor recovers 133 target IDs, marks 73 as combat candidates, and
+  The extractor recovers 137 target IDs, marks 75 as combat candidates, and
   filters out NPC/object helpers such as the `563903` female student, shield,
   and empty-model rows. Runtime stage spawns now use recovered combat enemy IDs
   for routed candidates before falling back to generated probes; the recovered
@@ -394,7 +397,7 @@ environment details are intentionally omitted from Git.
   trio, reducing routed stages with missing combat coordinates to 4.
 - A final fallback for `MonsterInfo` rows that store only X/Y before
   `Face`/`Id` now recovers `40650603` and `56111303`. Authored placement
-  recovery is up to 71 hints across 26 stages; the only remaining routed
+  recovery is up to 72 hints across 27 stages; the only remaining routed
   combat-coordinate gaps are the tower special rows `56240652` and `56240771`.
 - The English `monster_cfg` packed asset now has a conservative hint extractor:
   `scripts/derive_monster_cfg_hints.py`. It scans animation-key neighborhoods
@@ -406,7 +409,7 @@ environment details are intentionally omitted from Git.
   label and recovered display name.
 - Stage enemy AI assignment now has a parser-backed profile pass:
   `scripts/derive_enemy_ai_profile_hints.py` consumes recovered
-  `monster_cfg` stage-enemy names and promotes 33 AI overrides from stable
+  `monster_cfg` stage-enemy names and promotes 35 AI overrides from stable
   name markers such as BOSS, elite, ranged/gun, mechanical, and Nomu. Runtime
   stage spawns now distinguish `elite_chaser` and `mechanical_patrol` enemies
   in addition to the existing melee, ranged, boss, Nomu, sludge, mechanical
@@ -416,6 +419,10 @@ environment details are intentionally omitted from Git.
 - The newest authored placement promotions are now also AI-regression tested:
   `40011801` stays a Nomu brute, `40650603` stays a boss brute, and the
   `561211` trio keeps two melee rows plus the final boss-brute row.
+- The promoted `561115` route contributes two mechanical patrol combat rows
+  (`56111503`, `56111505`) and one authored compact-table coordinate for
+  `56111505`, while the other mechanical row remains generated until its
+  authored placement is recovered.
 - Seeding a recovered stage now also stores per-enemy AI directives in
   `StageState`: enemy ID, display alias, profile, behavior, BT name, home
   coordinates, attack range, leash radius, skill rotation, and combat HP. This
