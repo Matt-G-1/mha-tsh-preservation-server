@@ -44,6 +44,7 @@ from mhatsh_server.characters import (
     INITIAL_MAP_SPAWNS,
     INITIAL_PLAYABLE_ROSTER,
     MAP_CHARACTERS,
+    NON_PUBLIC_PLAYABLE_MODEL_REASONS,
     PLAYABLE_CHARACTERS,
     PUBLIC_PLAYABLE_MODEL_IDS,
     STARTER_CHARACTER,
@@ -314,6 +315,13 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert len(PUBLIC_PLAYABLE_MODEL_IDS) == 26
     assert "h1018" not in PUBLIC_PLAYABLE_MODEL_IDS
     assert "h1927" not in PUBLIC_PLAYABLE_MODEL_IDS
+    assert set(NON_PUBLIC_PLAYABLE_MODEL_REASONS) == {
+        "h1004",
+        "h1018",
+        "h1024",
+        "h1998",
+    }
+    assert "not public playable" in NON_PUBLIC_PLAYABLE_MODEL_REASONS["h1018"]
     assert all(
         character.model_asset_id != "h1018"
         for character in VERIFIED_PLAYABLE_ROSTER
@@ -1234,6 +1242,9 @@ def test_enemy_ai_profiles_can_seed_battle_npcs_and_monster_frames() -> None:
     assert generated_enemy_profile_key(30040109) == "elite_chaser"
     assert generated_enemy_profile_key(40525202) == "mechanical_patrol"
     assert generated_enemy_profile_key(40650205) == "ranged_pressure"
+    assert generated_enemy_profile_key(40011801) == "nomu_brute"
+    assert generated_enemy_profile_key(40650603) == "boss_brute"
+    assert generated_enemy_profile_key(56121103) == "boss_brute"
 
     sludge_spawn = stage_candidate_by_key("starter_intro_299301").enemy_spawns[0]
     assert sludge_spawn.ai_profile is sludge_ai
@@ -1265,6 +1276,21 @@ def test_enemy_ai_profiles_can_seed_battle_npcs_and_monster_frames() -> None:
     assert state.ai_directives[2]["AttackRange"] == ENEMY_AI_PROFILES[
         "elite_chaser"
     ].attack_range
+    state.enter_recovered_stage(stage_candidate_by_id(406506))
+    assert state.ai_directives[0]["EnemyId"] == 40650603
+    assert state.ai_directives[0]["Profile"] == "boss_brute"
+    assert state.ai_directives[0]["Home"] == {
+        "X": 10636,
+        "Y": 4708,
+        "Z": 0,
+        "Face": 180,
+    }
+    state.enter_recovered_stage(stage_candidate_by_id(561211))
+    assert [directive["Profile"] for directive in state.ai_directives] == [
+        "melee_chaser",
+        "melee_chaser",
+        "boss_brute",
+    ]
 
 
 def test_enemy_ai_profile_hint_parser_tracks_monster_name_markers() -> None:
@@ -1559,6 +1585,38 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert len(RECOVERED_HERO_ACTION_HINTS_BY_MODEL) == 25
     assert sum(len(actions) for actions in RECOVERED_HERO_ACTION_HINTS_BY_MODEL.values()) == 665
     assert len(RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL["h1020"]) == 24
+    action_gaps_by_model = {
+        character.model_asset_id: fight_style_for_character(
+            character
+        ).missing_action_hint_commands()
+        for character in VERIFIED_PLAYABLE_ROSTER
+    }
+    assert all(
+        not {"ATK", "Q", "W", "E", "R"}.intersection(missing_commands)
+        for missing_commands in action_gaps_by_model.values()
+    )
+    assert {
+        model_id: gaps
+        for model_id, gaps in action_gaps_by_model.items()
+        if gaps
+    } == {
+        "h1001": ("DODGE",),
+        "h1006": ("DODGE",),
+        "h1008": ("DODGE",),
+        "h1013": ("DODGE",),
+        "h1014": ("DODGE", "PASSIVE"),
+        "h1015": ("DODGE", "PASSIVE"),
+        "h1016": ("DODGE",),
+        "h1017": ("DODGE", "PASSIVE"),
+        "h1019": ("DODGE", "PASSIVE"),
+        "h1026": ("PASSIVE",),
+        "h1027": ("DODGE", "PASSIVE"),
+        "h1028": ("DODGE", "PASSIVE"),
+        "h1029": ("DODGE", "PASSIVE"),
+        "h1030": ("DODGE", "PASSIVE"),
+        "h1031": ("DODGE", "PASSIVE"),
+        "h1032": ("DODGE", "PASSIVE"),
+    }
 
     deku_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1001"])
     assert deku_style.style_name == "One For All Rookie"

@@ -93,6 +93,13 @@ SUPPORT_CHARACTERS = {
     "h1927": SupportCharacter("Best Jeanist", "h1927"),
 }
 
+NON_PUBLIC_PLAYABLE_MODEL_REASONS = {
+    "h1004": "small-form All Might variant, not a normal roster card",
+    "h1018": "Kyoka Jiro has local protocol/model rows but was not public playable",
+    "h1024": "alternate Deku row, not a separate public roster card",
+    "h1998": "All Might art-test variant, not a normal roster card",
+}
+
 # hero_cfg verifies the hero rows and ShapeId values; shape_info independently
 # maps each ShapeId to the listed AXMD model path.
 for model_id, name, hero_id, shape_id in (

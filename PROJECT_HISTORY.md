@@ -322,6 +322,9 @@ The clean-room server now supports:
   seed shape remains unchanged. Combat-summary coverage also checks surviving
   enemies so next-action hints and threat scores stay attached before a full
   clear.
+- Newly promoted authored placements are now pinned to their intended AI
+  classes in regression tests, including the `40011801` Nomu row, the
+  `40650603` boss row, and the mixed `561211` melee-plus-boss trio.
 - Combat telemetry now classifies recovered `BATTLE/HERO/...` action and audio
   paths per move command across the extracted asset tree. The recovery script
   currently finds 28 hero action prefixes, maps 27 of them to playable model
@@ -335,6 +338,10 @@ The clean-room server now supports:
   family. `scripts/derive_internal_combat_action_hints.py` finds 49 `putao`
   asset tokens, and 24 command-bearing internal hints are promoted into
   ATK/Q/W/E/R/dodge/passive telemetry for `h1020`.
+- The combat catalog now exposes per-command recovered-action coverage. Tests
+  require every public playable to keep recovered ATK/Q/W/E/R action evidence,
+  while the remaining dodge/passive gaps are tracked explicitly as evidence
+  gaps rather than being treated as original asset proof.
 
 ## Character Catalog
 

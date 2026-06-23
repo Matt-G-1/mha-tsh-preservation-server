@@ -176,6 +176,19 @@ class FightStyle:
             if _action_hint_command_for_model(self.model_asset_id, action) == command
         )
 
+    def action_hint_counts_by_command(self) -> dict[str, int]:
+        return {
+            command: len(self.action_hints_for_command(command))
+            for command in REPORT_BUTTON_COMMANDS.values()
+        }
+
+    def missing_action_hint_commands(self) -> tuple[str, ...]:
+        return tuple(
+            command
+            for command, count in self.action_hint_counts_by_command().items()
+            if count == 0
+        )
+
     def hero_cfg_skill_ids(self) -> tuple[int, ...]:
         if self.hero_cfg is None:
             return ()

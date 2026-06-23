@@ -222,6 +222,11 @@ environment details are intentionally omitted from Git.
   characters now have recovered ATK/Q/W/E/R action evidence. Jiro has
   `bot_dianqi`/`character/h1018` config evidence, but she is tracked as
   non-playable recovered data rather than a roster-completion blocker.
+- The verified combat catalog now reports recovered action-evidence coverage
+  per command. Regression tests require every public playable to keep
+  parser-backed ATK/Q/W/E/R evidence and record the remaining unresolved
+  dodge/passive evidence gaps explicitly, instead of silently treating
+  reconstructed move labels as original asset proof.
 - The public playable roster now has parser-backed `skill_info` text evidence
   for every verified playable model. The latest pass adds conservative
   original constants for Ochaco, Dabi, Aizawa, and Ojiro, including `Gravel
@@ -408,6 +413,9 @@ environment details are intentionally omitted from Git.
   boss, and training profiles. Current enterable-stage spawn coverage includes
   boss, elite, mechanical, ranged, Nomu, sludge, and training behaviors instead
   of collapsing nearly every parsed stage enemy into the generic melee profile.
+- The newest authored placement promotions are now also AI-regression tested:
+  `40011801` stays a Nomu brute, `40650603` stays a boss brute, and the
+  `561211` trio keeps two melee rows plus the final boss-brute row.
 - Seeding a recovered stage now also stores per-enemy AI directives in
   `StageState`: enemy ID, display alias, profile, behavior, BT name, home
   coordinates, attack range, leash radius, skill rotation, and combat HP. This
