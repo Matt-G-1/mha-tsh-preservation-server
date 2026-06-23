@@ -29,4 +29,6 @@
 *.apk
 *.aab
 *.obb
+/mhatsh_profiles.json
+/preservation_server/mhatsh_profiles.json
 

@@ -26,6 +26,11 @@ class WorldTaskState:
     auto_finished_tasks: set[int] = field(default_factory=set)
     completed_beginner_quest: bool = False
 
+    def seed_unlocked(self, city_level: int) -> None:
+        self.city_level = max(STARTER_CITY_LEVEL, int(city_level))
+        self.city_exp = 0
+        self.completed_beginner_quest = True
+
     def city_level_info(self) -> dict[str, object]:
         return {
             "Level": self.city_level,

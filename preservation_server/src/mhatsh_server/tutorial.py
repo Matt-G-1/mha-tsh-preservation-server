@@ -26,6 +26,11 @@ class TutorialState:
             "Ids": sorted(self.completed_guide_ids),
         }
 
+    def seed_completed_guide(self, guide_id: int, set_id: int | None = None) -> None:
+        self.completed_guide_ids.add(int(guide_id))
+        if set_id is not None:
+            self.completed_guide_sets.add(int(set_id))
+
     def record_login_drama_request(
         self, stage_id: int, drama_name: str, loop: int
     ) -> dict[str, object] | None:

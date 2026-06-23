@@ -11,6 +11,10 @@ STARTER_TASK_CONDITION_ID = 1
 STARTER_GUIDE_SET_ID = 9
 STARTER_GUIDE_DRAMA_ID = 20001301
 STARTER_GUIDE_STEP = 10011
+# The live client starts this map-selection guide immediately after scene load.
+# Task 1301 alone does not suppress its local overlay.
+STARTER_MAP_GUIDE_SET_ID = 12
+STARTER_MAP_GUIDE_ID = 1410
 STARTER_WORLD_MAP_ID = 1000
 STARTER_WORLD_AREA_ID = 0
 

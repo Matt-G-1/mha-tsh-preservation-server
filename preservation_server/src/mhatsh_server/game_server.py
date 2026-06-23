@@ -11,7 +11,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .activity_state import ActivityState
-from .beginner_quest import STARTER_TASK_ID
+from .beginner_quest import (
+    STARTER_MAP_GUIDE_ID,
+    STARTER_MAP_GUIDE_SET_ID,
+    STARTER_TASK_ID,
+)
 from .character_menu import CharacterMenuState
 from .characters import (
     STARTER_CHARACTER,
@@ -20,6 +24,8 @@ from .characters import (
     playable_roster,
     scene_npc_from_spawn,
 )
+from .combat import fight_style_for_character
+from .profile_store import ProfileStore
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .roster import RosterState
 from .schema import SchemaRegistry
@@ -29,7 +35,11 @@ from .stages import (
     STARTER_INTRO_STAGE_LEVEL,
     STARTER_INTRO_STAGE_TIME,
     STARTER_INTRO_STAGE_UID,
+    BattleStageDefinition,
     StageState,
+    stage_candidate_by_id,
+    stage_candidate_by_key,
+    stage_candidate_or_generated,
 )
 from .tasks import TaskState
 from .tutorial import TutorialState
@@ -46,6 +56,9 @@ STARTER_SCENE_ID = 1000
 STARTER_SCENE_X = 4221
 STARTER_SCENE_Y = 19931
 STARTER_SCENE_Z = 0
+PLAYER_LEVEL_CAP = 70
+CITY_LEVEL_CAP = 60
+FUNCTION_OPEN_IDS = tuple(range(1, 241))
 
 
 def _env_enabled(name: str, default: str) -> bool:
@@ -68,13 +81,19 @@ class Session:
     character_menu: CharacterMenuState = field(default_factory=CharacterMenuState)
     stage: StageState = field(default_factory=StageState)
     roster: RosterState | None = None
+    pending_starter_intro_stage: bool = False
+    profile_configured: bool = False
 
 
 class GameServer:
     def __init__(self, registry: SchemaRegistry) -> None:
         self.registry = registry
         self.codec = ProtocolCodec(registry)
-        self.roles: dict[str, int] = {}
+        self.profile_store = ProfileStore(
+            os.environ.get("MHATSH_PROFILE_STORE") or None
+        )
+        self.roles = self.profile_store.roles
+        self.active_cards = self.profile_store.active_cards
         self.response_id_bias = int(os.environ.get("MHATSH_RESPONSE_ID_BIAS", "0"))
         self.login_completion = os.environ.get(
             "MHATSH_LOGIN_COMPLETION", "merge"
@@ -99,34 +118,80 @@ class GameServer:
         self.send_map_characters = os.environ.get(
             "MHATSH_SEND_MAP_CHARACTERS", "1"
         ).lower() not in {"0", "false", "no"}
+        self.player_level = min(
+            PLAYER_LEVEL_CAP,
+            max(1, int(os.environ.get("MHATSH_PLAYER_LEVEL", "1"))),
+        )
+        self.hero_level = max(1, int(os.environ.get("MHATSH_HERO_LEVEL", "1")))
+        self.city_level = min(
+            CITY_LEVEL_CAP,
+            max(1, int(os.environ.get("MHATSH_CITY_LEVEL", "1"))),
+        )
+        self.skip_starter_quest = _env_enabled(
+            "MHATSH_SKIP_STARTER_QUEST", "0"
+        )
+        self.unlock_all_functions = _env_enabled(
+            "MHATSH_UNLOCK_ALL_FUNCTIONS", "0"
+        )
         self.roster_mode = os.environ.get("MHATSH_ROSTER_MODE", "starter")
         self.map_spawn_mode = os.environ.get("MHATSH_MAP_SPAWN_MODE", "starter")
         self.playable_roster = playable_roster(self.roster_mode)
         self.map_spawns = map_spawns(self.map_spawn_mode)
         self.intro_stage_enabled = _env_enabled("MHATSH_INTRO_STAGE_MODE", "skip")
+        self.intro_stage_key = os.environ.get(
+            "MHATSH_INTRO_STAGE_KEY", "starter_intro_299301"
+        )
+        try:
+            self.intro_stage_candidate = stage_candidate_by_key(self.intro_stage_key)
+        except KeyError:
+            self.intro_stage_candidate = stage_candidate_by_key(
+                "starter_intro_299301"
+            )
+        default_intro_stage_id = (
+            self.intro_stage_candidate.stage_id
+            if self.intro_stage_candidate.stage_id is not None
+            else STARTER_INTRO_STAGE_ID
+        )
         self.intro_stage_id = int(
-            os.environ.get("MHATSH_INTRO_STAGE_ID", STARTER_INTRO_STAGE_ID)
+            os.environ.get("MHATSH_INTRO_STAGE_ID", default_intro_stage_id)
         )
         self.intro_stage_uid = int(
-            os.environ.get("MHATSH_INTRO_STAGE_UID", STARTER_INTRO_STAGE_UID)
+            os.environ.get(
+                "MHATSH_INTRO_STAGE_UID",
+                (
+                    self.intro_stage_candidate.resolved_stage_uid
+                    if self.intro_stage_candidate.stage_id == self.intro_stage_id
+                    else self.intro_stage_id * 10000 + 1
+                ),
+            )
         )
         self.intro_stage_level = int(
-            os.environ.get("MHATSH_INTRO_STAGE_LEVEL", STARTER_INTRO_STAGE_LEVEL)
+            os.environ.get(
+                "MHATSH_INTRO_STAGE_LEVEL", self.intro_stage_candidate.level
+            )
         )
         self.intro_stage_time = int(
-            os.environ.get("MHATSH_INTRO_STAGE_TIME", STARTER_INTRO_STAGE_TIME)
+            os.environ.get(
+                "MHATSH_INTRO_STAGE_TIME", self.intro_stage_candidate.time_limit
+            )
         )
         self.intro_stage_drama = int(
-            os.environ.get("MHATSH_INTRO_STAGE_DRAMA", STARTER_INTRO_STAGE_DRAMA)
+            os.environ.get("MHATSH_INTRO_STAGE_DRAMA", self.intro_stage_candidate.drama)
         )
         self.intro_stage_trigger = os.environ.get(
             "MHATSH_INTRO_STAGE_TRIGGER", "task_enter"
         ).lower()
+        self.intro_stage_delay = max(
+            0.0, float(os.environ.get("MHATSH_INTRO_STAGE_DELAY", "0.25"))
+        )
         self.stage_report_response = os.environ.get(
             "MHATSH_STAGE_REPORT_RESPONSE", "record"
         ).lower()
         self.ping_response_delay = max(
             0.0, float(os.environ.get("MHATSH_PING_RESPONSE_DELAY", "0.05"))
+        )
+        self.guide_response_delay = max(
+            0.0, float(os.environ.get("MHATSH_GUIDE_RESPONSE_DELAY", "1.0"))
         )
 
     async def serve(self, host: str, port: int) -> None:
@@ -146,6 +211,7 @@ class GameServer:
             decoder=FrameDecoder(RollingXor(seed)),
             outbound=RollingXor(seed ^ 0x6666),
         )
+        self._configure_session(session)
         writer.write(b"\x00" + struct.pack("<I", seed))
         await writer.drain()
         LOG.info("client %s connected; handshake seed=%#010x", peer, seed)
@@ -171,6 +237,7 @@ class GameServer:
         body: bytes,
         writer: asyncio.StreamWriter,
     ) -> None:
+        self._configure_session(session)
         name = self.registry.protocol_names.get(protocol_id, f"unknown_{protocol_id}")
         try:
             values = self.codec.decode_message(name, body)
@@ -207,7 +274,7 @@ class GameServer:
                 int(values.get("StageId") or 0),
             )
         elif name == "s_login_player_add":
-            self.roles[session.urs] = session.uid
+            self._remember_role(session.urs, session.uid)
             await self._send(
                 writer,
                 session,
@@ -215,7 +282,7 @@ class GameServer:
                 {
                     "Uid": session.uid,
                     "Name": "Local Hero",
-                    "Level": 1,
+                    "Level": self.player_level,
                     "HostId": 1,
                     "ServerName": "Local Preservation Server",
                     "CreateTime": int(time.time()),
@@ -223,7 +290,7 @@ class GameServer:
             )
         elif name == "s_login_player_enter":
             requested_uid = int(values.get("id") or session.uid)
-            self.roles[session.urs] = requested_uid
+            self._remember_role(session.urs, requested_uid)
             session.uid = requested_uid
             await self._send(
                 writer,
@@ -234,6 +301,8 @@ class GameServer:
             if self.send_initial_user:
                 await self._send_initial_user(writer, session)
                 await self._send_initial_cards(writer, session)
+                if self.unlock_all_functions:
+                    await self._send_initial_function_unlocks(writer, session)
             if self.send_initial_scene:
                 await self._send_initial_scene(writer, session)
             if self.login_completion == "merge":
@@ -245,11 +314,45 @@ class GameServer:
                 )
         elif name == "s_scene_enter_end":
             await self._send(writer, session, "c_scene_enter_end", {})
-        elif name == "s_guide_finish":
-            guide_response = session.tutorial.finish_guides(
-                list(values.get("setIdList") or []),
-                list(values.get("guideIdList") or []),
+        elif name == "s_funcopen_query":
+            await self._send(
+                writer,
+                session,
+                "c_funcopen_query",
+                {
+                    "TargetUid": int(values.get("TargetUid") or session.uid),
+                    "OpenId": int(values.get("OpenId") or 0),
+                    "Result": int(self.unlock_all_functions),
+                },
             )
+        elif name == "s_guide_finish":
+            set_ids = [int(item) for item in list(values.get("setIdList") or [])]
+            guide_ids = [
+                int(item) for item in list(values.get("guideIdList") or [])
+            ]
+            session.tutorial.finish_guides(set_ids, guide_ids)
+            if self.skip_starter_quest:
+                # The patched preservation client waits for c_card_seeinfo here.
+                # Keep this acknowledgement tiny and target a non-player UID:
+                # repeating the full 30-card self roster is ignored by the
+                # archived client's waiter and would also redo card state.
+                if self.guide_response_delay:
+                    await asyncio.sleep(self.guide_response_delay)
+                await self._send(
+                    writer,
+                    session,
+                    "c_card_seeinfo",
+                    {"Uid": 0, "CardInfo": []},
+                )
+                return
+            guide_response = {
+                "Sets": sorted(set(set_ids)),
+                "Ids": sorted(set(guide_ids)),
+            }
+            # The archived client installs this callback just after SendPto.
+            # A same-tick local response can arrive before the waiter exists.
+            if self.guide_response_delay:
+                await asyncio.sleep(self.guide_response_delay)
             await self._send(
                 writer,
                 session,
@@ -263,9 +366,7 @@ class GameServer:
                 ):
                     await self._send_beginner_npc(writer, session)
                 if int(guide_id) == STARTER_TASK_ID:
-                    await self._maybe_send_starter_intro_stage(
-                        writer, session, "starter_guide"
-                    )
+                    self._queue_starter_intro_stage(session, "starter_guide")
                 task_update = session.tasks.complete_guide(int(guide_id))
                 if task_update is not None:
                     await self._send_task_progression(
@@ -288,12 +389,14 @@ class GameServer:
             if should_spawn_beginner_npc:
                 await self._send_beginner_npc(writer, session)
             if self._is_starter_guide_stat(stat):
-                await self._maybe_send_starter_intro_stage(
-                    writer, session, "starter_guide"
-                )
+                self._queue_starter_intro_stage(session, "starter_guide")
             task_update = session.tasks.observe_client_stat(stat)
             if task_update is not None:
                 await self._send_task_progression(writer, session, task_update)
+            if self._is_world_map_view_stat(stat):
+                await self._send_pending_starter_intro_stage(
+                    writer, session, "starter_guide"
+                )
         elif name == "s_teach_finish":
             await self._send(
                 writer,
@@ -387,6 +490,14 @@ class GameServer:
                     "IsShow": roster.active_show,
                 }
             await self._send(writer, session, "c_card_go_to_fight", response)
+            self._remember_active_card(session, roster)
+            await self._send(
+                writer,
+                session,
+                "c_scene_hero_change",
+                roster.scene_hero_change(session.uid),
+            )
+            await self._send_scene_player_info(writer, session, roster)
         elif name == "s_card_go_to_bridge_fight":
             roster = self._ensure_roster(session)
             try:
@@ -405,6 +516,14 @@ class GameServer:
                 "c_card_go_to_bridge_fight",
                 {"HeroUid": response["CardUid"]},
             )
+            self._remember_active_card(session, roster)
+            await self._send(
+                writer,
+                session,
+                "c_scene_hero_change",
+                roster.scene_hero_change(session.uid),
+            )
+            await self._send_scene_player_info(writer, session, roster)
         elif name == "s_team_change_hero":
             roster = self._ensure_roster(session)
             try:
@@ -483,6 +602,17 @@ class GameServer:
                     roster,
                 ),
             )
+        elif name == "s_skill_get_skill_level":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_skill_get_skill_level",
+                session.character_menu.skill_level(
+                    int(values.get("HeroUid") or 0),
+                    roster,
+                ),
+            )
         elif name == "s_skill_get_spec_level_list":
             roster = self._ensure_roster(session)
             await self._send(
@@ -494,6 +624,37 @@ class GameServer:
                     roster,
                 ),
             )
+        elif name == "s_skill_get_spec_level":
+            await self._send(
+                writer,
+                session,
+                "c_skill_get_spec_level",
+                session.character_menu.spec_level(
+                    int(values.get("HeroUid") or 0)
+                ),
+            )
+        elif name == "s_gem_list":
+            await self._send(
+                writer,
+                session,
+                "c_gem_list",
+                session.character_menu.gem_list(
+                    [int(item) for item in list(values.get("HeroCId") or [])]
+                ),
+            )
+        elif name == "s_toplist_pages":
+            await self._send(
+                writer,
+                session,
+                "c_toplist_pages",
+                session.character_menu.toplist_pages(
+                    int(values.get("ID") or 0),
+                    int(values.get("SubName") or 0),
+                    [int(item) for item in list(values.get("PageNums") or [])],
+                    int(values.get("SelfUid") or session.uid),
+                    int(values.get("IsCross") or 0),
+                ),
+            )
         elif name == "s_hero_rank_info":
             roster = self._ensure_roster(session)
             await self._send(
@@ -501,6 +662,14 @@ class GameServer:
                 session,
                 "c_hero_rank_info",
                 session.character_menu.hero_rank_info(roster),
+            )
+        elif name == "s_training_info":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_training_info",
+                session.character_menu.training_info(roster),
             )
         elif name == "s_training_hero_info":
             roster = self._ensure_roster(session)
@@ -618,6 +787,124 @@ class GameServer:
                 await self._maybe_send_starter_intro_stage(
                     writer, session, "task_enter"
                 )
+        elif name == "s_training_enter":
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("StageId") or 0),
+                hero_id=int(values.get("HeroCId") or 0),
+            )
+        elif name == "s_teach_pvp_enter":
+            hero_ids = [int(item) for item in list(values.get("HeroCId") or [])]
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("StageId") or 0),
+                hero_id=hero_ids[0] if hero_ids else 0,
+            )
+        elif name in {
+            "s_resource_stage_enter",
+            "s_resource_stage_reenter",
+            "s_herochip_stage_enter",
+        }:
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("Id") or 0),
+                card_uid=int(values.get("HeroUid") or 0),
+            )
+        elif name in {
+            "s_pressure_stage_enter",
+            "s_hero_rank_stage_enter",
+        }:
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("StageId") or 0),
+            )
+        elif name == "s_act_daily_stage_enter":
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("Id") or 0),
+                hero_id=int(values.get("HeroId") or 0),
+            )
+        elif name == "s_resource_stage_info":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_resource_stage_info",
+                session.stage.resource_stage_info(roster.active_card_uid),
+            )
+        elif name == "s_pressure_stage_detail":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_pressure_stage_detail",
+                session.stage.pressure_stage_detail(
+                    int(values.get("StageId") or 0),
+                    hero_list=[
+                        {
+                            "HeroId": card.hero_id,
+                            "Power": roster.hero_level * 1000 + card.hero_id,
+                        }
+                        for card in sorted(
+                            roster.cards.values(), key=lambda item: item.card_uid
+                        )
+                    ],
+                ),
+            )
+        elif name == "s_pressure_stage_finish":
+            session.stage.record_pressure_stage_finish(values)
+            self._remember_stage_family_progress(session)
+        elif name == "s_usj_get_stage_record":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_usj_get_stage_record",
+                session.stage.usj_stage_record(
+                    point_id=int(values.get("PointId") or 0),
+                    uid=session.uid,
+                    user_level=self.player_level,
+                    hero_id=roster.active_hero_id,
+                    fighting=roster.hero_level * 1000 + roster.active_hero_id,
+                ),
+            )
+        elif name == "s_usj_end_stage":
+            roster = self._ensure_roster(session)
+            usj_result = session.stage.usj_end_stage(
+                values,
+                hero_uid=int(values.get("HeroUid") or roster.active_card_uid),
+            )
+            self._remember_stage_family_progress(session)
+            await self._send(
+                writer,
+                session,
+                "c_usj_end_stage",
+                usj_result,
+            )
+        elif name == "s_act_daily_stage_report":
+            daily_result = session.stage.act_daily_stage_result(values)
+            self._remember_stage_family_progress(session)
+            self._grant_stage_reward_list(
+                session,
+                [
+                    reward
+                    for group in list(daily_result.get("RewardList") or [])
+                    if isinstance(group, dict)
+                    for reward in list(group.get("AddLog") or [])
+                    if isinstance(reward, dict)
+                ],
+            )
+            await self._send(
+                writer,
+                session,
+                "c_act_daily_stage_result",
+                daily_result,
+            )
         elif name == "s_stage_finish_loading":
             await self._send(
                 writer,
@@ -625,18 +912,92 @@ class GameServer:
                 "c_stage_finish_loading",
                 session.stage.finish_loading(session.uid),
             )
+        elif name == "s_stage_damage_info":
+            session.stage.record_damage_info(values)
+            await self._send(
+                writer,
+                session,
+                "c_stage_damage_info",
+                session.stage.damage_info(),
+            )
         elif name == "s_stage_report":
             session.stage.record_report(values)
             if self.stage_report_response in {"complete", "result"}:
-                await self._send(
-                    writer, session, "c_stage_drop", session.stage.empty_drop()
+                roster = self._ensure_roster(session)
+                fight_style = fight_style_for_character(roster.active_card.character)
+                stage = self._current_stage_definition(session)
+                stage_drop = session.stage.stage_drop(
+                    fight_style=fight_style,
+                    hero_level=roster.hero_level,
+                    stage=stage,
                 )
                 await self._send(
-                    writer, session, "c_stage_result", session.stage.result()
+                    writer,
+                    session,
+                    "c_stage_drop",
+                    stage_drop,
+                )
+                stage_result = session.stage.result(
+                    fight_style=fight_style,
+                    hero_level=roster.hero_level,
+                    stage=stage,
+                )
+                self.profile_store.remember_stage_progress(
+                    session.urs,
+                    session.stage.export_completions(),
+                )
+                self._grant_stage_rewards(session, stage_result, stage_drop)
+                await self._send(
+                    writer,
+                    session,
+                    "c_stage_result",
+                    stage_result,
                 )
                 await self._send(
-                    writer, session, "c_stage_end_gm", session.stage.end_gm()
+                    writer,
+                    session,
+                    "c_stage_end_gm",
+                    session.stage.end_gm(
+                        fight_style=fight_style,
+                        hero_level=roster.hero_level,
+                        stage=stage,
+                    ),
                 )
+        elif name == "s_frame_monster_data":
+            session.stage.record_monster_frame_data(values)
+        elif name == "s_stage_frame_report":
+            await self._send(
+                writer,
+                session,
+                "c_stage_frame_report",
+                session.stage.record_frame_report(),
+            )
+        elif name == "s_stage_play_sync":
+            await self._send(
+                writer,
+                session,
+                "c_stage_play_sync",
+                session.stage.record_play_sync(
+                    session.uid,
+                    list(values.get("SyncData") or []),
+                ),
+            )
+        elif name == "s_stage_is_back":
+            await self._send(
+                writer,
+                session,
+                "c_stage_is_back",
+                session.stage.stage_is_back(int(values.get("StageId") or 0)),
+            )
+        elif name == "s_stage_leave":
+            await self._send(
+                writer,
+                session,
+                "c_stage_leave",
+                session.stage.leave_stage(int(values.get("StageId") or 0)),
+            )
+        elif name == "s_stage_quick_reborn":
+            session.stage.record_quick_reborn(int(values.get("RebornCount") or 0))
         elif name == "s_stage_activity_info":
             await self._send(
                 writer,
@@ -745,7 +1106,7 @@ class GameServer:
         role_uid = self.roles.get(session.urs)
         if role_uid is None and self.auto_provision_role:
             role_uid = session.uid
-            self.roles[session.urs] = role_uid
+            self._remember_role(session.urs, role_uid)
         await self._send(
             writer,
             session,
@@ -773,7 +1134,7 @@ class GameServer:
                 "user": {
                     "Uid": session.uid,
                     "Name": "Local Hero",
-                    "Level": 1,
+                    "Level": self.player_level,
                     "TopLevel": 0,
                     "Gold": 0,
                     "BindGold": 0,
@@ -801,24 +1162,7 @@ class GameServer:
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
         roster = self._ensure_roster(session)
-        await self._send(
-            writer,
-            session,
-            "c_scene_player_info",
-            {
-                "Uid": session.uid,
-                "Camp": 0,
-                "Name": "Local Hero",
-                "Level": 1,
-                "TopLevel": 0,
-                "ShowHeroId": roster.active_hero_id,
-                "LeagueId": 0,
-                "LeagueName": "",
-                "TitleId": 0,
-                "MoodId": 0,
-                "Version": 1,
-            },
-        )
+        await self._send_scene_player_info(writer, session, roster)
         await self._send(
             writer,
             session,
@@ -878,19 +1222,192 @@ class GameServer:
             session.character_menu.card_hero_bio_info(roster),
         )
 
+    async def _send_initial_function_unlocks(
+        self, writer: asyncio.StreamWriter, session: Session
+    ) -> None:
+        await self._send(
+            writer,
+            session,
+            "c_funcopen_list",
+            {"idlist": list(FUNCTION_OPEN_IDS)},
+        )
+
     def _ensure_roster(self, session: Session) -> RosterState:
         if session.roster is None:
             session.roster = RosterState(
                 self.playable_roster,
                 first_card_uid=STARTER_CARD_UID,
+                hero_level=self.hero_level,
             )
+            try:
+                session.roster.select_card(self.active_cards.get(session.urs, 0), 1)
+            except KeyError:
+                pass
         return session.roster
+
+    def _remember_active_card(self, session: Session, roster: RosterState) -> None:
+        self.profile_store.remember_active_card(session.urs, roster.active_card_uid)
+
+    def _remember_role(self, urs: str, uid: int) -> None:
+        self.profile_store.remember_role(urs, uid)
+
+    def _current_stage_definition(self, session: Session) -> BattleStageDefinition:
+        if session.stage.current_stage_key:
+            try:
+                return stage_candidate_by_key(session.stage.current_stage_key)
+            except KeyError:
+                pass
+        if session.stage.current_stage_id:
+            return stage_candidate_or_generated(session.stage.current_stage_id)
+        return self.intro_stage_candidate
+
+    async def _enter_requested_stage(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        stage_id: int,
+        *,
+        hero_id: int = 0,
+        card_uid: int = 0,
+    ) -> None:
+        stage = stage_candidate_or_generated(stage_id or self.intro_stage_id)
+        roster = self._ensure_roster(session)
+        changed = False
+        if card_uid:
+            try:
+                roster.select_card(card_uid, 1)
+                changed = True
+            except KeyError:
+                pass
+        if hero_id:
+            try:
+                roster.select_hero(hero_id)
+                changed = True
+            except KeyError:
+                pass
+        if changed:
+            self._remember_active_card(session, roster)
+        await self._send(
+            writer,
+            session,
+            "c_stage_enter",
+            session.stage.enter_recovered_stage(stage),
+        )
+
+    async def _send_scene_player_info(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        roster: RosterState,
+    ) -> None:
+        await self._send(
+            writer,
+            session,
+            "c_scene_player_info",
+            {
+                "Uid": session.uid,
+                "Camp": 0,
+                "Name": "Local Hero",
+                "Level": self.player_level,
+                "TopLevel": 0,
+                "ShowHeroId": roster.active_hero_id,
+                "LeagueId": 0,
+                "LeagueName": "",
+                "TitleId": 0,
+                "MoodId": 0,
+                "Version": 1,
+            },
+        )
+
+    def _configure_session(self, session: Session) -> None:
+        if session.profile_configured:
+            return
+        session.stage.load_completions(
+            self.profile_store.stage_progress.get(session.urs, {})
+        )
+        session.stage.load_family_progress(
+            self.profile_store.stage_family_progress.get(session.urs, {})
+        )
+        session.world_tasks.city_level = self.city_level
+        if self.skip_starter_quest:
+            session.tasks.skip_starter_quest()
+            session.tutorial.seed_completed_guide(STARTER_TASK_ID)
+            session.tutorial.seed_completed_guide(
+                STARTER_MAP_GUIDE_ID,
+                STARTER_MAP_GUIDE_SET_ID,
+            )
+            session.world_tasks.seed_unlocked(self.city_level)
+        session.profile_configured = True
+
+    def _remember_stage_family_progress(self, session: Session) -> None:
+        self.profile_store.remember_stage_family_progress(
+            session.urs,
+            session.stage.export_family_progress(),
+        )
+
+    def _grant_stage_rewards(
+        self,
+        session: Session,
+        stage_result: dict[str, object],
+        stage_drop: dict[str, object],
+    ) -> None:
+        if int(stage_result.get("Result") or 0) != 1:
+            return
+
+        rewards: list[tuple[int, int]] = self._stage_reward_items(
+            list(stage_result.get("RewardList") or [])
+        )
+        for item in list(stage_drop.get("FirstReward") or []):
+            if not isinstance(item, dict):
+                continue
+            rewards.append(
+                (
+                    int(item.get("ItemId") or 0),
+                    int(item.get("count") or item.get("Count") or 0),
+                )
+            )
+        self.profile_store.grant_items(session.urs, rewards)
+
+    def _grant_stage_reward_list(
+        self, session: Session, reward_list: list[dict[str, object]]
+    ) -> None:
+        self.profile_store.grant_items(
+            session.urs,
+            self._stage_reward_items(reward_list),
+        )
+
+    @staticmethod
+    def _stage_reward_items(
+        reward_list: list[dict[str, object]],
+    ) -> list[tuple[int, int]]:
+        rewards: list[tuple[int, int]] = []
+        for item in reward_list:
+            if not isinstance(item, dict):
+                continue
+            rewards.append(
+                (
+                    int(item.get("ItemId") or 0),
+                    int(item.get("count") or item.get("Count") or 0),
+                )
+            )
+        return rewards
 
     def _is_starter_guide_stat(self, stat: dict[str, object]) -> bool:
         nums = list(stat.get("NumData") or [])
         if len(nums) < 2:
             return False
         return int(nums[0]) == 1 and int(nums[1]) == STARTER_TASK_ID
+
+    def _is_world_map_view_stat(self, stat: dict[str, object]) -> bool:
+        nums = list(stat.get("NumData") or [])
+        strings = [str(item) for item in list(stat.get("StrData") or [])]
+        return (
+            len(nums) >= 3
+            and int(nums[0]) == 0
+            and int(nums[1]) == 1404
+            and int(nums[2]) == 10351
+            and any("WorldMapView" in item for item in strings)
+        )
 
     async def _send_beginner_npc(
         self, writer: asyncio.StreamWriter, session: Session
@@ -937,6 +1454,7 @@ class GameServer:
                 level=self.intro_stage_level,
                 time_limit=self.intro_stage_time,
                 drama=self.intro_stage_drama,
+                stage_key=self.intro_stage_candidate.key,
             ),
         )
 
@@ -947,6 +1465,29 @@ class GameServer:
             return
         if session.stage.current_stage_id == self.intro_stage_id:
             return
+        await self._send_starter_intro_stage(writer, session)
+
+    def _queue_starter_intro_stage(self, session: Session, trigger: str) -> None:
+        if not self.intro_stage_enabled or self.intro_stage_trigger != trigger:
+            return
+        if session.stage.current_stage_id == self.intro_stage_id:
+            return
+        session.pending_starter_intro_stage = True
+
+    async def _send_pending_starter_intro_stage(
+        self, writer: asyncio.StreamWriter, session: Session, trigger: str
+    ) -> None:
+        if not session.pending_starter_intro_stage:
+            return
+        if not self.intro_stage_enabled or self.intro_stage_trigger != trigger:
+            session.pending_starter_intro_stage = False
+            return
+        if session.stage.current_stage_id == self.intro_stage_id:
+            session.pending_starter_intro_stage = False
+            return
+        if self.intro_stage_delay:
+            await asyncio.sleep(self.intro_stage_delay)
+        session.pending_starter_intro_stage = False
         await self._send_starter_intro_stage(writer, session)
 
     async def _send(

@@ -122,6 +122,12 @@ class TaskState:
         self.spawned_task_npcs.add(task_id)
         return True
 
+    def skip_starter_quest(self) -> None:
+        task = self._task(STARTER_TASK.id)
+        for condition in task.conditions:
+            condition.completed_count = max(condition.completed_count, 1)
+        self._finish(task)
+
     def sync_info(
         self, task_id: int, sync_type: str, params: list[str]
     ) -> dict[str, object]:

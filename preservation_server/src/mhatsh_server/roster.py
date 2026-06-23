@@ -29,6 +29,7 @@ class RosterState:
         characters: tuple[PlayableCharacter, ...],
         *,
         first_card_uid: int,
+        hero_level: int = 1,
     ) -> None:
         self.cards = {
             first_card_uid + index: RosterCard(first_card_uid + index, character)
@@ -39,6 +40,7 @@ class RosterState:
             raise ValueError("roster requires at least one verified playable character")
         self.active_card_uid = min(self.cards)
         self.active_show = 1
+        self.hero_level = max(1, int(hero_level))
 
     @property
     def active_card(self) -> RosterCard:
@@ -92,7 +94,7 @@ class RosterState:
             "Fighting": 1,
             "Vitality": 100,
             "ShapeId": card.shape_id,
-            "MLv": 1,
+            "MLv": self.hero_level,
         }
 
     def scene_hero_change(self, user_uid: int) -> dict[str, object]:
@@ -118,6 +120,10 @@ class RosterState:
         }
 
     def _card_to_protocol(self, card: RosterCard) -> dict[str, object]:
-        values = playable_card(card.character, card.card_uid)
+        values = playable_card(
+            card.character,
+            card.card_uid,
+            level=self.hero_level,
+        )
         values["Fighting"] = int(card.card_uid == self.active_card_uid)
         return values

@@ -139,10 +139,38 @@ INITIAL_PLAYABLE_ROSTER = tuple(
     PLAYABLE_CHARACTERS[model_id]
     for model_id in ("h1001", "h1002", "h1006", "h1007", "h1008", "h1009", "h1010")
 )
+PUBLIC_PLAYABLE_MODEL_IDS = (
+    "h1001",
+    "h1002",
+    "h1003",
+    "h1006",
+    "h1007",
+    "h1008",
+    "h1009",
+    "h1010",
+    "h1012",
+    "h1013",
+    "h1014",
+    "h1015",
+    "h1016",
+    "h1017",
+    "h1019",
+    "h1020",
+    "h1021",
+    "h1022",
+    "h1026",
+    "h1027",
+    "h1028",
+    "h1029",
+    "h1030",
+    "h1031",
+    "h1032",
+    "h1110",
+)
 VERIFIED_PLAYABLE_ROSTER = tuple(
-    character
-    for character in PLAYABLE_CHARACTERS.values()
-    if character.is_protocol_verified
+    PLAYABLE_CHARACTERS[model_id]
+    for model_id in PUBLIC_PLAYABLE_MODEL_IDS
+    if PLAYABLE_CHARACTERS[model_id].is_protocol_verified
 )
 
 
@@ -316,7 +344,12 @@ CHIBI_MODEL_ASSETS = {
 }
 
 
-def playable_card(character: PlayableCharacter, card_uid: int) -> dict[str, object]:
+def playable_card(
+    character: PlayableCharacter,
+    card_uid: int,
+    *,
+    level: int = 1,
+) -> dict[str, object]:
     if not character.is_protocol_verified:
         raise ValueError(
             f"{character.model_asset_id} has an AXMD model but no verified protocol mapping"
@@ -324,7 +357,7 @@ def playable_card(character: PlayableCharacter, card_uid: int) -> dict[str, obje
     return {
         "Uid": card_uid,
         "HeroId": character.hero_id,
-        "Lv": 1,
+        "Lv": max(1, int(level)),
         "Exp": 0,
         "ShapeId": character.shape_id,
         "FashionId": 0,

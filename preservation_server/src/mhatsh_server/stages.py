@@ -2,20 +2,1965 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .combat import CombatResolution, FightStyle
+
 
 STARTER_INTRO_STAGE_ID = 299301
 STARTER_INTRO_STAGE_UID = 2993010001
 STARTER_INTRO_STAGE_LEVEL = 1
 STARTER_INTRO_STAGE_TIME = 300
 STARTER_INTRO_STAGE_DRAMA = 1
+STAGE_CATALOG_SOURCE = (
+    "analysis/intro_qte_asset_index.txt and "
+    "analysis/battle_stage_candidate_catalog.json, 2026-06-23"
+)
+LOCAL_STAGE_PASS_REWARD_ITEM_ID = 1001
+LOCAL_STAGE_FIRST_REWARD_ITEM_ID = 1002
+LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID = 1003
+LOCAL_STAGE_STYLE_REWARD_ITEM_ID = 1004
+
+
+@dataclass(frozen=True, slots=True)
+class EnemyAIProfile:
+    key: str
+    bt_name: str
+    behavior: str
+    attack_range: int
+    leash_radius: int
+    skill_rotation: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class MonsterCfgEvidence:
+    monster_id: int
+    preferred_name: str
+    display_names: tuple[str, ...] = ()
+    animation_keys: tuple[str, ...] = ()
+    source: str = (
+        "analysis/mediafire_20260620/apk_extract/assets/1FO/fee3a47c0b4a95e9, "
+        "parsed by scripts/derive_monster_cfg_hints.py, 2026-06-23"
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class StageEnemySpawn:
+    label: str
+    enemy_id: int
+    shape_id: int
+    uid: int
+    x: int
+    y: int
+    z: int = 0
+    face: int = 0
+    level: int = 1
+    group_id: int = 0
+    ai_profile_key: str = "melee_chaser"
+
+    @property
+    def ai_profile(self) -> EnemyAIProfile:
+        return ENEMY_AI_PROFILES[self.ai_profile_key]
+
+    @property
+    def monster_cfg_evidence(self) -> MonsterCfgEvidence | None:
+        return MONSTER_CFG_EVIDENCE_BY_ID.get(self.enemy_id)
+
+    @property
+    def display_name(self) -> str:
+        evidence = self.monster_cfg_evidence
+        return evidence.preferred_name if evidence is not None else self.label
+
+    @property
+    def combat_hp(self) -> int:
+        base_hp = 1600 + max(1, int(self.level)) * 45
+        if self.ai_profile_key in {
+            "sludge_boss",
+            "boss_brute",
+            "nomu_brute",
+            "mechanical_boss",
+        }:
+            base_hp += 1800
+        return base_hp
+
+    def to_scene_npc(self) -> dict[str, object]:
+        return {
+            "Uid": self.uid,
+            "Id": self.enemy_id,
+            "X": self.x,
+            "Y": self.y,
+            "Z": self.z,
+            "Face": self.face,
+            "Version": 1,
+            "ShapeId": self.shape_id,
+            "Attach": [],
+            "HideStatus": 0,
+            "AreaId": 0,
+            "StartAnim": "",
+            "BTName": self.ai_profile.bt_name,
+            "ForceShow": 1,
+        }
+
+    def to_monster_frame_seed(self) -> dict[str, object]:
+        return {
+            "Uid": self.uid,
+            "Type": 1,
+            "X": self.x,
+            "Y": self.y,
+            "BoxFullMode": 0,
+            "OwnerUid": 0,
+            "CurFrame": 0,
+            "CurAni": "idle",
+            "CurAniTime": 0,
+            "CurAnimationIdx": 0,
+            "State": 0,
+            "BodyBlock": 0,
+            "ReplaceRunAni": "",
+            "Camp": 1,
+            "RotationY": self.face,
+            "SkillId": 0,
+            "Info": {
+                "Id": self.enemy_id,
+                "Face": self.face,
+                "ShapeVer": 1,
+                "MissionLv": self.level,
+                "StartAnim": "",
+                "DropList": [],
+                "MoneyList": [],
+                "Alias": self.display_name,
+                "GroupId": self.group_id,
+                "BallId": 0,
+                "AreaId": 0,
+                "WallNormal": [],
+                "Level": self.level,
+                "BTParam": list(self.ai_profile.skill_rotation),
+                "bNotAsync": 0,
+            },
+        }
+
+    def to_ai_directive(self) -> dict[str, object]:
+        profile = self.ai_profile
+        return {
+            "Uid": self.uid,
+            "EnemyId": self.enemy_id,
+            "Alias": self.display_name,
+            "Profile": profile.key,
+            "Behavior": profile.behavior,
+            "BTName": profile.bt_name,
+            "Home": {"X": self.x, "Y": self.y, "Z": self.z, "Face": self.face},
+            "AttackRange": profile.attack_range,
+            "LeashRadius": profile.leash_radius,
+            "SkillRotation": list(profile.skill_rotation),
+            "CombatHp": self.combat_hp,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class StageEnemyCombatResult:
+    uid: int
+    enemy_id: int
+    label: str
+    display_name: str
+    ai_profile_key: str
+    max_hp: int
+    damage_taken: int
+    defeated: bool
+    last_skill: str
+    threat_score: int
+    action_hint: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "Uid": self.uid,
+            "EnemyId": self.enemy_id,
+            "Label": self.label,
+            "DisplayName": self.display_name,
+            "AIProfile": self.ai_profile_key,
+            "MaxHP": self.max_hp,
+            "DamageTaken": self.damage_taken,
+            "Defeated": int(self.defeated),
+            "LastSkill": self.last_skill,
+            "ThreatScore": self.threat_score,
+            "ActionHint": self.action_hint,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class StageCompletion:
+    stage_id: int
+    status: int = 0
+    stars: tuple[int, ...] = ()
+    full_star_time: int = 0
+    best_time: int = 0
+    pass_count: int = 0
+
+    def to_stage_info(self) -> dict[str, object]:
+        return {
+            "Id": self.stage_id,
+            "Status": self.status,
+            "StarList": list(self.stars),
+            "FullStarTime": self.full_star_time,
+        }
+
+    def to_profile(self) -> dict[str, int | list[int]]:
+        return {
+            "status": self.status,
+            "stars": list(self.stars),
+            "full_star_time": self.full_star_time,
+            "best_time": self.best_time,
+            "pass_count": self.pass_count,
+        }
+
+    @classmethod
+    def from_profile(
+        cls, stage_id: int, values: dict[str, object]
+    ) -> "StageCompletion":
+        return cls(
+            stage_id=stage_id,
+            status=_as_int(values.get("status")),
+            stars=tuple(_as_int(item) for item in list(values.get("stars") or [])),
+            full_star_time=_as_int(values.get("full_star_time")),
+            best_time=_as_int(values.get("best_time")),
+            pass_count=_as_int(values.get("pass_count")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BattleStageDefinition:
+    key: str
+    label: str
+    stage_id: int | None
+    stage_uid: int | None = None
+    level: int = STARTER_INTRO_STAGE_LEVEL
+    time_limit: int = STARTER_INTRO_STAGE_TIME
+    drama: int = STARTER_INTRO_STAGE_DRAMA
+    scripts: tuple[str, ...] = ()
+    audio_events: tuple[str, ...] = ()
+    actor_sets: tuple[str, ...] = ()
+    video_assets: tuple[str, ...] = ()
+    character_refs: tuple[str, ...] = ()
+    enemy_group_ids: tuple[int, ...] = ()
+    enemy_spawns: tuple[StageEnemySpawn, ...] = ()
+    source: str = STAGE_CATALOG_SOURCE
+
+    @property
+    def can_enter_by_stage_id(self) -> bool:
+        return self.stage_id is not None
+
+    @property
+    def resolved_stage_uid(self) -> int:
+        if self.stage_uid is not None:
+            return self.stage_uid
+        if self.stage_id is None:
+            raise ValueError(f"{self.key} has no numeric stage id")
+        return self.stage_id * 10000 + 1
+
+    @property
+    def encounter_spawns(self) -> tuple[StageEnemySpawn, ...]:
+        if self.enemy_spawns:
+            return self.enemy_spawns
+        stage_cfg_spawns = stage_cfg_enemy_spawns(self.stage_id, self.combat_enemy_ids)
+        if stage_cfg_spawns:
+            return stage_cfg_spawns
+        return generated_stage_spawns(self.stage_id)
+
+    @property
+    def combat_enemy_ids(self) -> tuple[int, ...]:
+        if self.enemy_spawns:
+            return tuple(spawn.enemy_id for spawn in self.enemy_spawns)
+        if self.stage_id is None:
+            return ()
+        return STAGE_CFG_COMBAT_ENEMY_IDS_BY_STAGE.get(int(self.stage_id), ())
+
+    @property
+    def encounter_target_count(self) -> int:
+        return len(self.encounter_spawns)
+
+
+MONSTER_CFG_EVIDENCE_BY_ID = {
+    2005: MonsterCfgEvidence(
+        monster_id=2005,
+        preferred_name="Giant Villain",
+        display_names=("Giant Villain", "Gigantification", "Scavenger", "Thug"),
+        animation_keys=(
+            "2005_b1_01",
+            "2005_b2_01",
+            "2005_b2_02",
+            "2005_b2_03",
+            "2005_b2_04",
+            "2005_b2_05",
+            "2005_b3_01",
+            "2005_b3_02",
+            "2005_b4_01",
+            "2005_d7_01",
+        ),
+    ),
+    2202: MonsterCfgEvidence(
+        monster_id=2202,
+        preferred_name="Monstrous Lizard",
+        display_names=("Monstrous Lizard", "Sharp Blade"),
+        animation_keys=(
+            "2202_a1_01",
+            "2202_b1_01",
+            "2202_c2_01",
+            "2202_c2_02",
+            "2202_c2_03",
+            "2202_c2_04",
+            "2202_d1_01",
+            "2202_d1_02",
+            "2202_d1_03",
+            "2202_kong",
+        ),
+    ),
+    2470: MonsterCfgEvidence(
+        monster_id=2470,
+        preferred_name="Twice",
+        display_names=("Twice",),
+        animation_keys=("2470_a1_01",),
+    ),
+    2471: MonsterCfgEvidence(
+        monster_id=2471,
+        preferred_name="Twice",
+        display_names=("Twice",),
+        animation_keys=("2471_a1_01",),
+    ),
+    2472: MonsterCfgEvidence(
+        monster_id=2472,
+        preferred_name="Twice",
+        display_names=("Twice",),
+        animation_keys=("2472_a1_01", "2472_a1_02", "2472_a1_03"),
+    ),
+    3005: MonsterCfgEvidence(
+        monster_id=3005,
+        preferred_name="Faux Villain",
+        display_names=("Faux Villain",),
+        animation_keys=("3005_d1_01",),
+    ),
+    3006: MonsterCfgEvidence(
+        monster_id=3006,
+        preferred_name="Hanzo Suiden",
+        display_names=("Hanzo Suiden", "Water", "Cyclone", "Shark"),
+        animation_keys=(
+            "3006_30",
+            "3006_40",
+            "3006_40_1",
+            "3006_c3_01",
+            "3006_c4_01",
+            "3006_d3_01",
+        ),
+    ),
+    3007: MonsterCfgEvidence(
+        monster_id=3007,
+        preferred_name="Nomu",
+        display_names=("Nomu", "Gigantification", "Scavenger"),
+        animation_keys=(
+            "3007_60_11",
+            "3007_b2_01",
+            "3007_b2_02",
+            "3007_b2_03",
+            "3007_b2_04",
+            "3007_b2_05",
+            "3007_b2_06",
+            "3007_c6_04",
+            "3007_d1_01",
+            "3007_d5_01",
+            "3007_d5_02",
+            "3007_heroplay",
+        ),
+    ),
+    3016: MonsterCfgEvidence(
+        monster_id=3016,
+        preferred_name="Muscular",
+        display_names=("Muscular",),
+        animation_keys=("3016_c2_01",),
+    ),
+}
+
+
+ENEMY_AI_PROFILES = {
+    "melee_chaser": EnemyAIProfile(
+        key="melee_chaser",
+        bt_name="bt_preservation_melee_chaser",
+        behavior="close distance, use basic attacks, reset when far from spawn",
+        attack_range=220,
+        leash_radius=1800,
+        skill_rotation=("common_atk_01", "common_atk_02"),
+    ),
+    "sludge_boss": EnemyAIProfile(
+        key="sludge_boss",
+        bt_name="bt_preservation_sludge_boss",
+        behavior="slow boss pressure with short melee strings and QTE-friendly pauses",
+        attack_range=360,
+        leash_radius=2200,
+        skill_rotation=("sludge_grab", "sludge_slam", "sludge_recover"),
+    ),
+    "training_enemy": EnemyAIProfile(
+        key="training_enemy",
+        bt_name="bt_preservation_training_enemy",
+        behavior="low-aggression tutorial target used for move validation",
+        attack_range=180,
+        leash_radius=1200,
+        skill_rotation=("idle_guard", "common_atk_01"),
+    ),
+    "elite_chaser": EnemyAIProfile(
+        key="elite_chaser",
+        bt_name="bt_preservation_elite_chaser",
+        behavior="aggressive elite melee enemy with faster pursuit and combo pressure",
+        attack_range=280,
+        leash_radius=2200,
+        skill_rotation=("elite_dash", "elite_combo", "heavy_followup"),
+    ),
+    "boss_brute": EnemyAIProfile(
+        key="boss_brute",
+        bt_name="bt_preservation_boss_brute",
+        behavior="large enemy pressure pattern for Nomu/mech style candidates",
+        attack_range=420,
+        leash_radius=2600,
+        skill_rotation=("heavy_swing", "ground_slam", "reposition"),
+    ),
+    "nomu_brute": EnemyAIProfile(
+        key="nomu_brute",
+        bt_name="bt_preservation_nomu_brute",
+        behavior="armored brawler with slow pursuit and interrupt-heavy swings",
+        attack_range=440,
+        leash_radius=2600,
+        skill_rotation=("nomu_charge", "nomu_swing", "nomu_roar"),
+    ),
+    "mechanical_boss": EnemyAIProfile(
+        key="mechanical_boss",
+        bt_name="bt_preservation_mechanical_boss",
+        behavior="large mechanical boss probe with telegraphed area attacks",
+        attack_range=500,
+        leash_radius=2800,
+        skill_rotation=("mech_stomp", "mech_sweep", "mech_missile"),
+    ),
+    "mechanical_patrol": EnemyAIProfile(
+        key="mechanical_patrol",
+        bt_name="bt_preservation_mechanical_patrol",
+        behavior="mechanical small enemy with patrol-style pursuit and burst attacks",
+        attack_range=360,
+        leash_radius=2200,
+        skill_rotation=("mech_patrol", "mech_burst", "mech_reposition"),
+    ),
+    "ranged_pressure": EnemyAIProfile(
+        key="ranged_pressure",
+        bt_name="bt_preservation_ranged_pressure",
+        behavior="keeps distance and fires intermittent ranged attacks",
+        attack_range=620,
+        leash_radius=2100,
+        skill_rotation=("ranged_shot", "strafe", "ranged_burst"),
+    ),
+}
+
+
+STARTER_STAGE_ENEMIES = (
+    StageEnemySpawn(
+        label="starter_sludge_villain_probe",
+        enemy_id=3002,
+        shape_id=3002,
+        uid=3003001,
+        x=4560,
+        y=19980,
+        face=180,
+        level=1,
+        group_id=3003001,
+        ai_profile_key="sludge_boss",
+    ),
+    StageEnemySpawn(
+        label="starter_training_enemy_probe",
+        enemy_id=2005,
+        shape_id=2005,
+        uid=3003002,
+        x=4800,
+        y=20120,
+        face=180,
+        level=1,
+        group_id=3003002,
+        ai_profile_key="training_enemy",
+    ),
+)
+
+
+def generated_stage_spawns(stage_id: int | None) -> tuple[StageEnemySpawn, ...]:
+    if stage_id is None:
+        return ()
+    stage = int(stage_id)
+    if stage == 500:
+        enemy_ids = (2005,)
+    elif stage >= 560000:
+        enemy_ids = (2202, 2472, 3007)
+    elif stage >= 500000:
+        enemy_ids = (3002, 3007)
+    elif stage >= 420000:
+        enemy_ids = (2470, 2202, 3005)
+    elif stage >= 400000:
+        enemy_ids = (2202, 2005, 2202)
+    elif stage >= 200000:
+        enemy_ids = (2005, 2202)
+    else:
+        enemy_ids = (2005,)
+
+    base_x = ((stage % 11) - 5) * 120
+    base_y = ((stage // 10 % 11) - 5) * 120
+    return tuple(
+        StageEnemySpawn(
+            label=f"generated_stage_{stage}_enemy_{index + 1}",
+            enemy_id=enemy_id,
+            shape_id=enemy_id,
+            uid=stage * 100 + index + 1,
+            x=base_x + index * 180,
+            y=base_y + index * 140,
+            level=1 + (stage % 4),
+            group_id=stage,
+            ai_profile_key=generated_enemy_profile_key(enemy_id),
+        )
+        for index, enemy_id in enumerate(enemy_ids)
+    )
+
+
+def stage_cfg_enemy_spawns(
+    stage_id: int | None,
+    combat_enemy_ids: tuple[int, ...],
+) -> tuple[StageEnemySpawn, ...]:
+    if stage_id is None or not combat_enemy_ids:
+        return ()
+
+    stage = int(stage_id)
+    enemy_ids = combat_enemy_ids
+    authored_spawns = {
+        spawn.enemy_id: spawn
+        for spawn in STAGE_CFG_AUTHORED_SPAWN_HINTS_BY_STAGE.get(stage, ())
+    }
+    base_x = ((stage % 13) - 6) * 150
+    base_y = ((stage // 10 % 13) - 6) * 150
+    spawns: list[StageEnemySpawn] = []
+    for index, enemy_id in enumerate(enemy_ids):
+        authored_spawn = authored_spawns.get(enemy_id)
+        if authored_spawn is not None:
+            spawns.append(authored_spawn)
+            continue
+        spawns.append(
+            StageEnemySpawn(
+                label=f"stage_cfg_{stage}_enemy_{enemy_id}",
+                enemy_id=enemy_id,
+                shape_id=enemy_id,
+                uid=enemy_id,
+                x=base_x + index * 160,
+                y=base_y + index * 120,
+                level=1 + (stage % 5),
+                group_id=stage,
+                ai_profile_key=generated_enemy_profile_key(enemy_id),
+            )
+        )
+    return tuple(spawns)
+
+
+def generated_enemy_profile_key(enemy_id: int) -> str:
+    override = STAGE_CFG_AI_PROFILE_OVERRIDES_BY_ENEMY_ID.get(enemy_id)
+    if override is not None:
+        return override
+    if enemy_id == 3002:
+        return "sludge_boss"
+    if enemy_id in {2470, 2471, 3007, 31040301}:
+        return "nomu_brute"
+    if enemy_id == 3005:
+        return "mechanical_boss"
+    if enemy_id in {2472, 5008, 5015, 56390302}:
+        return "ranged_pressure"
+    if enemy_id == 2005:
+        return "training_enemy"
+    return "melee_chaser"
+
+
+STAGE_CFG_AI_PROFILE_OVERRIDES_BY_ENEMY_ID: dict[int, str] = {
+    16000101: "boss_brute",
+    30040104: "elite_chaser",
+    30040108: "boss_brute",
+    30040109: "elite_chaser",
+    31040301: "nomu_brute",
+    40011512: "elite_chaser",
+    40011513: "elite_chaser",
+    40011514: "boss_brute",
+    40011801: "nomu_brute",
+    40510301: "mechanical_patrol",
+    40510304: "mechanical_patrol",
+    40525201: "mechanical_patrol",
+    40525202: "mechanical_patrol",
+    40525203: "mechanical_patrol",
+    40525204: "mechanical_patrol",
+    40525251: "mechanical_patrol",
+    40525272: "mechanical_patrol",
+    40620504: "elite_chaser",
+    40650202: "elite_chaser",
+    40650205: "ranged_pressure",
+    40650504: "elite_chaser",
+    40650603: "boss_brute",
+    56120303: "elite_chaser",
+    56121103: "boss_brute",
+    56130412: "ranged_pressure",
+    56240652: "elite_chaser",
+    56240751: "elite_chaser",
+    56250410: "elite_chaser",
+    56261004: "elite_chaser",
+    56370101: "elite_chaser",
+    56370103: "elite_chaser",
+    56390302: "ranged_pressure",
+    56390303: "elite_chaser",
+}
+
+
+EXPLICIT_RECOVERED_STAGE_IDS = {
+    STARTER_INTRO_STAGE_ID,
+    500,
+    160001,
+    200508,
+    200509,
+    404103,
+    404105,
+    404201,
+    404204,
+    404205,
+    404402,
+    404405,
+    406405,
+    406502,
+    406505,
+    406506,
+    420001,
+    501201,
+    502601,
+    561203,
+}
+
+
+ZX_NUMERIC_STAGE_SCRIPT_GROUPS: dict[int, tuple[str, ...]] = {
+    50206: ("zx_50206_1", "zx_50206_2"),
+    101002: ("zx_101002_1",),
+    101101: ("zx_101101_1",),
+    102003: ("zx_102003_1",),
+    103006: ("zx_103006_1",),
+    201006: (
+        "zx_201006_1",
+        "zx_201006_2",
+        "zx_201006_3",
+        "zx_201006_4",
+        "zx_201006_5",
+    ),
+    201008: ("zx_201008_1", "zx_201008_2"),
+    201009: ("zx_201009_2", "zx_201009_3", "zx_201009_4"),
+    201101: ("zx_201101_1", "zx_201101_2", "zx_201101_3"),
+    201103: (
+        "zx_201103_1",
+        "zx_201103_2",
+        "zx_201103_3",
+        "zx_201103_5",
+    ),
+    201104: ("zx_201104_1",),
+    201105: ("zx_201105_1",),
+    201107: ("zx_201107",),
+    202102: ("zx_202102_1",),
+    202105: ("zx_202105_2",),
+    301201: ("zx_301201_1",),
+    301202: ("zx_301202_2",),
+    301203: ("zx_301203_3",),
+    301204: ("zx_301204_3",),
+    402009: ("zx_402009_1",),
+    402010: ("zx_402010_1",),
+    404001: (
+        "zx_404001_1",
+        "zx_404001_2",
+        "zx_404001_21",
+        "zx_404001_22",
+        "zx_404001_23",
+        "zx_404001_3",
+    ),
+    404002: ("zx_404002_1", "zx_404002_2"),
+    404003: ("zx_404003_1", "zx_404003_2"),
+    404004: ("zx_404004_1",),
+    404005: ("zx_404005_1",),
+    404006: (
+        "zx_404006_1",
+        "zx_404006_11",
+        "zx_404006_12",
+        "zx_404006_13",
+        "zx_404006_21",
+        "zx_404006_22",
+        "zx_404006_31",
+        "zx_404006_32",
+        "zx_404006_33",
+    ),
+    501007: ("zx_501007_1",),
+    501101: ("zx_501101_1_copy", "zx_501101_2", "zx_501101_3"),
+    501103: ("zx_501103_1", "zx_501103_2", "zx_501103_3"),
+    501104: ("zx_501104_1",),
+    502104: ("zx_502104_1",),
+    502105: ("zx_502105_1",),
+    502106: ("zx_502106_1",),
+    502107: ("zx_502107_1", "zx_502107_2", "zx_502107_3"),
+    502108: ("zx_502108_1",),
+    561004: ("zx_561004",),
+    561201: ("zx_561201_1", "zx_561201_2", "zx_561201_3"),
+    561221: ("zx_561221_1", "zx_561221_2", "zx_561221_3", "zx_561221_4"),
+    561222: ("zx_561222_1", "zx_561222_2", "zx_561222_3"),
+    561224: ("zx_561224_2",),
+    562402: ("zx_562402_1",),
+    562403: ("zx_562403_1",),
+    562406: ("zx_562406_1", "zx_562406_2", "zx_562406_3"),
+    562407: ("zx_562407_1", "zx_562407_2"),
+    562504: ("zx_562504_1",),
+    562606: ("zx_562606_1",),
+    602007: ("zx_602007_1",),
+    801201: ("zx_801201_1", "zx_801201_3", "zx_801201_5", "zx_801201_6", "zx_801201_7"),
+    801202: ("zx_801202_1",),
+    801204: ("zx_801204_1",),
+    801205: ("zx_801205_1", "zx_801205_2"),
+    801206: ("zx_801206_1",),
+}
+
+
+ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS: dict[int, tuple[str, ...]] = {
+    101201: ("101201_1", "101201_2"),
+    101203: ("101203_1",),
+    200503: ("200503",),
+    200504: ("200504",),
+    200505: ("200505_1",),
+    200506: ("200506",),
+    200507: ("200507_1",),
+    300406: ("300406",),
+    300503: ("300503_01", "300503_02"),
+    350010: ("350010", "350010_end"),
+    360401: ("360401", "360401_1"),
+    360402: ("360402_1",),
+    360403: ("360403_1",),
+    400006: ("400006_boss",),
+    400301: ("400301_1", "400301_2", "400301_3"),
+    400302: ("400302", "400302_1", "400302_2", "400302_3"),
+    400303: ("400303", "400303_1", "400303_2", "400303_3"),
+    400304: ("400304", "400304_1", "400304_2", "400304_3"),
+    400305: ("400305", "400305_1", "400305_2", "400305_3"),
+    400306: ("400306_1", "400306_2", "400306_3"),
+    403301: ("403301",),
+    403302: ("403302",),
+    403304: ("403304",),
+    403352: ("403352", "403352_2"),
+    403361: ("403361",),
+    404101: ("404101",),
+    404102: ("404102",),
+    404202: ("404202",),
+    404301: ("404301",),
+    404303: ("404303_1",),
+    404305: ("404305",),
+    404306: ("404306",),
+    404401: ("404401",),
+    405401: ("405401",),
+    405402: ("405402", "405402_1"),
+    405403: ("405403",),
+    405404: ("405404",),
+    405405: ("405405",),
+    405406: ("405406",),
+    405501: ("405501",),
+    405506: ("405506",),
+    406401: ("406401",),
+    406403: ("406403",),
+    406406: ("406406", "406406_1"),
+    406451: ("406451", "406451_1"),
+    406452: ("406452",),
+    411351: ("411351",),
+    501301: ("501301-1", "501301-2", "501301-3", "501301-4"),
+    501403: ("501403",),
+    510003: ("510003",),
+    511001: ("511001",),
+    511002: ("511002",),
+    511003: ("511003",),
+    511004: ("511004",),
+    511005: ("511005",),
+    511006: ("511006", "511006_1"),
+    511007: ("511007",),
+    511008: ("511008",),
+    520001: ("520001",),
+    520002: ("520002",),
+    520003: ("520003",),
+    520004: ("520004",),
+    520005: ("520005",),
+    520006: ("520006",),
+    520007: ("520007",),
+    520015: ("520015",),
+    520016: ("520016",),
+    520017: ("520017",),
+    520018: ("520018",),
+    520019: ("520019",),
+    520020: ("520020",),
+    520021: ("520021",),
+    530001: ("530001",),
+    530002: ("530002",),
+    530003: ("530003",),
+    530004: ("530004",),
+    530005: ("530005",),
+    530006: ("530006",),
+    530007: ("530007",),
+    561002: ("561002", "561002_1"),
+    561223: ("561223",),
+    561225: (
+        "561225",
+        "561225_1",
+        "561225_2",
+        "561225_3",
+        "561225_4",
+        "561225_5",
+    ),
+    561304: ("561304", "561304_1"),
+    561310: ("561310",),
+    606001: ("606001",),
+    901003: ("901003",),
+    901004: ("901004",),
+    901005: ("901005",),
+    901006: ("901006",),
+    901007: ("901007",),
+    901008: ("901008",),
+}
+
+
+STAGE_CFG_SCRIPT_ROUTE_GROUPS: dict[int, tuple[str, ...]] = {
+    160001: ("stage160001_lose", "stage160001_start", "stage160001_win"),
+    201005: ("act_signal",),
+    201006: ("chase_end",),
+    300301: ("zx_touqiu",),
+    300401: ("zx_usj_002",),
+    300502: ("zx_tyj03",),
+    300505: ("zx_tyj05",),
+    310403: ("zx_usj_03002",),
+    400115: ("tyj_400116", "tyj_400117"),
+    400118: ("tyj_400118",),
+    404105: ("stage404105",),
+    404201: ("stage404201",),
+    404205: ("stage404205_1",),
+    405103: ("area5_1_3",),
+    405252: ("area6_2end",),
+    405302: ("area5_3_2_1", "area5_3_2_2"),
+    406205: ("area6_2_6", "area6_2_6_2"),
+    406305: ("area6_3_6", "area6_3_6_2"),
+    406502: ("stage406502",),
+    406505: ("stage406505",),
+    406506: ("stage406506",),
+    561002: ("561002",),
+    561112: ("ZX-3-1-3-2",),
+    561113: ("ZX-3-1-5-1",),
+    561203: ("stage561203",),
+    561211: ("zx_561221_1", "zx_561222_1"),
+    561223: ("zx_201103_3",),
+    561224: ("zx_201104_1", "zx_561224_2"),
+    561304: ("561304", "561304_1"),
+    562406: ("zx_562406_1", "zx_562406_3"),
+    562407: ("zx_562407_1",),
+    562504: ("zx_562504_1",),
+    562610: ("act_70110901try",),
+    563701: ("act_70110204", "act_70110204try"),
+    563901: ("901003", "9010031"),
+    563903: ("901008",),
+    571101: ("101201_1",),
+}
+
+
+STAGE_CFG_ENCOUNTER_GROUPS: dict[int, tuple[int, ...]] = {
+    160001: (16000101,),
+    201005: (20100502,),
+    201006: (20100602, 20100603, 20100606, 20100607, 20100608),
+    300401: (
+        30040101,
+        30040102,
+        30040103,
+        30040104,
+        30040105,
+        30040106,
+        30040107,
+        30040108,
+        30040109,
+    ),
+    300502: (30050201, 30050202, 30050204, 30050205),
+    310403: (31040301,),
+    400115: (40011512, 40011513, 40011514),
+    400118: (40011801,),
+    404201: (40420102, 40420103),
+    405103: (40510301, 40510304, 40510371, 40510372, 40510373, 40510374),
+    405252: (
+        40525201,
+        40525202,
+        40525203,
+        40525204,
+        40525251,
+        40525271,
+        40525272,
+    ),
+    405302: (40530201, 40530202),
+    406205: (40620502, 40620503, 40620504, 40620505, 40620506),
+    406305: (40630501, 40630503, 40630505, 40630506),
+    406502: (40650201, 40650202, 40650203, 40650204, 40650205),
+    406505: (40650501, 40650502, 40650503, 40650504, 40650505),
+    406506: (40650603,),
+    561112: (56111203, 56111204, 56111205),
+    561113: (56111302, 56111303, 56111304),
+    561203: (56120302, 56120303),
+    561211: (56121101, 56121102, 56121103),
+    561223: (
+        56122302,
+        56122303,
+        56122304,
+        56122305,
+        56122306,
+        56122331,
+        56122332,
+        56122333,
+        56122335,
+        56122339,
+        56122341,
+        56122343,
+    ),
+    561224: (56122401, 56122402, 56122403, 56122404, 56122405, 56122406),
+    561304: (56130411, 56130412, 56130413, 56130414, 56130415),
+    562406: (
+        56240604,
+        56240605,
+        56240606,
+        56240607,
+        56240608,
+        56240652,
+        56240671,
+        56240681,
+    ),
+    562407: (56240702, 56240751, 56240771, 56240773, 56240775),
+    562504: (56250406, 56250407, 56250408, 56250409, 56250410),
+    562610: (56261001, 56261002, 56261003, 56261004),
+    563701: (56370101, 56370102, 56370103),
+    563901: (56390101, 56390102, 56390104),
+    563903: (56390301, 56390302, 56390303, 56390304, 56390305, 56390306),
+    571101: (57110101, 57110102, 57110104),
+}
+
+
+STAGE_CFG_COMBAT_ENEMY_IDS_BY_STAGE: dict[int, tuple[int, ...]] = {
+    160001: (16000101,),
+    201006: (20100603,),
+    300401: (
+        30040101,
+        30040102,
+        30040103,
+        30040104,
+        30040105,
+        30040106,
+        30040107,
+        30040108,
+        30040109,
+    ),
+    310403: (31040301,),
+    400115: (40011512, 40011513, 40011514),
+    400118: (40011801,),
+    404201: (40420102, 40420103),
+    405103: (40510301, 40510304),
+    405252: (40525201, 40525202, 40525203, 40525204, 40525251, 40525272),
+    405302: (40530201, 40530202),
+    406205: (40620502, 40620503, 40620504),
+    406305: (40630501, 40630503, 40630506),
+    406502: (40650202, 40650204, 40650205),
+    406505: (40650501, 40650503, 40650504),
+    406506: (40650603,),
+    561113: (56111303, 56111304),
+    561203: (56120302, 56120303),
+    561211: (56121101, 56121102, 56121103),
+    561304: (56130411, 56130412, 56130414),
+    562406: (56240652,),
+    562407: (56240702, 56240751, 56240771),
+    562504: (56250407, 56250408, 56250409, 56250410),
+    562610: (56261001, 56261002, 56261003, 56261004),
+    563701: (56370101, 56370102, 56370103),
+    563901: (56390101, 56390102),
+    563903: (56390301, 56390302, 56390303),
+    571101: (57110101, 57110102),
+}
+
+
+STAGE_CFG_AUTHORED_SPAWN_HINTS_BY_STAGE: dict[int, tuple[StageEnemySpawn, ...]] = {
+    300401: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040101",
+            enemy_id=30040101,
+            shape_id=30040101,
+            uid=30040101,
+            x=13493,
+            y=19529,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040101),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040102",
+            enemy_id=30040102,
+            shape_id=30040102,
+            uid=30040102,
+            x=13908,
+            y=19515,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040102),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040103",
+            enemy_id=30040103,
+            shape_id=30040103,
+            uid=30040103,
+            x=13053,
+            y=19328,
+            face=337,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040103),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040104",
+            enemy_id=30040104,
+            shape_id=30040104,
+            uid=30040104,
+            x=14852,
+            y=18674,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040104),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040105",
+            enemy_id=30040105,
+            shape_id=30040105,
+            uid=30040105,
+            x=14863,
+            y=17882,
+            face=90,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040105),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040106",
+            enemy_id=30040106,
+            shape_id=30040106,
+            uid=30040106,
+            x=12627,
+            y=17570,
+            face=270,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040106),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040107",
+            enemy_id=30040107,
+            shape_id=30040107,
+            uid=30040107,
+            x=12337,
+            y=18408,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040107),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040108",
+            enemy_id=30040108,
+            shape_id=30040108,
+            uid=30040108,
+            x=13503,
+            y=20148,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040108),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_300401_enemy_30040109",
+            enemy_id=30040109,
+            shape_id=30040109,
+            uid=30040109,
+            x=13472,
+            y=17177,
+            face=180,
+            group_id=300401,
+            ai_profile_key=generated_enemy_profile_key(30040109),
+        ),
+    ),
+    404201: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_404201_enemy_40420102",
+            enemy_id=40420102,
+            shape_id=40420102,
+            uid=40420102,
+            x=11294,
+            y=12209,
+            z=195,
+            group_id=404201,
+            ai_profile_key=generated_enemy_profile_key(40420102),
+        ),
+    ),
+    405252: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_405252_enemy_40525202",
+            enemy_id=40525202,
+            shape_id=40525202,
+            uid=40525202,
+            x=22942,
+            y=17316,
+            face=157,
+            group_id=405252,
+            ai_profile_key=generated_enemy_profile_key(40525202),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_405252_enemy_40525272",
+            enemy_id=40525272,
+            shape_id=40525272,
+            uid=40525272,
+            x=21361,
+            y=17640,
+            group_id=405252,
+            ai_profile_key=generated_enemy_profile_key(40525272),
+        ),
+    ),
+    406305: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_406305_enemy_40630501",
+            enemy_id=40630501,
+            shape_id=40630501,
+            uid=40630501,
+            x=12128,
+            y=3047,
+            group_id=406305,
+            ai_profile_key=generated_enemy_profile_key(40630501),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_406305_enemy_40630506",
+            enemy_id=40630506,
+            shape_id=40630506,
+            uid=40630506,
+            x=11282,
+            y=2785,
+            z=1225,
+            group_id=406305,
+            ai_profile_key=generated_enemy_profile_key(40630506),
+        ),
+    ),
+    406502: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_406502_enemy_40650202",
+            enemy_id=40650202,
+            shape_id=40650202,
+            uid=40650202,
+            x=4802,
+            y=16698,
+            face=270,
+            group_id=406502,
+            ai_profile_key=generated_enemy_profile_key(40650202),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_406502_enemy_40650204",
+            enemy_id=40650204,
+            shape_id=40650204,
+            uid=40650204,
+            x=5005,
+            y=13341,
+            group_id=406502,
+            ai_profile_key=generated_enemy_profile_key(40650204),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_406502_enemy_40650205",
+            enemy_id=40650205,
+            shape_id=40650205,
+            uid=40650205,
+            x=7542,
+            y=11969,
+            group_id=406502,
+            ai_profile_key=generated_enemy_profile_key(40650205),
+        ),
+    ),
+    406505: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_406505_enemy_40650503",
+            enemy_id=40650503,
+            shape_id=40650503,
+            uid=40650503,
+            x=2765,
+            y=3122,
+            z=616,
+            group_id=406505,
+            ai_profile_key=generated_enemy_profile_key(40650503),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_406505_enemy_40650504",
+            enemy_id=40650504,
+            shape_id=40650504,
+            uid=40650504,
+            x=2764,
+            y=3196,
+            group_id=406505,
+            ai_profile_key=generated_enemy_profile_key(40650504),
+        ),
+    ),
+    561113: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_561113_enemy_56111304",
+            enemy_id=56111304,
+            shape_id=56111304,
+            uid=56111304,
+            x=26315,
+            y=23088,
+            group_id=561113,
+            ai_profile_key=generated_enemy_profile_key(56111304),
+        ),
+    ),
+    561203: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_561203_enemy_56120302",
+            enemy_id=56120302,
+            shape_id=56120302,
+            uid=56120302,
+            x=8637,
+            y=1122,
+            z=5069,
+            face=119,
+            group_id=561203,
+            ai_profile_key=generated_enemy_profile_key(56120302),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_561203_enemy_56120303",
+            enemy_id=56120303,
+            shape_id=56120303,
+            uid=56120303,
+            x=8081,
+            y=5945,
+            group_id=561203,
+            ai_profile_key=generated_enemy_profile_key(56120303),
+        ),
+    ),
+    561304: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_561304_enemy_56130412",
+            enemy_id=56130412,
+            shape_id=56130412,
+            uid=56130412,
+            x=25731,
+            y=4541,
+            z=2033,
+            group_id=561304,
+            ai_profile_key=generated_enemy_profile_key(56130412),
+        ),
+    ),
+    563701: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_563701_enemy_56370101",
+            enemy_id=56370101,
+            shape_id=56370101,
+            uid=56370101,
+            x=30655,
+            y=23585,
+            face=180,
+            group_id=563701,
+            ai_profile_key=generated_enemy_profile_key(56370101),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_563701_enemy_56370102",
+            enemy_id=56370102,
+            shape_id=56370102,
+            uid=56370102,
+            x=30917,
+            y=23188,
+            group_id=563701,
+            ai_profile_key=generated_enemy_profile_key(56370102),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_563701_enemy_56370103",
+            enemy_id=56370103,
+            shape_id=56370103,
+            uid=56370103,
+            x=30747,
+            y=24369,
+            z=982,
+            group_id=563701,
+            ai_profile_key=generated_enemy_profile_key(56370103),
+        ),
+    ),
+    563901: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_563901_enemy_56390102",
+            enemy_id=56390102,
+            shape_id=56390102,
+            uid=56390102,
+            x=15498,
+            y=13956,
+            face=230,
+            group_id=563901,
+            ai_profile_key=generated_enemy_profile_key(56390102),
+        ),
+    ),
+    571101: (
+        StageEnemySpawn(
+            label="stage_cfg_authored_571101_enemy_57110101",
+            enemy_id=57110101,
+            shape_id=57110101,
+            uid=57110101,
+            x=10144,
+            y=2366,
+            z=27144,
+            face=90,
+            group_id=571101,
+            ai_profile_key=generated_enemy_profile_key(57110101),
+        ),
+        StageEnemySpawn(
+            label="stage_cfg_authored_571101_enemy_57110102",
+            enemy_id=57110102,
+            shape_id=57110102,
+            uid=57110102,
+            x=10333,
+            y=2240,
+            z=27160,
+            face=-8,
+            group_id=571101,
+            ai_profile_key=generated_enemy_profile_key(57110102),
+        ),
+    ),
+}
+
+
+def _zx_numeric_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    return tuple(
+        BattleStageDefinition(
+            key=f"zx_stage_{stage_id}",
+            label=f"recovered numeric zx stage script cluster {stage_id}",
+            stage_id=stage_id,
+            scripts=scripts,
+            source="parsed from zx numeric drama script names, 2026-06-23",
+        )
+        for stage_id, scripts in sorted(ZX_NUMERIC_STAGE_SCRIPT_GROUPS.items())
+        if stage_id not in EXPLICIT_RECOVERED_STAGE_IDS
+    )
+
+
+def _asset_numeric_drama_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = EXPLICIT_RECOVERED_STAGE_IDS | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+    return tuple(
+        BattleStageDefinition(
+            key=f"asset_drama_stage_{stage_id}",
+            label=f"asset-header numeric drama stage {stage_id}",
+            stage_id=stage_id,
+            scripts=scripts,
+            source="parsed from packed Lua drama chunk headers, 2026-06-23",
+        )
+        for stage_id, scripts in sorted(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS.items())
+        if stage_id not in occupied_ids
+    )
+
+
+def _stage_cfg_script_route_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | set(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+    )
+    return tuple(
+        BattleStageDefinition(
+            key=f"stage_cfg_route_{stage_id}",
+            label=f"stage_cfg routed drama stage {stage_id}",
+            stage_id=stage_id,
+            scripts=scripts,
+            enemy_group_ids=STAGE_CFG_ENCOUNTER_GROUPS.get(stage_id, ()),
+            source="parsed from packed stage_cfg constant routes, 2026-06-23",
+        )
+        for stage_id, scripts in sorted(STAGE_CFG_SCRIPT_ROUTE_GROUPS.items())
+        if stage_id not in occupied_ids
+    )
+
+
+RECOVERED_BATTLE_STAGES = (
+    BattleStageDefinition(
+        key="starter_intro_299301",
+        label="starter intro battle cluster",
+        stage_id=STARTER_INTRO_STAGE_ID,
+        stage_uid=STARTER_INTRO_STAGE_UID,
+        scripts=(
+            "zx_battle01",
+            "zx_battle02",
+            "zx_battle02_1",
+            "zx_battle03",
+            "zx_battle03_1",
+            "zx_battle03_2",
+            "zx_battle04",
+            "zx_battle05",
+            "zx_battle06",
+            "zx_battle07",
+            "zx_lvb_001",
+            "zx_lvb_002",
+            "zx_lvb_003",
+            "zx_lvb_004",
+            "zx_lvbzero",
+        ),
+        audio_events=(
+            "PLOT_zx_battle01_01",
+            "PLOT_zx_battle04_08",
+            "PLOT_zx_battle07_01",
+            "PLOT_zx_battle07_02",
+            "PLOT_zx_battle07_03",
+            "PLOT_zx_battle07_04",
+            "PLOT_zx_battle07_04+05",
+            "PLOT_zx_battle07_05",
+        ),
+        actor_sets=(
+            "zx_lvb001",
+            "zx_lvb002",
+            "zx_lvb002_1",
+            "zx_lvb003",
+            "zx_lvb003_1",
+            "zx_lvb004",
+            "zx_lvb005",
+            "zx_lvb006",
+        ),
+        video_assets=(
+            "video/zx/chapter2/lvb01.flv",
+            "video/zx/chapter2/lvb02.flv",
+            "video/zx/chapter2/lvb03.flv",
+            "video/zx/chapter2/lvb04.flv",
+        ),
+        character_refs=("h1001", "h1002", "h1007", "h1024"),
+        enemy_group_ids=(
+            2001,
+            3002,
+            3003,
+            3004,
+            8003,
+            20021,
+            20022,
+            20023,
+            20031,
+            20032,
+            20033,
+            20041,
+            3003001,
+            3003002,
+            3003003,
+            3003004,
+            3003005,
+            3003006,
+            3003007,
+            3003008,
+            3003009,
+            3003010,
+            3003011,
+            3003012,
+            3003013,
+            3003014,
+            3003015,
+            3003016,
+        ),
+        enemy_spawns=STARTER_STAGE_ENEMIES,
+    ),
+    BattleStageDefinition(
+        key="all_might_stage_502601",
+        label="All Might related drama stage cluster",
+        stage_id=502601,
+        scripts=("stage502601", "stage502601a", "stage502601b", "stage502601c"),
+        audio_events=(
+            "BATTLE_HERO_allmight_allmight_VO_01",
+            "BATTLE_HERO_allmight_allmight_VO_02",
+            "BATTLE_HERO_allmight_allmight_VO_03",
+            "BATTLE/HERO/allmight/skills/Eskill_01",
+            "BATTLE/HERO/allmight/commonATK/commonATK_01",
+        ),
+        actor_sets=("stage502601a", "stage502601b"),
+        character_refs=("h1003",),
+        enemy_spawns=(
+            StageEnemySpawn(
+                label="all_might_stage_brute_probe",
+                enemy_id=3002,
+                shape_id=3002,
+                uid=50260101,
+                x=0,
+                y=0,
+                level=1,
+                group_id=502601,
+                ai_profile_key="sludge_boss",
+            ),
+        ),
+    ),
+    BattleStageDefinition(
+        key="main_stage_160001",
+        label="generic main-stage drama cluster",
+        stage_id=160001,
+        scripts=(
+            "stage160001",
+            "stage160001_start",
+            "stage160001_win",
+            "stage160001_lose",
+            "stage160001_end",
+        ),
+        enemy_group_ids=STAGE_CFG_ENCOUNTER_GROUPS[160001],
+        enemy_spawns=(
+            StageEnemySpawn(
+                label="main_stage_training_enemy",
+                enemy_id=2005,
+                shape_id=2005,
+                uid=16000101,
+                x=0,
+                y=0,
+                group_id=160001,
+                ai_profile_key="training_enemy",
+            ),
+        ),
+    ),
+    BattleStageDefinition(
+        key="stage_500",
+        label="recovered numeric drama stage 500",
+        stage_id=500,
+        scripts=("stage500",),
+    ),
+    BattleStageDefinition(
+        key="stage_200508",
+        label="recovered numeric drama stage 200508",
+        stage_id=200508,
+        scripts=("stage200508",),
+    ),
+    BattleStageDefinition(
+        key="stage_200509",
+        label="recovered numeric drama stage 200509",
+        stage_id=200509,
+        scripts=("stage200509_1", "stage200509_2"),
+    ),
+    BattleStageDefinition(
+        key="stage_404103",
+        label="recovered numeric drama stage 404103",
+        stage_id=404103,
+        scripts=("stage404103_1",),
+    ),
+    BattleStageDefinition(
+        key="stage_404105",
+        label="recovered numeric drama stage 404105",
+        stage_id=404105,
+        scripts=("stage404105",),
+    ),
+    BattleStageDefinition(
+        key="stage_404201",
+        label="recovered numeric drama stage 404201",
+        stage_id=404201,
+        scripts=("stage404201",),
+    ),
+    BattleStageDefinition(
+        key="stage_404204",
+        label="recovered numeric drama stage 404204",
+        stage_id=404204,
+        scripts=("stage404204",),
+    ),
+    BattleStageDefinition(
+        key="stage_404205",
+        label="recovered numeric drama stage 404205",
+        stage_id=404205,
+        scripts=("stage404205_1",),
+    ),
+    BattleStageDefinition(
+        key="stage_404402",
+        label="recovered numeric drama stage 404402",
+        stage_id=404402,
+        scripts=("stage404402",),
+    ),
+    BattleStageDefinition(
+        key="stage_404405",
+        label="recovered numeric drama stage 404405",
+        stage_id=404405,
+        scripts=("stage404405",),
+    ),
+    BattleStageDefinition(
+        key="stage_406405",
+        label="recovered numeric drama stage 406405",
+        stage_id=406405,
+        scripts=("stage406405",),
+    ),
+    BattleStageDefinition(
+        key="stage_406502",
+        label="recovered numeric drama stage 406502",
+        stage_id=406502,
+        scripts=("stage406502",),
+    ),
+    BattleStageDefinition(
+        key="stage_406505",
+        label="recovered numeric drama stage 406505",
+        stage_id=406505,
+        scripts=("stage406505", "stage406505_1"),
+    ),
+    BattleStageDefinition(
+        key="stage_406506",
+        label="recovered numeric drama stage 406506",
+        stage_id=406506,
+        scripts=("stage406506",),
+    ),
+    BattleStageDefinition(
+        key="stage_420001",
+        label="recovered numeric drama stage 420001",
+        stage_id=420001,
+        scripts=("stage420001",),
+    ),
+    BattleStageDefinition(
+        key="stage_501201",
+        label="recovered numeric drama stage 501201",
+        stage_id=501201,
+        scripts=("stage501201a", "stage501201b"),
+    ),
+    BattleStageDefinition(
+        key="stage_561203",
+        label="recovered numeric drama stage 561203",
+        stage_id=561203,
+        scripts=("stage561203", "stage561203_1", "stage561203_2"),
+    ),
+    *_asset_numeric_drama_stage_definitions(),
+    *_stage_cfg_script_route_definitions(),
+    *_zx_numeric_stage_definitions(),
+    BattleStageDefinition(
+        key="battle_drama_zx_only",
+        label="battle drama scripts without recovered numeric stage id",
+        stage_id=None,
+        scripts=(
+            "zx_battle01",
+            "zx_battle02",
+            "zx_battle02_1",
+            "zx_battle03",
+            "zx_battle03_1",
+            "zx_battle03_2",
+            "zx_battle04",
+            "zx_battle05",
+            "zx_battle06",
+            "zx_battle07",
+        ),
+        audio_events=(
+            "PLOT_zx_battle01_01",
+            "PLOT_zx_battle04_08",
+            "PLOT_zx_battle07_01",
+            "PLOT_zx_battle07_02",
+            "PLOT_zx_battle07_03",
+            "PLOT_zx_battle07_04",
+            "PLOT_zx_battle07_05",
+        ),
+    ),
+    BattleStageDefinition(
+        key="ruxue_intro_drama_scripts",
+        label="U.A. enrollment intro drama script cluster",
+        stage_id=None,
+        scripts=(
+            "zx_ruxue01",
+            "zx_ruxue02",
+            "zx_ruxue03",
+            "zx_ruxue03_1",
+            "zx_ruxue03_2",
+            "zx_ruxue03_2_1",
+            "zx_ruxue04",
+            "zx_ruxue05",
+            "zx_ruxue_new2",
+            "zx_ruxue_new2_1",
+            "zx_ruxue_new3",
+        ),
+        audio_events=(
+            "PLOT_copyright_zx_ruxue02_01",
+            "PLOT_copyright_zx_ruxue02_02",
+            "PLOT_copyright_zx_ruxue02_03",
+            "PLOT_zx_ruxue03_1_01",
+            "PLOT_zx_ruxue03_2_09",
+        ),
+        video_assets=("video/zx/chapter2/ruxue_1.flv",),
+    ),
+    BattleStageDefinition(
+        key="usj_drama_scripts",
+        label="USJ drama and combat script cluster",
+        stage_id=None,
+        scripts=(
+            "zx_usj001",
+            "zx_usj002",
+            "zx_usj_001",
+            "zx_usj_001001",
+            "zx_usj_002",
+            "zx_usj_003",
+            "zx_usj_003001",
+            "zx_usj_004",
+            "zx_usj_005",
+            "zx_usj_006",
+            "zx_usj_007",
+            "zx_usj_03001",
+            "zx_usj_03002",
+        ),
+        enemy_group_ids=(3007, 3125),
+    ),
+    BattleStageDefinition(
+        key="beach_event_scripts",
+        label="beach event drama and carry script cluster",
+        stage_id=None,
+        scripts=(
+            "zx_beach",
+            "zx_beach01",
+            "zx_beach03",
+            "zx_beach04",
+            "zx_beach_1",
+            "zx_beach_carry",
+            "zx_beach_carry1_1",
+            "zx_beach_carry1_2",
+            "zx_beach_carry1_3",
+            "zx_beach_carry1_4",
+            "zx_beach_carry1_5",
+            "zx_beach_carry2",
+            "zx_beach_carry_fail1",
+            "zx_beach_carry_fail2",
+            "zx_beach_carry_fail3",
+            "zx_beach_carry_fail4",
+            "zx_beach_carry_fail5",
+            "zx_beach_carry_suc1",
+            "zx_beach_carry_suc2",
+            "zx_beach_carry_suc3",
+            "zx_beach_carry_suc4",
+            "zx_beach_carry_suc5",
+            "zx_beach_g1",
+            "zx_beach_suc",
+        ),
+        video_assets=("video/zx/chapter2/beach_01.flv",),
+    ),
+    BattleStageDefinition(
+        key="commercial_street_scripts",
+        label="commercial street intro/exploration script cluster",
+        stage_id=None,
+        scripts=(
+            "zx_shangyejie0",
+            "zx_shangyejie01",
+            "zx_shangyejie02",
+            "zx_shangyejie03",
+            "zx_shangyejie1",
+            "zx_shangyejie2",
+            "zx_shangyejie3",
+            "zx_shangyejie4",
+            "zx_shangyejie_end",
+            "zx_shangyejie_qte",
+            "zx_shangyejie_start",
+            "zx_shangyejie_test",
+        ),
+    ),
+    BattleStageDefinition(
+        key="training_yard_scripts",
+        label="training-yard drama and hazard script cluster",
+        stage_id=None,
+        scripts=(
+            "zx_tyj01",
+            "zx_tyj02",
+            "zx_tyj02_1",
+            "zx_tyj03",
+            "zx_tyj04",
+            "zx_tyj04_1",
+            "zx_tyj05",
+            "zx_tyj06",
+            "zx_touqiu",
+            "zx_tyj_dilei01",
+            "zx_tyj_dilei02",
+        ),
+        video_assets=("video/zx/chapter2/touqiu.flv",),
+    ),
+    BattleStageDefinition(
+        key="stage_cfg_chapter1_zx_evidence",
+        label="stage_cfg chapter 1 zx/video evidence without proven stage route",
+        stage_id=None,
+        scripts=("zx_2_2_1", "zx_2_2_2", "zx_2_6_1", "zx_2_7"),
+        video_assets=(
+            "video/zx/chapter1/judahua.flv",
+            "video/zx/chapter1/yuniguai_1.flv",
+        ),
+        source="parsed from packed stage_cfg strings, 2026-06-23",
+    ),
+)
+
+
+RECOVERED_BATTLE_STAGE_BY_KEY = {
+    stage.key: stage for stage in RECOVERED_BATTLE_STAGES
+}
+RECOVERED_BATTLE_STAGE_BY_ID = {
+    stage.stage_id: stage
+    for stage in RECOVERED_BATTLE_STAGES
+    if stage.stage_id is not None
+}
+
+
+def stage_candidate_by_key(key: str) -> BattleStageDefinition:
+    return RECOVERED_BATTLE_STAGE_BY_KEY[key]
+
+
+def stage_candidate_by_id(stage_id: int) -> BattleStageDefinition:
+    return RECOVERED_BATTLE_STAGE_BY_ID[stage_id]
+
+
+def stage_candidate_or_generated(stage_id: int) -> BattleStageDefinition:
+    stage = RECOVERED_BATTLE_STAGE_BY_ID.get(int(stage_id))
+    if stage is not None:
+        return stage
+    return BattleStageDefinition(
+        key=f"generated_stage_{int(stage_id)}",
+        label=f"generated playable combat stage {int(stage_id)}",
+        stage_id=int(stage_id),
+        scripts=(),
+        source="generated from requested stage id, 2026-06-23",
+    )
+
+
+def _as_int(value: object, default: int = 0) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _dict_list(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, dict)]
+
+
+@dataclass(frozen=True, slots=True)
+class StageCombatSummary:
+    stage_id: int
+    result: int
+    time: int
+    max_combo: int
+    combo_damage: int
+    all_damage: int
+    on_hit_num: int
+    solo_boss_num: int
+    monster_kills: tuple[tuple[int, int], ...] = ()
+    item_rewards: tuple[tuple[int, int], ...] = ()
+    skill_levels: tuple[tuple[int, int], ...] = ()
+    button_counts: tuple[tuple[str, int], ...] = ()
+    move_total: int = 0
+    damage_members: tuple[tuple[int, int], ...] = ()
+    mvp_uid: int = 0
+    reborn: int = 0
+    combat_resolution: CombatResolution | None = None
+    enemy_results: tuple[StageEnemyCombatResult, ...] = ()
+    stage_time_limit: int = STARTER_INTRO_STAGE_TIME
+
+    @property
+    def passed(self) -> bool:
+        return self.result == 1
+
+    @property
+    def stars(self) -> list[int]:
+        if not self.passed:
+            return []
+        stars = [1]
+        target_count = (
+            self.combat_resolution.target_count
+            if self.combat_resolution is not None
+            else 0
+        )
+        if not target_count or self.estimated_defeats >= target_count:
+            stars.append(2)
+        clean_clear = self.reborn == 0
+        fast_clear = not self.time or self.time <= max(1, int(self.stage_time_limit * 0.8))
+        if 2 in stars and clean_clear and fast_clear:
+            stars.append(3)
+        return stars
+
+    @property
+    def rewards(self) -> list[dict[str, object]]:
+        return [
+            {"ItemId": item_id, "count": count, "extra": []}
+            for item_id, count in self.item_rewards
+            if item_id and count
+        ]
+
+    @property
+    def generated_rewards(self) -> list[dict[str, object]]:
+        rewards = [
+            {
+                "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                "count": max(1, self.estimated_defeats or 1),
+                "extra": [],
+            }
+        ]
+        stars = self.stars
+        if 2 in stars:
+            rewards.append(
+                {
+                    "ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID,
+                    "count": len(stars),
+                    "extra": [],
+                }
+            )
+        if (
+            self.combat_resolution is not None
+            and self.combat_resolution.pressure_score >= 75
+        ):
+            rewards.append(
+                {
+                    "ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID,
+                    "count": max(1, self.combat_resolution.pressure_score // 75),
+                    "extra": [],
+                }
+            )
+        return rewards
+
+    @property
+    def result_rewards(self) -> list[dict[str, object]]:
+        return self.rewards or self.generated_rewards
+
+    @property
+    def move_results(self) -> list[dict[str, object]]:
+        if self.combat_resolution is None:
+            return []
+        return [
+            result.as_dict()
+            for result in self.combat_resolution.move_results
+            if result.count or result.estimated_damage
+        ]
+
+    @property
+    def estimated_defeats(self) -> int:
+        if self.enemy_results:
+            return sum(1 for result in self.enemy_results if result.defeated)
+        if self.combat_resolution is not None:
+            return self.combat_resolution.defeated_targets
+        return 0
+
+    @property
+    def enemy_result_list(self) -> list[dict[str, object]]:
+        return [result.as_dict() for result in self.enemy_results]
+
+    @property
+    def combat_effects(self) -> dict[str, object]:
+        if self.combat_resolution is None:
+            return {
+                "HeroId": 0,
+                "StyleName": "",
+                "Damage": 0,
+                "ControlScore": 0,
+                "ResourceDelta": 0,
+                "MobilityScore": 0,
+                "DefenseScore": 0,
+                "PressureScore": 0,
+                "DefeatedTargets": 0,
+            }
+        resolution = self.combat_resolution
+        return {
+            "HeroId": resolution.hero_id,
+            "StyleName": resolution.style_name,
+            "Damage": resolution.estimated_damage,
+            "ControlScore": resolution.control_score,
+            "ResourceDelta": resolution.resource_delta,
+            "MobilityScore": resolution.mobility_score,
+            "DefenseScore": resolution.defense_score,
+            "PressureScore": resolution.pressure_score,
+            "DefeatedTargets": resolution.defeated_targets,
+        }
 
 
 @dataclass(slots=True)
 class StageState:
     current_stage_id: int = 0
     current_stage_uid: int = 0
+    current_stage_key: str | None = None
     finished_loading_count: int = 0
     reports: list[dict[str, object]] = field(default_factory=list)
+    damage_reports: list[dict[str, object]] = field(default_factory=list)
+    encounter_frames: list[dict[str, object]] = field(default_factory=list)
+    ai_directives: list[dict[str, object]] = field(default_factory=list)
+    monster_frames: list[dict[str, object]] = field(default_factory=list)
+    play_sync_reports: list[dict[str, object]] = field(default_factory=list)
+    frame_report_count: int = 0
+    quick_reborn_count: int = 0
+    leave_requests: list[int] = field(default_factory=list)
+    is_back_checks: list[int] = field(default_factory=list)
+    pressure_scores: dict[int, int] = field(default_factory=dict)
+    daily_stage_counts: dict[int, int] = field(default_factory=dict)
+    completions: dict[int, StageCompletion] = field(default_factory=dict)
 
     def enter_stage(
         self,
@@ -25,9 +1970,11 @@ class StageState:
         level: int = STARTER_INTRO_STAGE_LEVEL,
         time_limit: int = STARTER_INTRO_STAGE_TIME,
         drama: int = STARTER_INTRO_STAGE_DRAMA,
+        stage_key: str | None = None,
     ) -> dict[str, object]:
         self.current_stage_id = stage_id
         self.current_stage_uid = stage_uid
+        self.current_stage_key = stage_key
         return {
             "StageId": stage_id,
             "StageUid": stage_uid,
@@ -40,12 +1987,233 @@ class StageState:
             "Extra": [],
         }
 
+    def enter_recovered_stage(
+        self, stage: BattleStageDefinition
+    ) -> dict[str, object]:
+        if stage.stage_id is None:
+            raise ValueError(f"{stage.key} has no numeric stage id")
+        payload = self.enter_stage(
+            stage.stage_id,
+            stage_uid=stage.resolved_stage_uid,
+            level=stage.level,
+            time_limit=stage.time_limit,
+            drama=stage.drama,
+            stage_key=stage.key,
+        )
+        self.seed_encounter(stage)
+        return payload
+
+    def seed_encounter(
+        self, stage: BattleStageDefinition
+    ) -> list[dict[str, object]]:
+        spawns = stage.encounter_spawns
+        frames = [spawn.to_monster_frame_seed() for spawn in spawns]
+        self.encounter_frames = frames
+        self.ai_directives = [spawn.to_ai_directive() for spawn in spawns]
+        return frames
+
     def finish_loading(self, uid: int) -> dict[str, object]:
         self.finished_loading_count += 1
         return {"Uid": uid}
 
     def record_report(self, values: dict[str, object]) -> None:
         self.reports.append(dict(values))
+
+    def record_damage_info(self, values: dict[str, object]) -> None:
+        self.damage_reports.append(dict(values))
+
+    def record_monster_frame_data(
+        self, values: dict[str, object]
+    ) -> list[dict[str, object]]:
+        frames = [dict(item) for item in list(values.get("monster_data") or [])]
+        self.monster_frames.extend(frames)
+        return frames
+
+    def record_play_sync(
+        self, uid: int, sync_data: list[dict[str, object]]
+    ) -> dict[str, object]:
+        normalized = [
+            {"Key": str(item.get("Key") or ""), "Val": _as_int(item.get("Val"))}
+            for item in sync_data
+            if isinstance(item, dict)
+        ]
+        payload = {"UUid": int(uid), "SyncData": normalized}
+        self.play_sync_reports.append(payload)
+        return payload
+
+    def record_frame_report(self) -> dict[str, object]:
+        self.frame_report_count += 1
+        return {}
+
+    def record_quick_reborn(self, reborn_count: int) -> None:
+        self.quick_reborn_count += max(0, int(reborn_count))
+
+    def leave_stage(self, stage_id: int | None = None) -> dict[str, object]:
+        resolved_stage_id = int(stage_id or self.current_stage_id or 0)
+        self.leave_requests.append(resolved_stage_id)
+        return {"StageId": resolved_stage_id}
+
+    def stage_is_back(self, stage_id: int | None = None) -> dict[str, object]:
+        resolved_stage_id = int(stage_id or self.current_stage_id or 0)
+        self.is_back_checks.append(resolved_stage_id)
+        return {"StageId": resolved_stage_id}
+
+    def resource_stage_info(self, hero_uid: int) -> dict[str, object]:
+        completed_stage_ids = sorted(
+            stage_id
+            for stage_id, completion in self.completions.items()
+            if completion.status == 1
+        )
+        progress_by_type: dict[int, int] = {}
+        for stage_id in completed_stage_ids:
+            resource_type = max(1, int(stage_id) // 100000)
+            progress_by_type[resource_type] = max(
+                progress_by_type.get(resource_type, 0),
+                len(self.completions[stage_id].stars),
+            )
+        return {
+            "Progress": [
+                {"Type": resource_type, "Level": level}
+                for resource_type, level in sorted(progress_by_type.items())
+            ],
+            "HeroUid": int(hero_uid),
+            "PassStage": completed_stage_ids,
+            "Chances": [
+                {"Type": resource_type, "Chances": 3}
+                for resource_type in range(1, 4)
+            ],
+        }
+
+    def pressure_stage_detail(
+        self,
+        stage_id: int,
+        *,
+        hero_list: list[dict[str, int]],
+    ) -> dict[str, object]:
+        numeric_stage_id = int(stage_id or self.current_stage_id or 0)
+        stage_score = self.pressure_scores.get(numeric_stage_id, 0)
+        total_score = sum(self.pressure_scores.values())
+        return {
+            "TotalScore": total_score,
+            "TotalRank": 0,
+            "StageId": numeric_stage_id,
+            "StageScore": stage_score,
+            "StageRank": 0,
+            "TopList": (
+                [
+                    {
+                        "Rank": 1,
+                        "Number": [stage_score],
+                        "String": ["Local Hero"],
+                    }
+                ]
+                if stage_score
+                else []
+            ),
+            "Count": 3,
+            "HeroList": hero_list,
+            "StageLevel": 1,
+        }
+
+    def record_pressure_stage_finish(self, values: dict[str, object]) -> None:
+        stage_id = _as_int(values.get("StageId"), self.current_stage_id)
+        score = _as_int(values.get("Score"))
+        if stage_id:
+            self.pressure_scores[stage_id] = max(
+                score,
+                self.pressure_scores.get(stage_id, 0),
+            )
+
+    def usj_stage_record(
+        self,
+        *,
+        point_id: int,
+        uid: int,
+        user_level: int,
+        hero_id: int,
+        fighting: int,
+    ) -> dict[str, object]:
+        score = self.pressure_scores.get(int(point_id), 0)
+        return {
+            "StageRecords": (
+                [
+                    {
+                        "PointId": int(point_id),
+                        "UserUid": int(uid),
+                        "UserName": "Local Hero",
+                        "UserLevel": int(user_level),
+                        "HeroId": int(hero_id),
+                        "Fighting": int(fighting),
+                        "Score": score,
+                    }
+                ]
+                if score
+                else []
+            )
+        }
+
+    def usj_end_stage(
+        self,
+        values: dict[str, object],
+        *,
+        hero_uid: int,
+    ) -> dict[str, object]:
+        hurt_sum = _as_int(values.get("HurtSum"))
+        hp_percent = _as_int(values.get("HpPercent"), 100)
+        use_time = max(0, STARTER_INTRO_STAGE_TIME - hp_percent)
+        base_score = max(0, hurt_sum // 100)
+        time_score = max(0, hp_percent)
+        score = base_score + time_score
+        point_id = self.current_stage_id or STARTER_INTRO_STAGE_ID
+        self.pressure_scores[point_id] = max(
+            score,
+            self.pressure_scores.get(point_id, 0),
+        )
+        return {
+            "CurrentZoneId": 0,
+            "CurrentPointId": point_id,
+            "CurrentHeroUid": int(hero_uid),
+            "UserTotalScore": sum(self.pressure_scores.values()),
+            "PointReward": [{"PointId": point_id, "RewardState": 1}],
+            "UseTime": use_time,
+            "HurtSum": hurt_sum,
+            "Score": score,
+            "HightestScore": self.pressure_scores[point_id],
+            "Reason": _as_int(values.get("Reason")),
+            "HpPercent": hp_percent,
+            "BaseScore": base_score,
+            "TimeScore": time_score,
+        }
+
+    def act_daily_stage_result(self, values: dict[str, object]) -> dict[str, object]:
+        act_id = _as_int(values.get("ActId"))
+        count = _as_int(values.get("Count"))
+        result = _as_int(values.get("Result"))
+        self.daily_stage_counts[act_id] = self.daily_stage_counts.get(act_id, 0) + 1
+        reward = (
+            [
+                {
+                    "AddLog": [
+                        {
+                            "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                            "count": max(1, count),
+                            "extra": [],
+                        }
+                    ]
+                }
+            ]
+            if result
+            else []
+        )
+        return {
+            "ActId": act_id,
+            "Count": {
+                "Id": act_id,
+                "Count": self.daily_stage_counts[act_id],
+                "Extra": {"NumList": [count], "StrList": []},
+            },
+            "RewardList": reward,
+        }
 
     def empty_drop(self) -> dict[str, object]:
         return {
@@ -57,22 +2225,365 @@ class StageState:
             "FirstReward": [],
         }
 
-    def result(self, result: int = 1) -> dict[str, object]:
-        stage_id = self.current_stage_id or STARTER_INTRO_STAGE_ID
+    def stage_drop(
+        self,
+        *,
+        fight_style: FightStyle | None = None,
+        hero_level: int = 1,
+        stage: BattleStageDefinition | None = None,
+    ) -> dict[str, object]:
+        summary = self.combat_summary(
+            fight_style=fight_style,
+            hero_level=hero_level,
+            stage=stage,
+        )
+        completion = self.completions.get(
+            summary.stage_id, StageCompletion(summary.stage_id)
+        )
+        pass_count = completion.pass_count
+        pass_reward = max(1, summary.estimated_defeats or len(summary.monster_kills) or 1)
         return {
-            "StageId": stage_id,
-            "Result": result,
-            "Time": 0,
-            "RewardList": [],
-            "StageInfo": [
+            "Monster": [
                 {
-                    "Id": stage_id,
-                    "Status": result,
-                    "StarList": [],
-                    "FullStarTime": 0,
+                    "idx": index + 1,
+                    "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                    "Count": 1,
                 }
+                for index in range(max(0, summary.estimated_defeats))
+            ],
+            "Boss": [],
+            "StagePassDrop": [
+                {
+                    "idx": 1,
+                    "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                    "Count": pass_reward,
+                }
+            ],
+            "Card": [],
+            "VipCard": [],
+            "FirstReward": (
+                [
+                    {
+                        "idx": 1,
+                        "ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID,
+                        "Count": 1,
+                    }
+                ]
+                if summary.passed and pass_count == 0
+                else []
+            ),
+        }
+
+    def load_completions(
+        self, values: dict[str, dict[str, int | list[int]]]
+    ) -> None:
+        self.completions = {}
+        for stage_id, progress in values.items():
+            try:
+                numeric_stage_id = int(stage_id)
+            except (TypeError, ValueError):
+                continue
+            self.completions[numeric_stage_id] = StageCompletion.from_profile(
+                numeric_stage_id, dict(progress)
+            )
+
+    def load_family_progress(
+        self, values: dict[str, dict[str, int]]
+    ) -> None:
+        self.pressure_scores = self._int_section(
+            values.get("pressure_scores", {})
+        )
+        self.daily_stage_counts = self._int_section(
+            values.get("daily_stage_counts", {})
+        )
+
+    def export_completions(self) -> dict[int, dict[str, int | list[int]]]:
+        return {
+            stage_id: completion.to_profile()
+            for stage_id, completion in sorted(self.completions.items())
+        }
+
+    def export_family_progress(self) -> dict[str, dict[int, int]]:
+        return {
+            "pressure_scores": dict(sorted(self.pressure_scores.items())),
+            "daily_stage_counts": dict(sorted(self.daily_stage_counts.items())),
+        }
+
+    @staticmethod
+    def _int_section(values: dict[str, int]) -> dict[int, int]:
+        output: dict[int, int] = {}
+        if not isinstance(values, dict):
+            return output
+        for key, value in values.items():
+            try:
+                numeric_key = int(key)
+                numeric_value = int(value)
+            except (TypeError, ValueError):
+                continue
+            if numeric_key > 0 and numeric_value >= 0:
+                output[numeric_key] = numeric_value
+        return output
+
+    def complete_stage(self, summary: StageCombatSummary) -> StageCompletion:
+        existing = self.completions.get(summary.stage_id)
+        if not summary.passed:
+            completion = StageCompletion(
+                stage_id=summary.stage_id,
+                status=0,
+                stars=existing.stars if existing else (),
+                full_star_time=existing.full_star_time if existing else 0,
+                best_time=existing.best_time if existing else 0,
+                pass_count=existing.pass_count if existing else 0,
+            )
+            self.completions[summary.stage_id] = completion
+            return completion
+
+        previous_stars = set(existing.stars if existing else ())
+        stars = tuple(sorted(previous_stars.union(summary.stars)))
+        previous_best = existing.best_time if existing else 0
+        best_time = (
+            summary.time
+            if summary.time and (not previous_best or summary.time < previous_best)
+            else previous_best
+        )
+        full_star_time = (
+            summary.time
+            if len(stars) >= 3 and summary.time
+            else (existing.full_star_time if existing else 0)
+        )
+        completion = StageCompletion(
+            stage_id=summary.stage_id,
+            status=1,
+            stars=stars,
+            full_star_time=full_star_time,
+            best_time=best_time,
+            pass_count=(existing.pass_count if existing else 0) + 1,
+        )
+        self.completions[summary.stage_id] = completion
+        return completion
+
+    def combat_summary(
+        self,
+        *,
+        fight_style: FightStyle | None = None,
+        hero_level: int = 1,
+        stage: BattleStageDefinition | None = None,
+    ) -> StageCombatSummary:
+        report = self.reports[-1] if self.reports else {}
+        end_report = report.get("EndReport")
+        end = dict(end_report) if isinstance(end_report, dict) else {}
+        damage_report = self.damage_reports[-1] if self.damage_reports else {}
+
+        result_value = report.get("Result")
+        result = 1 if result_value is None else _as_int(result_value, 1)
+        stage_id = _as_int(
+            report.get("Id"),
+            self.current_stage_id or STARTER_INTRO_STAGE_ID,
+        )
+        time = _as_int(end.get("RoundTimeUse"), 0)
+        max_combo = max(
+            _as_int(report.get("MaxCombo")),
+            _as_int(end.get("RoundFighterComboMax")),
+            _as_int(damage_report.get("MaxCombo")),
+        )
+        all_damage = max(
+            _as_int(report.get("AllDmg")),
+            _as_int(end.get("RoundFighterDpsTotal")),
+            _as_int(end.get("RoundFighterAtkTotal")),
+        )
+        monster_kills = tuple(
+            (
+                _as_int(item.get("MonsterId")),
+                _as_int(item.get("Amount")),
+            )
+            for item in _dict_list(report.get("MonsterNum"))
+        )
+        item_rewards = tuple(
+            (
+                _as_int(item.get("ItemId")),
+                _as_int(item.get("Amount")),
+            )
+            for item in _dict_list(report.get("ItemNum"))
+        )
+        skill_levels = tuple(
+            (
+                _as_int(item.get("SkillId")),
+                _as_int(item.get("SkillLevel")),
+            )
+            for item in _dict_list(end.get("SkillLevel"))
+        )
+        button_counts = [
+            ("ATK", _as_int(end.get("RoundFighterButtonClickCountATK"))),
+        ]
+        button_counts.extend(
+            (
+                str(index),
+                _as_int(end.get(f"RoundFighterButtonClickCount{index}")),
+            )
+            for index in range(1, 11)
+        )
+        damage_members = tuple(
+            (
+                _as_int(item.get("UserUid")),
+                _as_int(item.get("HurtSum")),
+            )
+            for item in _dict_list(damage_report.get("Members"))
+        )
+        target_count = (
+            stage.encounter_target_count
+            if stage is not None
+            else max(1, len(monster_kills), len(self.monster_frames))
+        )
+        combat_resolution = (
+            fight_style.resolve_usage(
+                tuple(button_counts),
+                hero_level=hero_level,
+                reported_damage=all_damage,
+                target_count=target_count,
+                target_hp_values=(
+                    tuple(spawn.combat_hp for spawn in stage.encounter_spawns)
+                    if stage is not None
+                    else ()
+                ),
+            )
+            if fight_style is not None
+            else None
+        )
+        enemy_results = (
+            _resolve_enemy_results(stage.encounter_spawns, combat_resolution)
+            if stage is not None and combat_resolution is not None
+            else ()
+        )
+        return StageCombatSummary(
+            stage_id=stage_id,
+            result=result,
+            time=time,
+            max_combo=max_combo,
+            combo_damage=_as_int(report.get("ComboDmg")),
+            all_damage=all_damage,
+            on_hit_num=_as_int(report.get("OnHitNum")),
+            solo_boss_num=_as_int(report.get("SoloBossNum")),
+            monster_kills=monster_kills,
+            item_rewards=item_rewards,
+            skill_levels=skill_levels,
+            button_counts=tuple(button_counts),
+            move_total=_as_int(end.get("RoundFighterMoveTotal")),
+            damage_members=damage_members,
+            mvp_uid=_as_int(damage_report.get("MvpUserUid")),
+            reborn=_as_int(damage_report.get("Reborn")),
+            combat_resolution=combat_resolution,
+            enemy_results=enemy_results,
+            stage_time_limit=stage.time_limit if stage is not None else STARTER_INTRO_STAGE_TIME,
+        )
+
+    def damage_info(self) -> dict[str, object]:
+        return {}
+
+    def result(
+        self,
+        result: int | None = None,
+        *,
+        fight_style: FightStyle | None = None,
+        hero_level: int = 1,
+        stage: BattleStageDefinition | None = None,
+    ) -> dict[str, object]:
+        summary = self.combat_summary(
+            fight_style=fight_style,
+            hero_level=hero_level,
+            stage=stage,
+        )
+        stage_result = summary.result if result is None else result
+        completion = (
+            self.complete_stage(summary)
+            if stage_result == 1
+            else self.completions.get(summary.stage_id)
+        )
+        return {
+            "StageId": summary.stage_id,
+            "Result": stage_result,
+            "Time": summary.time,
+            "RewardList": summary.result_rewards if stage_result == 1 else [],
+            "StageInfo": [
+                (
+                    completion.to_stage_info()
+                    if completion is not None
+                    else {
+                        "Id": summary.stage_id,
+                        "Status": stage_result,
+                        "StarList": [],
+                        "FullStarTime": 0,
+                    }
+                )
             ],
         }
 
-    def end_gm(self, result: int = 1) -> dict[str, object]:
-        return {"Result": result}
+    def end_gm(
+        self,
+        result: int | None = None,
+        *,
+        fight_style: FightStyle | None = None,
+        hero_level: int = 1,
+        stage: BattleStageDefinition | None = None,
+    ) -> dict[str, object]:
+        summary = self.combat_summary(
+            fight_style=fight_style,
+            hero_level=hero_level,
+            stage=stage,
+        )
+        return {"Result": summary.result if result is None else result}
+
+
+def _resolve_enemy_results(
+    spawns: tuple[StageEnemySpawn, ...],
+    combat_resolution: CombatResolution,
+) -> tuple[StageEnemyCombatResult, ...]:
+    remaining_damage = max(0, combat_resolution.estimated_damage)
+    last_skill = ""
+    for move_result in reversed(combat_resolution.move_results):
+        if move_result.count or move_result.estimated_damage:
+            last_skill = move_result.name
+            break
+
+    results: list[StageEnemyCombatResult] = []
+    for spawn in spawns:
+        hp = spawn.combat_hp
+        damage_taken = min(hp, remaining_damage)
+        remaining_damage = max(0, remaining_damage - damage_taken)
+        results.append(
+            StageEnemyCombatResult(
+                uid=spawn.uid,
+                enemy_id=spawn.enemy_id,
+                label=spawn.label,
+                display_name=spawn.display_name,
+                ai_profile_key=spawn.ai_profile_key,
+                max_hp=hp,
+                damage_taken=damage_taken,
+                defeated=damage_taken >= hp,
+                last_skill=last_skill,
+                threat_score=_enemy_threat_score(spawn, damage_taken),
+                action_hint=_enemy_action_hint(spawn, damage_taken >= hp),
+            )
+        )
+    return tuple(results)
+
+
+def _enemy_threat_score(spawn: StageEnemySpawn, damage_taken: int) -> int:
+    profile = spawn.ai_profile
+    base = max(1, profile.attack_range // 80)
+    if spawn.ai_profile_key in {"sludge_boss", "boss_brute", "nomu_brute"}:
+        base += 4
+    elif spawn.ai_profile_key == "mechanical_boss":
+        base += 5
+    elif spawn.ai_profile_key == "ranged_pressure":
+        base += 3
+    if damage_taken <= 0:
+        base += 2
+    return base
+
+
+def _enemy_action_hint(spawn: StageEnemySpawn, defeated: bool) -> str:
+    if defeated:
+        return "defeated"
+    profile = spawn.ai_profile
+    first_skill = profile.skill_rotation[0] if profile.skill_rotation else "advance"
+    return f"{profile.behavior}; next={first_skill}"

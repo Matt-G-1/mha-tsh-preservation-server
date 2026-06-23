@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .combat import fight_style_for_character
 from .roster import RosterState
 
 
@@ -39,7 +40,13 @@ class CharacterMenuState:
         cards = self._requested_cards(requested_card_uids, roster)
         return {
             "SkillInfoList": [
-                {"HeroUid": card.card_uid, "SkillLevelInfo": []} for card in cards
+                {
+                    "HeroUid": card.card_uid,
+                    "SkillLevelInfo": fight_style_for_character(
+                        card.character
+                    ).skill_levels(roster.hero_level),
+                }
+                for card in cards
             ]
         }
 
@@ -51,6 +58,50 @@ class CharacterMenuState:
             "SpecInfoList": [
                 {"HeroUid": card.card_uid, "SpecLevelInfo": []} for card in cards
             ]
+        }
+
+    def skill_level(self, card_uid: int, roster: RosterState) -> dict[str, object]:
+        card = roster.cards.get(card_uid)
+        if card is None:
+            return {"SkillInfo": {"HeroUid": card_uid, "SkillLevelInfo": []}}
+        return {
+            "SkillInfo": {
+                "HeroUid": card_uid,
+                "SkillLevelInfo": fight_style_for_character(
+                    card.character
+                ).skill_levels(roster.hero_level),
+            }
+        }
+
+    def spec_level(self, card_uid: int) -> dict[str, object]:
+        return {"SpecInfo": {"HeroUid": card_uid, "SpecLevelInfo": []}}
+
+    def gem_list(self, hero_ids: list[int]) -> dict[str, object]:
+        return {
+            "Total": 0,
+            "HeroGemData": [
+                {"HeroCId": int(hero_id), "GemData": []}
+                for hero_id in hero_ids
+            ],
+        }
+
+    def toplist_pages(
+        self,
+        list_id: int,
+        sub_name: int,
+        page_numbers: list[int],
+        self_uid: int,
+        is_cross: int,
+    ) -> dict[str, object]:
+        return {
+            "ID": list_id,
+            "SubName": sub_name,
+            "PageNums": page_numbers,
+            "MaxPageNum": 0,
+            "SelfUid": self_uid,
+            "Pages": [],
+            "SelfRankInfo": {"Rank": 0, "Number": [], "String": []},
+            "IsCross": is_cross,
         }
 
     def hero_rank_info(self, roster: RosterState) -> dict[str, object]:
@@ -128,6 +179,9 @@ class CharacterMenuState:
 
     def training_hero_info(self, roster: RosterState) -> dict[str, object]:
         active = roster.active_card
+        active_skill_level = fight_style_for_character(
+            active.character
+        ).skill_levels(roster.hero_level)
         return {
             "TrainingData": {
                 "HeroId": active.hero_id,
@@ -136,7 +190,12 @@ class CharacterMenuState:
                 "CardUid": active.card_uid,
                 "infos": [],
                 "ChooseHero": [],
-                "CardSkillLevel": [],
+                "CardSkillLevel": [
+                    {
+                        "HeroUid": active.card_uid,
+                        "SkillLevel": active_skill_level,
+                    }
+                ],
                 "CardSpecLevel": [],
                 "RuneSpecList": [],
                 "Buffs": [],
@@ -145,6 +204,20 @@ class CharacterMenuState:
                 "ActiveCards": [],
                 "SupportSkill": [],
             }
+        }
+
+    def training_info(self, roster: RosterState) -> dict[str, object]:
+        return {
+            "HeroData": [
+                {
+                    "HeroCId": card.hero_id,
+                    "FinishList": [],
+                    "GetList": [],
+                }
+                for card in sorted(
+                    roster.cards.values(), key=lambda item: item.card_uid
+                )
+            ]
         }
 
     def card_lock(self, card_uid: int, is_lock: int) -> dict[str, object]:
