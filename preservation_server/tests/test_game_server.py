@@ -658,7 +658,19 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     )
     assert {
         spawn.enemy_id for spawn in STAGE_CFG_AUTHORED_SPAWN_HINTS_BY_STAGE[406305]
-    } == {40630501, 40630506}
+    } == {40630501, 40630503, 40630506}
+    assert tuple(
+        spawn.enemy_id for spawn in stage_candidate_by_id(405252).encounter_spawns
+    ) == (
+        40525201,
+        40525202,
+        40525203,
+        40525204,
+        40525251,
+        40525272,
+    )
+    assert stage_candidate_by_id(405252).encounter_spawns[0].face == 90
+    assert stage_candidate_by_id(405252).encounter_spawns[4].face == 270
 
     assert all(
         stage.encounter_target_count > 0
@@ -819,8 +831,8 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
     )
 
     assert hints["target_count"] == 73
-    assert hints["stage_count"] == 19
-    assert hints["spawn_count"] == 49
+    assert hints["stage_count"] == 20
+    assert hints["spawn_count"] == 60
     assert len(hints["stages"]["300401"]) == 9
     assert hints["stages"]["300401"][0] == {
         "enemy_id": 30040101,
@@ -925,6 +937,62 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
             "face": 0,
             "pattern": "map_monster_info_times",
             "source_asset": "2ZU/57cb3401afd5056d",
+        },
+    ]
+    assert hints["stages"]["405252"] == [
+        {
+            "enemy_id": 40525201,
+            "x": 22330,
+            "y": 16891,
+            "z": 164,
+            "face": 90,
+            "pattern": "MonsterInfo",
+            "source_asset": "1FO/0ff00360167bd2b8",
+        },
+        {
+            "enemy_id": 40525202,
+            "x": 22942,
+            "y": 17316,
+            "z": 0,
+            "face": 157,
+            "pattern": "compact_enemy_table",
+            "source_asset": "1FO/0ff00360167bd2b8",
+        },
+        {
+            "enemy_id": 40525203,
+            "x": 21633,
+            "y": 16617,
+            "z": 0,
+            "face": 230,
+            "pattern": "map_monster_info_times",
+            "source_asset": "1FO/0ff00360167bd2b8",
+        },
+        {
+            "enemy_id": 40525204,
+            "x": 23411,
+            "y": 17080,
+            "z": 0,
+            "face": 0,
+            "pattern": "map_monster_info_times",
+            "source_asset": "1FO/0ff00360167bd2b8",
+        },
+        {
+            "enemy_id": 40525251,
+            "x": 22002,
+            "y": 17132,
+            "z": 0,
+            "face": 270,
+            "pattern": "map_monster_info_times",
+            "source_asset": "1FO/0ff00360167bd2b8",
+        },
+        {
+            "enemy_id": 40525272,
+            "x": 21361,
+            "y": 17640,
+            "z": 0,
+            "face": 0,
+            "pattern": "compact_enemy_table",
+            "source_asset": "1FO/0ff00360167bd2b8",
         },
     ]
     assert hints["stages"]["563903"] == [

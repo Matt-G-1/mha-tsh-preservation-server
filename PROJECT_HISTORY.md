@@ -296,6 +296,11 @@ The clean-room server now supports:
   stages, and runtime stages now use recovered layouts for `400115`, `562610`,
   `563903`, and several partially recovered route stages instead of generated
   placeholders.
+- A fourth authored spawn parser pass recognizes corrupted map-section keys
+  like `MoWsterInfo` and wider `Times` rows with delay/BTParam fields. The
+  parser now recovers 60 authored coordinate hints across 20 stages, including
+  the full `405252` route stage and new rows for `405103`, `406305`, `406505`,
+  `562407`, `562504`, and `563901`.
 - Enemy AI assignment now uses parser-backed `monster_cfg` name markers through
   `scripts/derive_enemy_ai_profile_hints.py`. Thirty-three recovered stage
   enemies receive boss, elite, ranged/gun, mechanical, or Nomu profile

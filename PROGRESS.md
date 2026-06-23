@@ -371,6 +371,13 @@ environment details are intentionally omitted from Git.
   stages. Runtime coverage now includes full authored spawn layouts for
   `400115`, `562610`, and `563903`, plus additional recovered rows for
   `404201`, `405103`, `405302`, `561211`, `561304`, and `562504`.
+- A fourth authored-position pass handles corrupted/variant map-section keys
+  such as `MoWsterInfo` and wider `Times` rows with delay/BTParam fields
+  interleaved with coordinates. Authored placement recovery is now 60 hints
+  across 20 stages. Newly promoted runtime rows complete `405252` and add
+  parser-backed spawns for `40510301`, `40630503`, `40650501`, `56240702`,
+  `56240751`, `56250409`, and `56390101`; only 10 routed stages still have
+  combat IDs without authored coordinates.
 - The English `monster_cfg` packed asset now has a conservative hint extractor:
   `scripts/derive_monster_cfg_hints.py`. It scans animation-key neighborhoods
   for display-name candidates and feeds a typed monster evidence layer for

@@ -27,7 +27,12 @@ SKIP_SCAN_SUFFIXES = {
 }
 
 STRING_TAGS = {4, 0x37}
-MONSTER_INFO_SECTION_NAMES = ("MonsterInfo", "MonsterInfo2", "MonsterInfo3")
+MONSTER_INFO_SECTION_NAMES = (
+    "MonsterInfo",
+    "MonsterInfo2",
+    "MonsterInfo3",
+    "MoWsterInfo",
+)
 MONSTER_INFO_STOP_KEYS = {
     "NpcInfo",
     "PathInfo",
@@ -147,10 +152,14 @@ def _face_after_coords(constants: list[object], index: int) -> int:
     return int(round(number))
 
 
-def _monster_info_index_before(constants: list[object], index: int) -> int | None:
-    for cursor in range(index - 1, max(-1, index - 42), -1):
+def _monster_info_index_before(
+    constants: list[object], index: int, *, limit: int = 120
+) -> int | None:
+    for cursor in range(index - 1, max(-1, index - limit), -1):
         value = constants[cursor]
-        if isinstance(value, str) and value.startswith("MonsterInfo"):
+        if isinstance(value, str) and (
+            value.startswith("MonsterInfo") or value == "MoWsterInfo"
+        ):
             return cursor
     return None
 
@@ -401,6 +410,34 @@ def _numeric_run_before(
     return run
 
 
+def _last_xy_face_run_before(
+    constants: list[object],
+    index: int,
+    *,
+    limit: int = 14,
+) -> tuple[float, float, float, int] | None:
+    numbers: list[float] = []
+    for value in constants[max(0, index - limit) : index]:
+        number = _as_number(value)
+        if number is not None and _is_coord(number):
+            numbers.append(number)
+
+    for cursor in range(len(numbers) - 1, 0, -1):
+        y = numbers[cursor]
+        x = numbers[cursor - 1]
+        if not (_is_xy_coord(x) and _is_xy_coord(y)):
+            continue
+        face = 0
+        if (
+            cursor + 1 < len(numbers)
+            and numbers[cursor + 1].is_integer()
+            and abs(numbers[cursor + 1]) <= 360
+        ):
+            face = int(round(numbers[cursor + 1]))
+        return x, y, 0.0, face
+    return None
+
+
 def _coords_from_monster_info_times_run(
     constants: list[object],
     index: int,
@@ -415,6 +452,14 @@ def _coords_from_monster_info_times_run(
         x, y, z = run[-4], run[-3], run[-2]
         if _is_xy_coord(x) and _is_xy_coord(y):
             return x, y, z, int(round(run[-1]))
+    if (
+        len(run) >= 3
+        and run[-1].is_integer()
+        and abs(run[-1]) <= 360
+        and _is_xy_coord(run[-3])
+        and _is_xy_coord(run[-2])
+    ):
+        return run[-3], run[-2], 0.0, int(round(run[-1]))
     if len(run) >= 3 and _is_z_coord(run[-1]):
         x, y, z = run[-3], run[-2], run[-1]
         if _is_xy_coord(x) and _is_xy_coord(y):
@@ -423,7 +468,7 @@ def _coords_from_monster_info_times_run(
         x, y = run[-2], run[-1]
         if _is_xy_coord(x) and _is_xy_coord(y):
             return x, y, 0.0, 0
-    return None
+    return _last_xy_face_run_before(constants, index)
 
 
 def _map_monster_info_times_hint(
