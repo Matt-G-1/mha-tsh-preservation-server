@@ -206,6 +206,34 @@ def _monster_info_face_before(
     return 0
 
 
+def _monster_info_keyed_coords_before(
+    constants: list[object],
+    monster_info_index: int,
+    index: int,
+) -> tuple[float, float, float, int] | None:
+    keyed_numbers: dict[str, float] = {}
+    for cursor in range(monster_info_index + 1, index):
+        value = constants[cursor]
+        if value not in {"AreaX", "AreaY", "AreaZ", "Face"}:
+            continue
+        number = _as_number(constants[cursor + 1]) if cursor + 1 < index else None
+        if number is not None:
+            keyed_numbers[str(value)] = number
+
+    x = keyed_numbers.get("AreaX")
+    y = keyed_numbers.get("AreaY")
+    if x is None or y is None or not (_is_xy_coord(x) and _is_xy_coord(y)):
+        return None
+
+    z = keyed_numbers.get("AreaZ", 0.0)
+    if not _is_z_coord(z):
+        z = 0.0
+
+    face_number = keyed_numbers.get("Face", 0.0)
+    face = int(round(face_number)) if abs(face_number) <= 360 else 0
+    return x, y, z, face
+
+
 def _compact_enemy_table_hint(
     constants: list[object],
     index: int,
@@ -293,6 +321,18 @@ def _spawn_hint_for_index(
                 "face": _monster_info_face_before(
                     constants, monster_info_index, index
                 ),
+                "pattern": "MonsterInfo",
+            }
+        keyed_coords = _monster_info_keyed_coords_before(
+            constants, monster_info_index, index
+        )
+        if keyed_coords is not None:
+            return {
+                "enemy_id": enemy_id,
+                "x": int(round(keyed_coords[0])),
+                "y": int(round(keyed_coords[1])),
+                "z": int(round(keyed_coords[2])),
+                "face": keyed_coords[3],
                 "pattern": "MonsterInfo",
             }
 

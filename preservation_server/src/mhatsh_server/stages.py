@@ -1895,6 +1895,99 @@ STAGE_CFG_AUTHORED_SPAWN_HINTS_BY_STAGE.update(
     }
 )
 
+STAGE_CFG_AUTHORED_SPAWN_HINTS_BY_STAGE.update(
+    {
+        160001: (
+            StageEnemySpawn(
+                label="stage_cfg_authored_160001_enemy_16000101",
+                enemy_id=16000101,
+                shape_id=16000101,
+                uid=16000101,
+                x=5193,
+                y=23257,
+                z=526,
+                group_id=160001,
+                ai_profile_key=generated_enemy_profile_key(16000101),
+            ),
+        ),
+        201006: (
+            StageEnemySpawn(
+                label="stage_cfg_authored_201006_enemy_20100603",
+                enemy_id=20100603,
+                shape_id=20100603,
+                uid=20100603,
+                x=10290,
+                y=28269,
+                z=2033,
+                face=300,
+                group_id=201006,
+                ai_profile_key=generated_enemy_profile_key(20100603),
+            ),
+        ),
+        310403: (
+            StageEnemySpawn(
+                label="stage_cfg_authored_310403_enemy_31040301",
+                enemy_id=31040301,
+                shape_id=31040301,
+                uid=31040301,
+                x=13952,
+                y=19206,
+                group_id=310403,
+                ai_profile_key=generated_enemy_profile_key(31040301),
+            ),
+        ),
+        400118: (
+            StageEnemySpawn(
+                label="stage_cfg_authored_400118_enemy_40011801",
+                enemy_id=40011801,
+                shape_id=40011801,
+                uid=40011801,
+                x=18484,
+                y=10491,
+                z=186,
+                face=90,
+                group_id=400118,
+                ai_profile_key=generated_enemy_profile_key(40011801),
+            ),
+        ),
+        561211: (
+            StageEnemySpawn(
+                label="stage_cfg_authored_561211_enemy_56121101",
+                enemy_id=56121101,
+                shape_id=56121101,
+                uid=56121101,
+                x=15186,
+                y=14578,
+                z=2034,
+                group_id=561211,
+                ai_profile_key=generated_enemy_profile_key(56121101),
+            ),
+            StageEnemySpawn(
+                label="stage_cfg_authored_561211_enemy_56121102",
+                enemy_id=56121102,
+                shape_id=56121102,
+                uid=56121102,
+                x=15186,
+                y=14578,
+                z=2034,
+                group_id=561211,
+                ai_profile_key=generated_enemy_profile_key(56121102),
+            ),
+            StageEnemySpawn(
+                label="stage_cfg_authored_561211_enemy_56121103",
+                enemy_id=56121103,
+                shape_id=56121103,
+                uid=56121103,
+                x=15186,
+                y=14578,
+                z=2034,
+                group_id=561211,
+                ai_profile_key=generated_enemy_profile_key(56121103),
+            ),
+        ),
+    }
+)
+
 
 def _zx_numeric_stage_definitions() -> tuple[BattleStageDefinition, ...]:
     return tuple(

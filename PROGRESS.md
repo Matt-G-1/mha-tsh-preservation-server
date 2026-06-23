@@ -382,6 +382,11 @@ environment details are intentionally omitted from Git.
   chunk. This recovers and promotes all three `406205` combat spawns, bringing
   authored placement recovery to 63 hints across 21 stages and reducing routed
   stages with missing combat coordinates to 9.
+- The spawn parser now also reads keyed `AreaX`/`AreaY`/`AreaZ`/`Face`
+  dictionaries in `MonsterInfo` rows. This recovers 69 authored placements
+  across 25 stages and promotes parser-backed runtime coordinates for
+  `16000101`, `20100603`, `31040301`, `40011801`, and the full `561211` combat
+  trio, reducing routed stages with missing combat coordinates to 4.
 - The English `monster_cfg` packed asset now has a conservative hint extractor:
   `scripts/derive_monster_cfg_hints.py`. It scans animation-key neighborhoods
   for display-name candidates and feeds a typed monster evidence layer for

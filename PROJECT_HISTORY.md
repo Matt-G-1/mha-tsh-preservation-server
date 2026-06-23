@@ -304,6 +304,10 @@ The clean-room server now supports:
 - The loose spawn scanner now also accepts the `0x79` string tag used by the
   `406205` map chunk, recovering all three `406205` combat placements and
   bringing authored spawn recovery to 63 hints across 21 stages.
+- The authored spawn parser now also reads keyed `AreaX`/`AreaY`/`AreaZ`/`Face`
+  dictionaries in `MonsterInfo` rows. Authored recovery now reaches 69
+  placements across 25 stages, including runtime coordinates for `160001`,
+  `201006`, `310403`, `400118`, and the completed `561211` combat trio.
 - Enemy AI assignment now uses parser-backed `monster_cfg` name markers through
   `scripts/derive_enemy_ai_profile_hints.py`. Thirty-three recovered stage
   enemies receive boss, elite, ranged/gun, mechanical, or Nomu profile
