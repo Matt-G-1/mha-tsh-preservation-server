@@ -1514,6 +1514,14 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert "BATTLE/HERO/yuchazi/skills/Wskill" in (
         ochaco_resolution.move_results[2].action_hints
     )
+    assert ochaco_style.recovered_skill_info_evidence() is not None
+    assert ochaco_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "Gravel Strike",
+        "Meteor Storm",
+    )
+    assert ochaco_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "御茶子必杀技",
+    )
 
     iida_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1006"])
     iida_resolution = iida_style.resolve_usage(
@@ -1541,6 +1549,18 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         ].action_hints
     )
 
+    dabi_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1012"])
+    assert dabi_style.recovered_skill_info_evidence() is not None
+    assert dabi_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "DabiQ",
+    )
+    assert dabi_style.recovered_skill_info_evidence().terms_for_command("E") == (
+        "Dabi Assist Skill E",
+    )
+    assert dabi_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "Dabi大招（PVE)",
+    )
+
     kirishima_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1013"])
     assert kirishima_style.recovered_skill_info_evidence() is not None
     assert "Kirishima Q change 2 tap" in (
@@ -1564,10 +1584,27 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     )
 
     aizawa_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1015"])
+    assert aizawa_style.recovered_skill_info_evidence() is not None
+    assert aizawa_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "相泽Q1",
+    )
+    assert aizawa_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "相泽大招",
+    )
     assert "BATTLE/HERO/xiangze/skills/xiangze_skillex" in (
         aizawa_style.resolve_usage((("4", 1),), hero_level=1).move_results[
             4
         ].action_hints
+    )
+
+    ojiro_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1016"])
+    assert ojiro_style.recovered_skill_info_evidence() is not None
+    assert ojiro_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "尾白Q",
+        "尾巴强化Q",
+    )
+    assert ojiro_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "尾白大招",
     )
 
     endeavor_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1021"])
@@ -1657,6 +1694,15 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     mineta_resolution = mineta_style.resolve_usage(
         (("ATK", 1), ("1", 1), ("2", 1), ("3", 1), ("4", 1), ("5", 1), ("6", 1)),
         hero_level=1,
+    )
+    assert "INTERNAL/HERO/putao/putao_vo/putao_qskill_vo" in (
+        mineta_resolution.move_results[1].action_hints
+    )
+    assert "INTERNAL/HERO/putao/putao_vo/putao_rskill_vo" in (
+        mineta_resolution.move_results[4].action_hints
+    )
+    assert "INTERNAL/HERO/putao/putao_dash_01" in (
+        mineta_resolution.move_results[5].action_hints
     )
     assert "INTERNAL/HERO/putao/putao_vo/putao_atk_vo_long_a" in (
         mineta_resolution.move_results[0].action_hints
@@ -1912,8 +1958,16 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert hints["h1006"]["terms"]["Recipro Extend"]["count"] == 1
     assert hints["h1009"]["terms"]["Meteor Storm"]["count"] == 1
     assert hints["h1010"]["terms"]["Lightning Bolt"]["count"] == 1
+    assert hints["h1007"]["terms"]["Gravel Strike"]["count"] == 1
+    assert hints["h1007"]["terms"]["御茶子必杀技"]["count"] == 1
+    assert hints["h1012"]["terms"]["DabiQ"]["count"] == 8
+    assert hints["h1012"]["terms"]["Dabi Assist Skill E"]["count"] == 1
     assert hints["h1013"]["terms"]["Kirishima Q change 2 tap"]["count"] == 1
     assert hints["h1014"]["terms"]["Tongue Swipe"]["count"] == 1
+    assert hints["h1015"]["terms"]["相泽Q1"]["count"] == 1
+    assert hints["h1015"]["terms"]["相泽大招"]["count"] == 1
+    assert hints["h1016"]["terms"]["尾白Q"]["count"] == 3
+    assert hints["h1016"]["terms"]["尾白大招"]["count"] == 1
     assert hints["h1017"]["terms"]["Mina Perfect Dodge QTE"]["count"] == 1
     assert hints["h1020"]["terms"]["Grape Rain"]["count"] == 1
     assert hints["h1019"]["terms"]["Vicious Contact"]["count"] == 1

@@ -174,6 +174,11 @@ The clean-room server now supports:
   Todoroki. The extractor now exposes those late-roster skill-ID neighborhoods
   as structured command buckets, giving the runtime labels reproducible
   original-asset evidence beyond simple byte-search matches.
+- The remaining public-roster skill-info gaps now have parser-backed terms:
+  Ochaco, Dabi, Aizawa, and Ojiro all carry original constants from
+  `skill_info.lua`, and Mineta's internal `putao` action tokens are regression
+  tested against ATK/Q/W/E/R/dodge/passive move result buckets. Jiro remains
+  excluded from the public playable roster.
 - A separate support-skill promotion parses the English `hero_supports_cfg.lua`
   asset under `assets/0QIU/17d0df31842d7982`. It records support-skill evidence
   for Shigaraki (`Vicious Contact`), Endeavor (`Exploding Lance`), alternate

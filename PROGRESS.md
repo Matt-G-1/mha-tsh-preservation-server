@@ -222,6 +222,12 @@ environment details are intentionally omitted from Git.
   characters now have recovered ATK/Q/W/E/R action evidence. Jiro has
   `bot_dianqi`/`character/h1018` config evidence, but she is tracked as
   non-playable recovered data rather than a roster-completion blocker.
+- The public playable roster now has parser-backed `skill_info` text evidence
+  for every verified playable model. The latest pass adds conservative
+  original constants for Ochaco, Dabi, Aizawa, and Ojiro, including `Gravel
+  Strike`, `DabiQ`, `Dabi Assist Skill E`, `相泽Q1`, `相泽大招`, `尾白Q`, and
+  `尾白大招`. Tests also verify Mineta's internal `putao` action tokens are
+  attached to the correct ATK/Q/W/E/R/dodge/passive move results.
 - The combat catalog now also attaches canonical `hero_cfg` combat metadata
   for every protocol-verified playable character: config row, `ShapeId`,
   `SkillGroupId`, `SkillIds`, `QShapeId`, passive activation mode, preload

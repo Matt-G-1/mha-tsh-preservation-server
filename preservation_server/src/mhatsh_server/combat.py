@@ -892,6 +892,15 @@ HERO_SKILL_INFO_EVIDENCE_BY_MODEL = {
     ),
     "h1003": HeroSkillInfoEvidence((("E", ("I Am Here!",)),)),
     "h1006": HeroSkillInfoEvidence((("Q", ("Recipro Extend",)),)),
+    "h1007": HeroSkillInfoEvidence(
+        (
+            ("Q", ("Gravel Strike", "Meteor Storm")),
+            ("W", ("失重冲击",)),
+            ("E", ("个性无重力",)),
+            ("R", ("御茶子必杀技",)),
+            ("DODGE", ("御茶子极限闪避QTE",)),
+        )
+    ),
     "h1008": HeroSkillInfoEvidence(
         (
             ("Q", ("Half-Cold Half-Hot",)),
@@ -906,6 +915,16 @@ HERO_SKILL_INFO_EVIDENCE_BY_MODEL = {
         )
     ),
     "h1010": HeroSkillInfoEvidence((("R", ("Lightning Bolt",)),)),
+    "h1012": HeroSkillInfoEvidence(
+        (
+            ("ATK", ("Dabi普攻1",)),
+            ("Q", ("DabiQ",)),
+            ("W", ("DabiQ变身",)),
+            ("E", ("Dabi Assist Skill E",)),
+            ("R", ("Dabi大招（PVE)",)),
+            ("PASSIVE", ("Dabi ability fire",)),
+        )
+    ),
     "h1013": HeroSkillInfoEvidence(
         (
             (
@@ -927,6 +946,28 @@ HERO_SKILL_INFO_EVIDENCE_BY_MODEL = {
         )
     ),
     "h1014": HeroSkillInfoEvidence((("Q", ("Tongue Swipe",)),)),
+    "h1015": HeroSkillInfoEvidence(
+        (
+            ("ATK", ("正常普攻1",)),
+            ("Q", ("相泽Q1",)),
+            ("W", ("相泽W陷阱",)),
+            ("E", ("相泽E远程",)),
+            ("R", ("相泽大招",)),
+            ("DODGE", ("相泽闪避",)),
+            ("PASSIVE", ("相泽能力",)),
+        )
+    ),
+    "h1016": HeroSkillInfoEvidence(
+        (
+            ("ATK", ("尾白普攻1",)),
+            ("Q", ("尾白Q", "尾巴强化Q")),
+            ("W", ("尾白W", "尾白强化W")),
+            ("E", ("尾白E", "尾白强化E")),
+            ("R", ("尾白大招",)),
+            ("DODGE", ("尾白闪避攻击",)),
+            ("PASSIVE", ("尾白能力",)),
+        )
+    ),
     "h1017": HeroSkillInfoEvidence(
         (
             ("Q", ("Mina Q", "Mina Enhanced Q", "Mina Q acid")),
