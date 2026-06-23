@@ -607,9 +607,24 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         56390302,
         56390303,
     )
+    assert stage_candidate_by_id(563903).encounter_spawns[0].label == (
+        "stage_cfg_authored_563903_enemy_56390301"
+    )
+    assert (
+        stage_candidate_by_id(563903).encounter_spawns[0].x,
+        stage_candidate_by_id(563903).encounter_spawns[0].y,
+        stage_candidate_by_id(563903).encounter_spawns[0].z,
+    ) == (7821, 21904, 944)
     assert [
         spawn.ai_profile_key for spawn in stage_candidate_by_id(563903).encounter_spawns
     ] == ["melee_chaser", "ranged_pressure", "elite_chaser"]
+    assert tuple(spawn.enemy_id for spawn in stage_candidate_by_id(562610).encounter_spawns) == (
+        56261001,
+        56261002,
+        56261003,
+        56261004,
+    )
+    assert stage_candidate_by_id(562610).encounter_spawns[2].face == 180
     assert tuple(spawn.enemy_id for spawn in stage_candidate_by_id(571101).encounter_spawns) == (
         57110101,
         57110102,
@@ -804,8 +819,8 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
     )
 
     assert hints["target_count"] == 73
-    assert hints["stage_count"] == 12
-    assert hints["spawn_count"] == 29
+    assert hints["stage_count"] == 19
+    assert hints["spawn_count"] == 49
     assert len(hints["stages"]["300401"]) == 9
     assert hints["stages"]["300401"][0] == {
         "enemy_id": 30040101,
@@ -873,6 +888,73 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
             "pattern": "MonsterInfo",
             "source_asset": "4YOU/49d248130af6a140",
         }
+    ]
+    assert hints["stages"]["562610"] == [
+        {
+            "enemy_id": 56261001,
+            "x": 14679,
+            "y": 14883,
+            "z": 670,
+            "face": 0,
+            "pattern": "map_monster_info_times",
+            "source_asset": "2ZU/57cb3401afd5056d",
+        },
+        {
+            "enemy_id": 56261002,
+            "x": 14877,
+            "y": 13745,
+            "z": 0,
+            "face": 0,
+            "pattern": "compact_enemy_table",
+            "source_asset": "2ZU/57cb3401afd5056d",
+        },
+        {
+            "enemy_id": 56261003,
+            "x": 14797,
+            "y": 12399,
+            "z": 661,
+            "face": 180,
+            "pattern": "MonsterInfo",
+            "source_asset": "2ZU/57cb3401afd5056d",
+        },
+        {
+            "enemy_id": 56261004,
+            "x": 14183,
+            "y": 12526,
+            "z": 0,
+            "face": 0,
+            "pattern": "map_monster_info_times",
+            "source_asset": "2ZU/57cb3401afd5056d",
+        },
+    ]
+    assert hints["stages"]["563903"] == [
+        {
+            "enemy_id": 56390301,
+            "x": 7821,
+            "y": 21904,
+            "z": 944,
+            "face": 90,
+            "pattern": "map_monster_info_times",
+            "source_asset": "1FO/eda2b453448dedb2",
+        },
+        {
+            "enemy_id": 56390302,
+            "x": 6220,
+            "y": 21612,
+            "z": 0,
+            "face": 0,
+            "pattern": "compact_enemy_table",
+            "source_asset": "1FO/eda2b453448dedb2",
+        },
+        {
+            "enemy_id": 56390303,
+            "x": 6536,
+            "y": 21355,
+            "z": 0,
+            "face": 0,
+            "pattern": "compact_enemy_table",
+            "source_asset": "1FO/eda2b453448dedb2",
+        },
     ]
 
 

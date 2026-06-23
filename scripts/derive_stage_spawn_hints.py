@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import struct
 import sys
 from pathlib import Path
 
@@ -23,6 +24,27 @@ SKIP_SCAN_SUFFIXES = {
     ".png",
     ".txt",
     ".wav",
+}
+
+STRING_TAGS = {4, 0x37}
+MONSTER_INFO_SECTION_NAMES = ("MonsterInfo", "MonsterInfo2", "MonsterInfo3")
+MONSTER_INFO_STOP_KEYS = {
+    "NpcInfo",
+    "PathInfo",
+    "Player3DPanelInfo",
+    "PlayerAppearInfo",
+    "TriggerInfo",
+}
+MONSTER_INFO_SCALAR_KEYS = {
+    "Alias",
+    "Amount",
+    "AreaName",
+    "Face",
+    "Id",
+    "IsHight",
+    "Radius",
+    "StartAnim",
+    "Times",
 }
 
 
@@ -47,6 +69,14 @@ def _stage_id_for_enemy(enemy_id: int) -> int:
 
 def _is_coord(value: float) -> bool:
     return -100000.0 < value < 100000.0
+
+
+def _is_xy_coord(value: float) -> bool:
+    return abs(value) > 1000 and _is_coord(value)
+
+
+def _is_z_coord(value: float) -> bool:
+    return -1000.0 <= value <= 5000.0
 
 
 def _last_coord_run_before(
@@ -119,8 +149,25 @@ def _face_after_coords(constants: list[object], index: int) -> int:
 
 def _monster_info_index_before(constants: list[object], index: int) -> int | None:
     for cursor in range(index - 1, max(-1, index - 42), -1):
-        if constants[cursor] == "MonsterInfo":
+        value = constants[cursor]
+        if isinstance(value, str) and value.startswith("MonsterInfo"):
             return cursor
+    return None
+
+
+def _last_key_before(
+    constants: list[object],
+    index: int,
+    key: str,
+    *,
+    limit: int = 80,
+) -> int | None:
+    for cursor in range(index - 1, max(-1, index - limit), -1):
+        if constants[cursor] == key:
+            return cursor
+        value = constants[cursor]
+        if isinstance(value, str) and value in MONSTER_INFO_STOP_KEYS:
+            return None
     return None
 
 
@@ -134,6 +181,20 @@ def _monster_command_index_before(constants: list[object], index: int) -> int | 
         }:
             return None
     return None
+
+
+def _monster_info_face_before(
+    constants: list[object],
+    monster_info_index: int,
+    index: int,
+) -> int:
+    for cursor in range(index - 1, monster_info_index, -1):
+        if constants[cursor] != "Face":
+            continue
+        number = _as_number(constants[cursor + 1]) if cursor + 1 < index else None
+        if number is not None and abs(number) <= 360:
+            return int(round(number))
+    return 0
 
 
 def _compact_enemy_table_hint(
@@ -210,13 +271,19 @@ def _spawn_hint_for_index(
             if id_key_index is not None
             else None
         )
-        if coords is not None:
+        if (
+            coords is not None
+            and _is_xy_coord(coords[0])
+            and _is_xy_coord(coords[1])
+        ):
             return {
                 "enemy_id": enemy_id,
                 "x": int(round(coords[0])),
                 "y": int(round(coords[1])),
                 "z": int(round(coords[2])),
-                "face": 0,
+                "face": _monster_info_face_before(
+                    constants, monster_info_index, index
+                ),
                 "pattern": "MonsterInfo",
             }
 
@@ -248,11 +315,158 @@ def _spawn_hint_for_index(
     }
 
 
+def _read_lua_constant_at(data: bytes, offset: int) -> tuple[object, int]:
+    tag = data[offset]
+    offset += 1
+    if tag == 0:
+        return None, offset
+    if tag == 1:
+        return bool(data[offset]), offset + 1
+    if tag == 3:
+        return struct.unpack("<d", data[offset : offset + 8])[0], offset + 8
+    if tag in STRING_TAGS:
+        encoded_size = struct.unpack("<I", data[offset : offset + 4])[0]
+        offset += 4
+        size = encoded_size & 0xFFFF
+        raw = data[offset : offset + size]
+        offset += size
+        if raw.endswith(b"\x00"):
+            raw = raw[:-1]
+        return raw.decode("utf-8", "replace"), offset
+    raise ValueError(f"unsupported constant tag {tag:#x}")
+
+
+def _tag_start_for_string(data: bytes, index: int, value: str) -> int | None:
+    tag_start = index - 5
+    if tag_start < 0 or data[tag_start] not in STRING_TAGS:
+        return None
+    encoded_size = struct.unpack("<I", data[tag_start + 1 : tag_start + 5])[0]
+    size = encoded_size & 0xFFFF
+    if size not in {len(value), len(value) + 1}:
+        return None
+    return tag_start
+
+
+def _loose_monster_info_sections(data: bytes) -> list[list[object]]:
+    sections: list[list[object]] = []
+    starts: set[int] = set()
+    for name in MONSTER_INFO_SECTION_NAMES:
+        raw = name.encode("utf-8")
+        cursor = 0
+        while True:
+            index = data.find(raw, cursor)
+            if index < 0:
+                break
+            cursor = index + 1
+            tag_start = _tag_start_for_string(data, index, name)
+            if tag_start is not None:
+                starts.add(tag_start)
+
+    for start in sorted(starts):
+        constants: list[object] = []
+        offset = start
+        for _ in range(180):
+            try:
+                value, offset = _read_lua_constant_at(data, offset)
+            except (IndexError, struct.error, ValueError):
+                break
+            constants.append(value)
+            if (
+                len(constants) > 1
+                and isinstance(value, str)
+                and value in MONSTER_INFO_STOP_KEYS
+            ):
+                break
+        if constants and isinstance(constants[0], str):
+            sections.append(constants)
+    return sections
+
+
+def _numeric_run_before(
+    constants: list[object],
+    index: int,
+    *,
+    limit: int = 16,
+) -> list[float]:
+    run: list[float] = []
+    for cursor in range(index - 1, max(-1, index - limit), -1):
+        value = constants[cursor]
+        number = _as_number(value)
+        if number is not None and _is_coord(number):
+            run.insert(0, number)
+            continue
+        if isinstance(value, str) and value in MONSTER_INFO_SCALAR_KEYS:
+            continue
+        break
+    return run
+
+
+def _coords_from_monster_info_times_run(
+    constants: list[object],
+    index: int,
+) -> tuple[float, float, float, int] | None:
+    monster_info_index = _monster_info_index_before(constants, index)
+    times_index = _last_key_before(constants, index, "Times")
+    if monster_info_index is None or times_index is None or times_index < monster_info_index:
+        return None
+
+    run = _numeric_run_before(constants, index)
+    if len(run) >= 4 and abs(run[-1]) <= 360 and _is_z_coord(run[-2]):
+        x, y, z = run[-4], run[-3], run[-2]
+        if _is_xy_coord(x) and _is_xy_coord(y):
+            return x, y, z, int(round(run[-1]))
+    if len(run) >= 3 and _is_z_coord(run[-1]):
+        x, y, z = run[-3], run[-2], run[-1]
+        if _is_xy_coord(x) and _is_xy_coord(y):
+            return x, y, z, 0
+    if len(run) >= 2:
+        x, y = run[-2], run[-1]
+        if _is_xy_coord(x) and _is_xy_coord(y):
+            return x, y, 0.0, 0
+    return None
+
+
+def _map_monster_info_times_hint(
+    constants: list[object],
+    index: int,
+    enemy_id: int,
+) -> dict[str, object] | None:
+    coords = _coords_from_monster_info_times_run(constants, index)
+    if coords is None:
+        return None
+    return {
+        "enemy_id": enemy_id,
+        "x": int(round(coords[0])),
+        "y": int(round(coords[1])),
+        "z": int(round(coords[2])),
+        "face": coords[3],
+        "pattern": "map_monster_info_times",
+    }
+
+
+def _spawn_hints_from_constants(
+    constants: list[object],
+    wanted: set[int],
+) -> list[dict[str, object]]:
+    hints: list[dict[str, object]] = []
+    for index, value in enumerate(constants):
+        enemy_id = _as_int(value)
+        if enemy_id not in wanted:
+            continue
+        hint = _spawn_hint_for_index(constants, index, enemy_id)
+        if hint is None:
+            hint = _map_monster_info_times_hint(constants, index, enemy_id)
+        if hint is not None:
+            hints.append(hint)
+    return hints
+
+
 def _spawn_hint_priority(hint: dict[str, object]) -> int:
     pattern = str(hint.get("pattern") or "")
     return {
         "MonsterInfo": 3,
         "drama_monster_command": 3,
+        "map_monster_info_times": 3,
         "compact_enemy_table": 2,
     }.get(pattern, 1)
 
@@ -283,24 +497,25 @@ def collect_stage_spawn_hints(
         if not path.is_file() or path.suffix.lower() in SKIP_SCAN_SUFFIXES:
             continue
         scanned += 1
+        data = path.read_bytes()
+        constant_groups: list[list[object]] = []
         try:
-            constants = _RootConstantReader(path.read_bytes()).root_constants()
+            constant_groups.append(_RootConstantReader(data).root_constants())
         except Exception:
+            pass
+        constant_groups.extend(_loose_monster_info_sections(data))
+        if not constant_groups:
             continue
         parsed += 1
-        for index, value in enumerate(constants):
-            enemy_id = _as_int(value)
-            if enemy_id not in wanted:
-                continue
-            hint = _spawn_hint_for_index(constants, index, enemy_id)
-            if hint is None:
-                continue
-            hint["source_asset"] = str(path.relative_to(asset_root)).replace("\\", "/")
-            existing = stage_spawns_by_enemy.get(enemy_id)
-            if existing is None or _spawn_hint_priority(hint) > _spawn_hint_priority(
-                existing
-            ):
-                stage_spawns_by_enemy[enemy_id] = hint
+        for constants in constant_groups:
+            for hint in _spawn_hints_from_constants(constants, wanted):
+                enemy_id = int(hint["enemy_id"])
+                hint["source_asset"] = str(path.relative_to(asset_root)).replace("\\", "/")
+                existing = stage_spawns_by_enemy.get(enemy_id)
+                if existing is None or _spawn_hint_priority(hint) > _spawn_hint_priority(
+                    existing
+                ):
+                    stage_spawns_by_enemy[enemy_id] = hint
 
     stage_spawns: dict[int, list[dict[str, object]]] = {}
     for enemy_id, hint in sorted(stage_spawns_by_enemy.items()):

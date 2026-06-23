@@ -284,6 +284,13 @@ The clean-room server now supports:
   12 stages. Runtime stage generation now uses the full `300401` placement
   table, completed `563701` placements, and additional authored rows from
   stages such as `405252`, `406502`, `561203`, and `563901`.
+- A third authored spawn parser pass now scans loose map `MonsterInfo*`
+  sections from validated Lua string tags, including packed `Times` coordinate
+  runs and keyed `Face` fields in chunks where the root constant reader loses
+  alignment. Authored spawn recovery now reaches 49 coordinate hints across 19
+  stages, and runtime stages now use recovered layouts for `400115`, `562610`,
+  `563903`, and several partially recovered route stages instead of generated
+  placeholders.
 - Enemy AI assignment now uses parser-backed `monster_cfg` name markers through
   `scripts/derive_enemy_ai_profile_hints.py`. Thirty-three recovered stage
   enemies receive boss, elite, ranged/gun, mechanical, or Nomu profile

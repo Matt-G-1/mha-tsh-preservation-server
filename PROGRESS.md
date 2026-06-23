@@ -358,6 +358,13 @@ environment details are intentionally omitted from Git.
   generation now prefers those parsed positions over generated placeholders
   while still keeping generated fallback rows for enemies whose authored
   positions are not recovered yet.
+- A third authored-position pass now scans validated Lua string-tag boundaries
+  for loose map `MonsterInfo*` sections whose full chunks defeat the root
+  constant reader. It recovers packed `Times` coordinate runs and keyed `Face`
+  values, raising authored placement recovery to 49 coordinate hints across 19
+  stages. Runtime coverage now includes full authored spawn layouts for
+  `400115`, `562610`, and `563903`, plus additional recovered rows for
+  `404201`, `405103`, `405302`, `561211`, `561304`, and `562504`.
 - The English `monster_cfg` packed asset now has a conservative hint extractor:
   `scripts/derive_monster_cfg_hints.py`. It scans animation-key neighborhoods
   for display-name candidates and feeds a typed monster evidence layer for
