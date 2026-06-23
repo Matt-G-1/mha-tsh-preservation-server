@@ -234,6 +234,44 @@ def _monster_info_keyed_coords_before(
     return x, y, z, face
 
 
+def _monster_info_xy_before_face_id(
+    constants: list[object],
+    monster_info_index: int,
+    index: int,
+) -> tuple[float, float, float, int] | None:
+    face_index = None
+    for cursor in range(index - 1, monster_info_index, -1):
+        if constants[cursor] == "Face":
+            face_index = cursor
+            break
+    if face_index is None:
+        return None
+
+    face_number = (
+        _as_number(constants[face_index + 1]) if face_index + 1 < index else None
+    )
+    if face_number is None or abs(face_number) > 360:
+        return None
+
+    xy_run: list[float] = []
+    for value in constants[monster_info_index + 1 : face_index]:
+        number = _as_number(value)
+        if number is None or not _is_coord(number):
+            if len(xy_run) >= 2:
+                xy_run = xy_run[-2:]
+            else:
+                xy_run = []
+            continue
+        xy_run.append(number)
+
+    if len(xy_run) < 2:
+        return None
+    x, y = xy_run[-2], xy_run[-1]
+    if not (_is_xy_coord(x) and _is_xy_coord(y)):
+        return None
+    return x, y, 0.0, int(round(face_number))
+
+
 def _compact_enemy_table_hint(
     constants: list[object],
     index: int,
@@ -361,6 +399,36 @@ def _spawn_hint_for_index(
         "z": int(round(coords[2])),
         "face": face,
         "pattern": "drama_monster_command",
+    }
+
+
+def _monster_info_xy_hint(
+    constants: list[object],
+    index: int,
+    enemy_id: int,
+) -> dict[str, object] | None:
+    monster_info_index = _monster_info_index_before(constants, index)
+    if monster_info_index is None:
+        return None
+
+    id_key_index = None
+    for cursor in range(index - 1, max(monster_info_index - 1, index - 4), -1):
+        if constants[cursor] == "Id":
+            id_key_index = cursor
+            break
+    if id_key_index is None:
+        return None
+
+    xy_coords = _monster_info_xy_before_face_id(constants, monster_info_index, index)
+    if xy_coords is None:
+        return None
+    return {
+        "enemy_id": enemy_id,
+        "x": int(round(xy_coords[0])),
+        "y": int(round(xy_coords[1])),
+        "z": int(round(xy_coords[2])),
+        "face": xy_coords[3],
+        "pattern": "MonsterInfoXY",
     }
 
 
@@ -541,6 +609,8 @@ def _spawn_hints_from_constants(
         hint = _spawn_hint_for_index(constants, index, enemy_id)
         if hint is None:
             hint = _map_monster_info_times_hint(constants, index, enemy_id)
+        if hint is None:
+            hint = _monster_info_xy_hint(constants, index, enemy_id)
         if hint is not None:
             hints.append(hint)
     return hints
@@ -553,6 +623,7 @@ def _spawn_hint_priority(hint: dict[str, object]) -> int:
         "drama_monster_command": 3,
         "map_monster_info_times": 3,
         "compact_enemy_table": 2,
+        "MonsterInfoXY": 1,
     }.get(pattern, 1)
 
 

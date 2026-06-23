@@ -1950,6 +1950,42 @@ STAGE_CFG_AUTHORED_SPAWN_HINTS_BY_STAGE.update(
                 ai_profile_key=generated_enemy_profile_key(40011801),
             ),
         ),
+        406506: (
+            StageEnemySpawn(
+                label="stage_cfg_authored_406506_enemy_40650603",
+                enemy_id=40650603,
+                shape_id=40650603,
+                uid=40650603,
+                x=10636,
+                y=4708,
+                face=180,
+                group_id=406506,
+                ai_profile_key=generated_enemy_profile_key(40650603),
+            ),
+        ),
+        561113: (
+            StageEnemySpawn(
+                label="stage_cfg_authored_561113_enemy_56111303",
+                enemy_id=56111303,
+                shape_id=56111303,
+                uid=56111303,
+                x=26375,
+                y=23089,
+                face=180,
+                group_id=561113,
+                ai_profile_key=generated_enemy_profile_key(56111303),
+            ),
+            StageEnemySpawn(
+                label="stage_cfg_authored_561113_enemy_56111304",
+                enemy_id=56111304,
+                shape_id=56111304,
+                uid=56111304,
+                x=26315,
+                y=23088,
+                group_id=561113,
+                ai_profile_key=generated_enemy_profile_key(56111304),
+            ),
+        ),
         561211: (
             StageEnemySpawn(
                 label="stage_cfg_authored_561211_enemy_56121101",

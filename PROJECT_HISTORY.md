@@ -308,6 +308,9 @@ The clean-room server now supports:
   dictionaries in `MonsterInfo` rows. Authored recovery now reaches 69
   placements across 25 stages, including runtime coordinates for `160001`,
   `201006`, `310403`, `400118`, and the completed `561211` combat trio.
+- A lower-priority `MonsterInfo` X/Y-only fallback now recovers `40650603` and
+  `56111303`, bringing authored placement recovery to 71 hints across 26
+  stages while preserving stronger compact/table/Times evidence when present.
 - Enemy AI assignment now uses parser-backed `monster_cfg` name markers through
   `scripts/derive_enemy_ai_profile_hints.py`. Thirty-three recovered stage
   enemies receive boss, elite, ranged/gun, mechanical, or Nomu profile

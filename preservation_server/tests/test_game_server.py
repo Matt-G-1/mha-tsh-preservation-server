@@ -705,6 +705,19 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         stage_candidate_by_id(400118).encounter_spawns[0].enemy_id,
         stage_candidate_by_id(400118).encounter_spawns[0].face,
     ) == (40011801, 90)
+    assert (
+        stage_candidate_by_id(406506).encounter_spawns[0].label
+        == "stage_cfg_authored_406506_enemy_40650603"
+    )
+    assert (
+        stage_candidate_by_id(406506).encounter_spawns[0].x,
+        stage_candidate_by_id(406506).encounter_spawns[0].y,
+        stage_candidate_by_id(406506).encounter_spawns[0].face,
+    ) == (10636, 4708, 180)
+    assert tuple(
+        spawn.enemy_id for spawn in stage_candidate_by_id(561113).encounter_spawns
+    ) == (56111303, 56111304)
+    assert stage_candidate_by_id(561113).encounter_spawns[0].face == 180
     assert tuple(
         spawn.enemy_id for spawn in stage_candidate_by_id(561211).encounter_spawns
     ) == (
@@ -876,8 +889,8 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
     )
 
     assert hints["target_count"] == 73
-    assert hints["stage_count"] == 25
-    assert hints["spawn_count"] == 69
+    assert hints["stage_count"] == 26
+    assert hints["spawn_count"] == 71
     assert hints["stages"]["160001"] == [
         {
             "enemy_id": 16000101,
@@ -1111,6 +1124,37 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
             "face": 90,
             "pattern": "MonsterInfo",
             "source_asset": "2ZU/fbe646e45765e35b",
+        },
+    ]
+    assert hints["stages"]["406506"] == [
+        {
+            "enemy_id": 40650603,
+            "x": 10636,
+            "y": 4708,
+            "z": 0,
+            "face": 180,
+            "pattern": "MonsterInfoXY",
+            "source_asset": "2ZU/206565765646b295",
+        },
+    ]
+    assert hints["stages"]["561113"] == [
+        {
+            "enemy_id": 56111303,
+            "x": 26375,
+            "y": 23089,
+            "z": 0,
+            "face": 180,
+            "pattern": "MonsterInfoXY",
+            "source_asset": "0QIU/1132c4410f808cb9",
+        },
+        {
+            "enemy_id": 56111304,
+            "x": 26315,
+            "y": 23088,
+            "z": 0,
+            "face": 0,
+            "pattern": "compact_enemy_table",
+            "source_asset": "0QIU/1132c4410f808cb9",
         },
     ]
     assert hints["stages"]["561211"] == [
