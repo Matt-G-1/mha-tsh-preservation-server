@@ -976,12 +976,59 @@ HERO_SKILL_INFO_EVIDENCE_BY_MODEL = {
             ("PASSIVE", ("Hawks passive",)),
         )
     ),
-    "h1030": HeroSkillInfoEvidence((("Q", ("Wave Blast",)),)),
-    "h1031": HeroSkillInfoEvidence((("Q", ("Tentacles Grasp",)),)),
+    "h1027": HeroSkillInfoEvidence(
+        (
+            ("ATK", ("WHM绿谷普攻1", "Midoriya black whip")),
+            ("Q", ("Midoriya Q", "Midoriya Q skill down kick")),
+            ("W", ("Midoriya W",)),
+            ("E", ("Midoriya E", "Midoriya E skill charge")),
+            ("R", ("whm绿谷R",)),
+        )
+    ),
+    "h1028": HeroSkillInfoEvidence(
+        (
+            ("ATK", ("Normal ATK 6 (Fly)", "Bakugo DEF Break attack")),
+            ("Q", ("Q Ground charge", "Q Ground machine gun", "Q Air 1")),
+            ("W", ("W Wuhu takeoff", "W Air move")),
+            ("E", ("E Fire tornado", "E Drill flame")),
+            ("R", ("R Movie Ult (PVE)",)),
+            ("PASSIVE", ("whm爆豪被动1",)),
+        )
+    ),
+    "h1029": HeroSkillInfoEvidence(
+        (
+            ("Q", ("whm轰Q1", "whm轰Q2")),
+            ("W", ("whm轰W1", "冰枪1段")),
+            ("E", ("whm轰E", "火焰喷射")),
+            ("R", ("whm轰R",)),
+            ("PASSIVE", ("whm轰被动1",)),
+        )
+    ),
+    "h1030": HeroSkillInfoEvidence(
+        (
+            ("ATK", ("测试波动普攻1",)),
+            ("Q", ("波动Q1", "Wave Blast")),
+            ("W", ("波动W",)),
+            ("E", ("波动E1", "波动E2")),
+            ("R", ("波动R",)),
+        )
+    ),
+    "h1031": HeroSkillInfoEvidence(
+        (
+            ("ATK", ("天喰环普攻1",)),
+            ("Q", ("天喰环Q1", "Tentacles Grasp")),
+            ("W", ("天喰环W",)),
+            ("E", ("天喰环E1", "天喰环E2")),
+            ("R", ("天喰环R",)),
+        )
+    ),
     "h1032": HeroSkillInfoEvidence(
         (
+            ("ATK", ("通行百万普攻1",)),
+            ("Q", ("通行百万Q3", "通行百万Q4")),
             ("W", ("Mirio TogataW",)),
             ("E", ("Mirio TogataE",)),
+            ("R", ("通行百万R",)),
         )
     ),
     "h1110": HeroSkillInfoEvidence(

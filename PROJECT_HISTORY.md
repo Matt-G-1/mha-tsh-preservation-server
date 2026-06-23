@@ -168,6 +168,10 @@ The clean-room server now supports:
   `Mina Perfect Dodge QTE`, `Grape Rain`, `Abyssal Talons`,
   `Tentacles Grasp`, `Mirio TogataW`, `Mirio TogataE`, `Aura of Fear`, and
   `Shadowy Surprise`.
+- A third conservative skill-info pass reads the cleaner late-roster skill-ID
+  neighborhoods and adds original ATK/Q/W/E/R text evidence for WHM Midoriya,
+  WHM Bakugo, Nejire, Tamaki, and Mirio, plus Q/W/E/R evidence for WHM
+  Todoroki.
 - A separate support-skill promotion parses the English `hero_supports_cfg.lua`
   asset under `assets/0QIU/17d0df31842d7982`. It records support-skill evidence
   for Shigaraki (`Vicious Contact`), Endeavor (`Exploding Lance`), alternate

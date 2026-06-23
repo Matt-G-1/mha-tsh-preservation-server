@@ -258,6 +258,13 @@ environment details are intentionally omitted from Git.
   Stain's `Aura of Fear`, `Permeate Uppercut`, `Shadowy Surprise`, and
   `Vigor` evidence. These are parser-backed annotations for combat telemetry,
   not a claim that every packet-side skill slot is fully proven yet.
+- A third conservative `skill_info` pass now uses the cleaner late-roster
+  skill-ID neighborhoods to annotate WHM Midoriya, WHM Bakugo, WHM Todoroki,
+  Nejire, Tamaki, and Mirio. WHM Midoriya, WHM Bakugo, Nejire, Tamaki, and
+  Mirio now have original ATK/Q/W/E/R text evidence attached to combat
+  telemetry; WHM Todoroki has Q/W/E/R evidence and only ATK remains unlabeled
+  at this layer. The public-roster original-text gap count dropped from 25 to
+  20 characters with at least one missing ATK/Q/W/E/R label.
 - A separate support-skill pass now parses the packed English
   `hero_supports_cfg.lua` asset at
   `analysis/mediafire_20260620/apk_extract/assets/0QIU/17d0df31842d7982`.

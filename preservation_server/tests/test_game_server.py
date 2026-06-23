@@ -1625,21 +1625,55 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert hawks_style.recovered_support_skill_evidence().terms == ("Downfall",)
 
     whm_deku_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1027"])
-    assert whm_deku_style.recovered_skill_info_evidence() is None
+    assert whm_deku_style.recovered_skill_info_evidence() is not None
+    assert whm_deku_style.recovered_skill_info_evidence().terms_for_command("ATK") == (
+        "WHM绿谷普攻1",
+        "Midoriya black whip",
+    )
+    assert whm_deku_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "Midoriya Q",
+        "Midoriya Q skill down kick",
+    )
+    assert whm_deku_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "whm绿谷R",
+    )
     assert whm_deku_style.recovered_support_skill_evidence() is not None
     assert whm_deku_style.recovered_support_skill_evidence().terms == (
         "WHM Shoot Style",
     )
 
     whm_bakugo_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1028"])
-    assert whm_bakugo_style.recovered_skill_info_evidence() is None
+    assert whm_bakugo_style.recovered_skill_info_evidence() is not None
+    assert whm_bakugo_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "Q Ground charge",
+        "Q Ground machine gun",
+        "Q Air 1",
+    )
+    assert whm_bakugo_style.recovered_skill_info_evidence().terms_for_command("E") == (
+        "E Fire tornado",
+        "E Drill flame",
+    )
+    assert whm_bakugo_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "R Movie Ult (PVE)",
+    )
     assert whm_bakugo_style.recovered_support_skill_evidence() is not None
     assert whm_bakugo_style.recovered_support_skill_evidence().terms == (
         "Turbo Twister",
     )
 
     whm_todoroki_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1029"])
-    assert whm_todoroki_style.recovered_skill_info_evidence() is None
+    assert whm_todoroki_style.recovered_skill_info_evidence() is not None
+    assert whm_todoroki_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "whm轰Q1",
+        "whm轰Q2",
+    )
+    assert whm_todoroki_style.recovered_skill_info_evidence().terms_for_command("W") == (
+        "whm轰W1",
+        "冰枪1段",
+    )
+    assert whm_todoroki_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "whm轰R",
+    )
     assert whm_todoroki_style.recovered_support_skill_evidence() is not None
     assert whm_todoroki_style.recovered_support_skill_evidence().terms == (
         "Icicle Storm",
@@ -1647,8 +1681,15 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
 
     nejire_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1030"])
     assert nejire_style.recovered_skill_info_evidence() is not None
+    assert nejire_style.recovered_skill_info_evidence().terms_for_command("ATK") == (
+        "测试波动普攻1",
+    )
     assert nejire_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "波动Q1",
         "Wave Blast",
+    )
+    assert nejire_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "波动R",
     )
 
     mirio_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1032"])
@@ -1659,11 +1700,21 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     )
     assert mirio_style.recovered_ai_name() == "bot_tongxingbaiwan"
     assert mirio_style.recovered_skill_info_evidence() is not None
+    assert mirio_style.recovered_skill_info_evidence().terms_for_command("ATK") == (
+        "通行百万普攻1",
+    )
+    assert mirio_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "通行百万Q3",
+        "通行百万Q4",
+    )
     assert mirio_style.recovered_skill_info_evidence().terms_for_command("W") == (
         "Mirio TogataW",
     )
     assert mirio_style.recovered_skill_info_evidence().terms_for_command("E") == (
         "Mirio TogataE",
+    )
+    assert mirio_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "通行百万R",
     )
     assert HERO_CFG_ACTION_MAP_BY_MODEL["h1032"] == (
         ("arder_biliqi", "arder_biliqi02"),
@@ -1708,14 +1759,27 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
 
     tamaki_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1031"])
     assert tamaki_style.recovered_skill_info_evidence() is not None
+    assert tamaki_style.recovered_skill_info_evidence().terms_for_command("ATK") == (
+        "天喰环普攻1",
+    )
     assert tamaki_style.recovered_skill_info_evidence().terms_for_command("Q") == (
+        "天喰环Q1",
         "Tentacles Grasp",
+    )
+    assert tamaki_style.recovered_skill_info_evidence().terms_for_command("R") == (
+        "天喰环R",
     )
 
     mirio_skill_info = mirio_style.recovered_skill_info_evidence()
     assert mirio_skill_info is not None
+    assert mirio_skill_info.terms_for_command("ATK") == ("通行百万普攻1",)
+    assert mirio_skill_info.terms_for_command("Q") == (
+        "通行百万Q3",
+        "通行百万Q4",
+    )
     assert mirio_skill_info.terms_for_command("W") == ("Mirio TogataW",)
     assert mirio_skill_info.terms_for_command("E") == ("Mirio TogataE",)
+    assert mirio_skill_info.terms_for_command("R") == ("通行百万R",)
 
     jiro_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1018"])
     assert jiro_style.recovered_skill_video_evidence() is None
@@ -1776,8 +1840,17 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert hints["h1024"]["terms"]["Smash!"]["count"] == 1
     assert hints["h1026"]["terms"]["Hawks Q open"]["count"] == 1
     assert hints["h1026"]["terms"]["Hawks ult"]["count"] == 3
+    assert hints["h1027"]["terms"]["Midoriya Q"]["count"] >= 1
+    assert hints["h1027"]["terms"]["whm绿谷R"]["count"] == 1
+    assert hints["h1028"]["terms"]["Q Ground charge"]["count"] == 1
+    assert hints["h1028"]["terms"]["R Movie Ult (PVE)"]["count"] == 1
+    assert hints["h1029"]["terms"]["whm轰Q1"]["count"] == 1
+    assert hints["h1029"]["terms"]["whm轰R"]["count"] == 1
+    assert hints["h1030"]["terms"]["测试波动普攻1"]["count"] == 2
     assert hints["h1030"]["terms"]["Wave Blast"]["count"] == 1
+    assert hints["h1031"]["terms"]["天喰环R"]["count"] == 1
     assert hints["h1031"]["terms"]["Tentacles Grasp"]["count"] == 1
+    assert hints["h1032"]["terms"]["通行百万Q3"]["count"] >= 1
     assert hints["h1032"]["terms"]["Mirio TogataW"]["count"] == 1
     assert hints["h1110"]["terms"]["Dagger Throw"]["count"] == 1
     assert hints["h1110"]["terms"]["Permeate Uppercut"]["count"] == 1
