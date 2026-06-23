@@ -3,7 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from derive_stage_cfg_route_hints import _RootConstantReader
 
 
 DEFAULT_SKILL_INFO_ASSET = (
@@ -15,6 +19,15 @@ DEFAULT_SKILL_INFO_ASSET = (
     / "0a6af507ecd6f4a5"
 )
 DEFAULT_SKILL_INFO_ASSETS = (DEFAULT_SKILL_INFO_ASSET,)
+
+STRUCTURED_SKILL_INFO_MODEL_PREFIXES = {
+    "h1027": 1027,
+    "h1028": 1028,
+    "h1029": 1029,
+    "h1030": 1030,
+    "h1031": 1031,
+    "h1032": 1032,
+}
 
 SKILL_INFO_TERMS_BY_MODEL = {
     "h1001": ("Smash", "One For All", "Detroit Smash"),
@@ -144,6 +157,136 @@ def _coerce_paths(path_or_paths: Path | tuple[Path, ...]) -> tuple[Path, ...]:
     return (path_or_paths,)
 
 
+def _as_skill_id(value: object) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if 100000 <= value <= 199999 else None
+    if isinstance(value, float) and value.is_integer():
+        numeric_value = int(value)
+        return numeric_value if 100000 <= numeric_value <= 199999 else None
+    return None
+
+
+def _command_for_skill_values(values: list[str]) -> str | None:
+    normalized = " ".join(values).lower()
+    if any(token in normalized for token in ("skill04", "skill4", "ult", "必杀", "大招")):
+        return "R"
+    if any(token in normalized for token in ("skill03", "skill3")):
+        return "E"
+    if any(token in normalized for token in ("skill02", "skill2")):
+        return "W"
+    if any(token in normalized for token in ("skill01", "skill1", "skill0_")):
+        return "Q"
+    if any(token in normalized for token in ("dash", "roll", "闪避")):
+        return "DODGE"
+    if any(token in normalized for token in ("ability", "nengli", "被动", "能力")):
+        return "PASSIVE"
+    if any(token in normalized for token in ("atk", "normal atk", "普攻")):
+        return "ATK"
+    return None
+
+
+def _is_human_skill_term(value: str) -> bool:
+    term = value.strip()
+    lowered = term.lower()
+    if not term or len(term) > 48:
+        return False
+    rejected_fragments = (
+        "#",
+        "pve_",
+        "pvp_",
+        "apvp_",
+        "skill0",
+        "skill1",
+        "skill2",
+        "skill3",
+        "skill4",
+        "atk_",
+        "atk0",
+        "rush_",
+        "cd:",
+        "changeicon",
+        "nolimit",
+    )
+    if any(fragment in lowered for fragment in rejected_fragments):
+        return False
+    if lowered in {"q", "w", "e", "r", "stun", "true", "false"}:
+        return False
+    return any(char.isalpha() for char in term)
+
+
+def _command_for_skill_term(term: str, fallback: str) -> str:
+    normalized = term.lower()
+    if "normal atk" in normalized or "普攻" in term:
+        return "ATK"
+    if "闪避" in term or "dodge" in normalized:
+        return "DODGE"
+    if "被动" in term or "ability" in normalized:
+        return "PASSIVE"
+    if "ult" in normalized or "必杀" in term or "大招" in term:
+        return "R"
+    if re.search(r"(^|[\s_-])q(\d+)?($|[\s_-])", normalized) or re.search(
+        r"Q\d?$", term
+    ):
+        return "Q"
+    if re.search(r"(^|[\s_-])w(\d+)?($|[\s_-])", normalized) or re.search(
+        r"W\d?$", term
+    ):
+        return "W"
+    if re.search(r"(^|[\s_-])e(\d+)?($|[\s_-])", normalized) or re.search(
+        r"E\d?$", term
+    ):
+        return "E"
+    if re.search(r"(^|[\s_-])r(\d+)?($|[\s_-])", normalized) or re.search(
+        r"R\d?$", term
+    ):
+        return "R"
+    return fallback
+
+
+def collect_structured_skill_info_hints(path: Path = DEFAULT_SKILL_INFO_ASSET) -> dict[str, dict[str, object]]:
+    constants = _RootConstantReader(path.read_bytes()).root_constants()
+    model_by_prefix = {
+        prefix: model_id for model_id, prefix in STRUCTURED_SKILL_INFO_MODEL_PREFIXES.items()
+    }
+    hints: dict[str, dict[str, object]] = {
+        model_id: {"command_terms": {}} for model_id in STRUCTURED_SKILL_INFO_MODEL_PREFIXES
+    }
+
+    for index, value in enumerate(constants):
+        skill_id = _as_skill_id(value)
+        if skill_id is None:
+            continue
+        model_id = model_by_prefix.get(skill_id // 100)
+        if model_id is None:
+            continue
+
+        values: list[str] = []
+        for cursor in range(index + 1, min(len(constants), index + 30)):
+            if _as_skill_id(constants[cursor]) is not None:
+                break
+            if isinstance(constants[cursor], str):
+                values.append(constants[cursor])
+        command = _command_for_skill_values(values) or "UNKNOWN"
+
+        command_terms = hints[model_id]["command_terms"]
+        assert isinstance(command_terms, dict)
+        terms = command_terms.setdefault(command, {})
+        for term in values:
+            if not _is_human_skill_term(term):
+                continue
+            term_command = _command_for_skill_term(term, command)
+            if term_command == "UNKNOWN":
+                continue
+            terms = command_terms.setdefault(term_command, {})
+            if term not in terms:
+                terms[term] = {"skill_ids": [], "constant_indexes": []}
+            terms[term]["skill_ids"].append(skill_id)
+            terms[term]["constant_indexes"].append(index)
+    return hints
+
+
 def collect_skill_info_hints(
     path_or_paths: Path | tuple[Path, ...],
 ) -> dict[str, dict[str, object]]:
@@ -171,6 +314,11 @@ def collect_skill_info_hints(
                 ],
             }
         hints[model_id] = {"terms": model_terms}
+    structured = collect_structured_skill_info_hints(_coerce_paths(path_or_paths)[0])
+    for model_id, structured_hints in structured.items():
+        hints.setdefault(model_id, {"terms": {}})["structured_terms"] = structured_hints[
+            "command_terms"
+        ]
     return hints
 
 

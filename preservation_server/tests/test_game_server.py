@@ -1842,16 +1842,32 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert hints["h1026"]["terms"]["Hawks ult"]["count"] == 3
     assert hints["h1027"]["terms"]["Midoriya Q"]["count"] >= 1
     assert hints["h1027"]["terms"]["whm绿谷R"]["count"] == 1
+    assert "Midoriya Q" in hints["h1027"]["structured_terms"]["Q"]
+    assert "Midoriya W" in hints["h1027"]["structured_terms"]["W"]
+    assert "whm绿谷R" in hints["h1027"]["structured_terms"]["R"]
     assert hints["h1028"]["terms"]["Q Ground charge"]["count"] == 1
     assert hints["h1028"]["terms"]["R Movie Ult (PVE)"]["count"] == 1
+    assert "Q Ground charge" in hints["h1028"]["structured_terms"]["Q"]
+    assert "W Air move" in hints["h1028"]["structured_terms"]["W"]
+    assert "E Drill flame" in hints["h1028"]["structured_terms"]["E"]
+    assert "R Movie Ult (PVE)" in hints["h1028"]["structured_terms"]["R"]
     assert hints["h1029"]["terms"]["whm轰Q1"]["count"] == 1
     assert hints["h1029"]["terms"]["whm轰R"]["count"] == 1
+    assert "whm轰R" in hints["h1029"]["structured_terms"]["R"]
     assert hints["h1030"]["terms"]["测试波动普攻1"]["count"] == 2
     assert hints["h1030"]["terms"]["Wave Blast"]["count"] == 1
+    assert "波动W" in hints["h1030"]["structured_terms"]["W"]
+    assert "波动E1" in hints["h1030"]["structured_terms"]["E"]
+    assert "波动R" in hints["h1030"]["structured_terms"]["R"]
     assert hints["h1031"]["terms"]["天喰环R"]["count"] == 1
     assert hints["h1031"]["terms"]["Tentacles Grasp"]["count"] == 1
+    assert "天喰环Q1" in hints["h1031"]["structured_terms"]["Q"]
+    assert "天喰环R" in hints["h1031"]["structured_terms"]["R"]
     assert hints["h1032"]["terms"]["通行百万Q3"]["count"] >= 1
     assert hints["h1032"]["terms"]["Mirio TogataW"]["count"] == 1
+    assert "Mirio TogataW" in hints["h1032"]["structured_terms"]["W"]
+    assert "Mirio TogataE" in hints["h1032"]["structured_terms"]["E"]
+    assert "通行百万R" in hints["h1032"]["structured_terms"]["R"]
     assert hints["h1110"]["terms"]["Dagger Throw"]["count"] == 1
     assert hints["h1110"]["terms"]["Permeate Uppercut"]["count"] == 1
 

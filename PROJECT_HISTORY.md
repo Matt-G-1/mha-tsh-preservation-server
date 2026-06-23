@@ -171,7 +171,9 @@ The clean-room server now supports:
 - A third conservative skill-info pass reads the cleaner late-roster skill-ID
   neighborhoods and adds original ATK/Q/W/E/R text evidence for WHM Midoriya,
   WHM Bakugo, Nejire, Tamaki, and Mirio, plus Q/W/E/R evidence for WHM
-  Todoroki.
+  Todoroki. The extractor now exposes those late-roster skill-ID neighborhoods
+  as structured command buckets, giving the runtime labels reproducible
+  original-asset evidence beyond simple byte-search matches.
 - A separate support-skill promotion parses the English `hero_supports_cfg.lua`
   asset under `assets/0QIU/17d0df31842d7982`. It records support-skill evidence
   for Shigaraki (`Vicious Contact`), Endeavor (`Exploding Lance`), alternate

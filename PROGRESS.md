@@ -264,7 +264,10 @@ environment details are intentionally omitted from Git.
   Mirio now have original ATK/Q/W/E/R text evidence attached to combat
   telemetry; WHM Todoroki has Q/W/E/R evidence and only ATK remains unlabeled
   at this layer. The public-roster original-text gap count dropped from 25 to
-  20 characters with at least one missing ATK/Q/W/E/R label.
+  20 characters with at least one missing ATK/Q/W/E/R label. The extractor now
+  also parses structured skill-ID neighborhoods for `h1027` through `h1032`,
+  classifies human-readable labels into command buckets, and verifies that the
+  promoted late-roster terms are present in the original packed constants.
 - A separate support-skill pass now parses the packed English
   `hero_supports_cfg.lua` asset at
   `analysis/mediafire_20260620/apk_extract/assets/0QIU/17d0df31842d7982`.
