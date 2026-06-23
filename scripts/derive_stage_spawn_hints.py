@@ -26,7 +26,7 @@ SKIP_SCAN_SUFFIXES = {
     ".wav",
 }
 
-STRING_TAGS = {4, 0x37}
+STRING_TAGS = {4, 0x37, 0x79}
 MONSTER_INFO_SECTION_NAMES = (
     "MonsterInfo",
     "MonsterInfo2",

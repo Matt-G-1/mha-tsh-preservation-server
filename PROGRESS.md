@@ -378,6 +378,10 @@ environment details are intentionally omitted from Git.
   parser-backed spawns for `40510301`, `40630503`, `40650501`, `56240702`,
   `56240751`, `56250409`, and `56390101`; only 10 routed stages still have
   combat IDs without authored coordinates.
+- The spawn parser also accepts the `0x79` string tag used by the `406205` map
+  chunk. This recovers and promotes all three `406205` combat spawns, bringing
+  authored placement recovery to 63 hints across 21 stages and reducing routed
+  stages with missing combat coordinates to 9.
 - The English `monster_cfg` packed asset now has a conservative hint extractor:
   `scripts/derive_monster_cfg_hints.py`. It scans animation-key neighborhoods
   for display-name candidates and feeds a typed monster evidence layer for

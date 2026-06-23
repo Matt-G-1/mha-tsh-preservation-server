@@ -671,6 +671,14 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     )
     assert stage_candidate_by_id(405252).encounter_spawns[0].face == 90
     assert stage_candidate_by_id(405252).encounter_spawns[4].face == 270
+    assert tuple(
+        spawn.enemy_id for spawn in stage_candidate_by_id(406205).encounter_spawns
+    ) == (
+        40620502,
+        40620503,
+        40620504,
+    )
+    assert stage_candidate_by_id(406205).encounter_spawns[1].face == 160
 
     assert all(
         stage.encounter_target_count > 0
@@ -831,8 +839,8 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
     )
 
     assert hints["target_count"] == 73
-    assert hints["stage_count"] == 20
-    assert hints["spawn_count"] == 60
+    assert hints["stage_count"] == 21
+    assert hints["spawn_count"] == 63
     assert len(hints["stages"]["300401"]) == 9
     assert hints["stages"]["300401"][0] == {
         "enemy_id": 30040101,
@@ -993,6 +1001,35 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
             "face": 0,
             "pattern": "compact_enemy_table",
             "source_asset": "1FO/0ff00360167bd2b8",
+        },
+    ]
+    assert hints["stages"]["406205"] == [
+        {
+            "enemy_id": 40620502,
+            "x": 11350,
+            "y": 3476,
+            "z": 0,
+            "face": 43,
+            "pattern": "compact_enemy_table",
+            "source_asset": "0QIU/e97e111e09e62fcf",
+        },
+        {
+            "enemy_id": 40620503,
+            "x": 11117,
+            "y": 3820,
+            "z": 0,
+            "face": 160,
+            "pattern": "map_monster_info_times",
+            "source_asset": "0QIU/e97e111e09e62fcf",
+        },
+        {
+            "enemy_id": 40620504,
+            "x": 11639,
+            "y": 2918,
+            "z": 0,
+            "face": 0,
+            "pattern": "map_monster_info_times",
+            "source_asset": "0QIU/e97e111e09e62fcf",
         },
     ]
     assert hints["stages"]["563903"] == [
