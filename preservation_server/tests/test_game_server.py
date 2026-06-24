@@ -145,6 +145,7 @@ from mhatsh_server.task_cfg_hints import (
     RECOVERED_ACT_MARKERS,
     RECOVERED_ACT_TASKS,
     RECOVERED_AREA_EVENT_TASKS,
+    RECOVERED_QUEST_CHAIN,
     RECOVERED_TASK_TEXT_HINTS,
     TASK_CFG_CONSTANT_COUNT,
     TASK_CFG_HINT_SOURCE,
@@ -1569,9 +1570,66 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
     assert hints["area_event_count"] == len(RECOVERED_AREA_EVENT_TASKS) == 75
     assert hints["act_marker_count"] == len(RECOVERED_ACT_MARKERS) == 21
     assert hints["act_task_count"] == len(RECOVERED_ACT_TASKS) == 15
+    assert hints["quest_chain_count"] == len(RECOVERED_QUEST_CHAIN) == 90
     assert hints["area_events"] == RECOVERED_AREA_EVENT_TASKS
     assert hints["act_markers"] == RECOVERED_ACT_MARKERS
     assert hints["act_tasks"] == RECOVERED_ACT_TASKS
+    assert hints["quest_chain"] == RECOVERED_QUEST_CHAIN
+    assert RECOVERED_QUEST_CHAIN[:5] == [
+        {
+            "constant_index": 258,
+            "kind": "act",
+            "task_id": 1010,
+            "task_type": 1,
+            "marker": "act1001",
+            "label": "\u7b49\u7ea7",
+            "objective": "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f",
+            "order": 1,
+        },
+        {
+            "constant_index": 422,
+            "kind": "area_event",
+            "task_id": 280101,
+            "task_type": 28,
+            "event_id": 280101,
+            "condition_id": 1,
+            "label": "\u9996\u6b21\u51fa\u51fb",
+            "objective": "\u9996\u6b21\u51fa\u51fb\uff01\u51fb\u8d25\u7ed1\u67b6\u4e8b\u4ef6\u7684\u654c\u4eba",
+            "order": 2,
+        },
+        {
+            "constant_index": 436,
+            "kind": "area_event",
+            "task_id": 100602,
+            "task_type": 28,
+            "event_id": 280102,
+            "condition_id": 1,
+            "label": "\u62ef\u6551\u5e02\u6c11",
+            "objective": "\u62ef\u6551\u51fa\u88ab\u7ed1\u67b6\u7684\u5e02\u6c11\u4eec",
+            "order": 3,
+        },
+        {
+            "constant_index": 448,
+            "kind": "area_event",
+            "task_id": 100701,
+            "task_type": 28,
+            "event_id": 280103,
+            "condition_id": 1,
+            "label": "\u843d\u5e55",
+            "objective": "\u6293\u6355\u7ed1\u67b6\u4e8b\u4ef6\u7684\u5e55\u540e\u654c\u4eba",
+            "order": 4,
+        },
+        {
+            "constant_index": 460,
+            "kind": "act",
+            "task_id": 100902,
+            "task_type": 1,
+            "marker": "act1111",
+            "label": "\u8c03\u67e5\u7ed3\u679c",
+            "objective": "\u524d\u5f80\u65b0\u5174\u533a\u57fa\u7ad9\u8fdb\u884c\u8ba4\u8bc1",
+            "order": 5,
+        },
+    ]
 
     act_by_marker = {item["marker"]: item for item in RECOVERED_ACT_MARKERS}
     assert act_by_marker["act1001"]["task_id"] == 1010
@@ -3840,12 +3898,23 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         "IsStart": 1,
         "IsEnd": 1,
     }
+    all_task_info = state.task_info()
+    assert [task["Id"] for task in all_task_info["tasks"][:6]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+        100602,
+        100701,
+        100902,
+    ]
     assert expected_type_one_tasks[1]["Id"] == 1010
     assert RECOVERED_ACT_TASK_RECORDS[0].label == "\u7b49\u7ea7"
     assert RECOVERED_ACT_TASK_RECORDS[0].objective == (
         "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f"
     )
     assert RECOVERED_ACT_TASK_RECORDS[0].source_marker == "act1001"
+    assert RECOVERED_ACT_TASK_RECORDS[0].source_kind == "act"
+    assert RECOVERED_ACT_TASK_RECORDS[0].quest_order == 1
     accept = state.accept(STARTER_TASK.id)
     assert accept["action_type"] == 1
     assert accept["task_info"]["Status"] == TASK_STATUS_ACCEPTED
@@ -3897,6 +3966,8 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_event_id == 280101
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_stage_id == 21111
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_relate_stage_id == 290101
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_kind == "area_event"
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].quest_order == 2
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
     assert area_task_update["task_info"]["Id"] == 280101

@@ -599,6 +599,12 @@ environment details are intentionally omitted from Git.
   followed by recovered type-1 story gates such as `act1001`, `act1111`, and
   `act1120`; no conditions are invented when the packed task config does not
   expose one.
+- The task parser now emits a 90-entry recovered quest chain that interleaves
+  the 15 non-area `act*` tasks with the 75 area-event tasks by their original
+  packed constant order. Runtime task records carry that `quest_order`, so
+  all-task listings preserve the recovered sequence (`act1001`, first-sortie
+  area tasks, `act1111`, and onward) while still keeping the local starter task
+  first for compatibility.
 - The 75 recovered `task_cfg.lua` area-event task links are now bridged to the
   75 parsed `areaevent_cfg.lua` combat stage rows in recovered order. The
   server exposes them as type-28 task records, keeps both task/event/stage IDs

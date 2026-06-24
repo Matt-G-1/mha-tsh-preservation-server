@@ -279,6 +279,36 @@ def collect_task_cfg_hints(
             }
         )
 
+    quest_chain: list[dict[str, object]] = []
+    for item in act_tasks:
+        quest_chain.append(
+            {
+                "constant_index": int(item["constant_index"]),
+                "kind": "act",
+                "task_id": int(item["task_id"]),
+                "task_type": int(item["task_type"]),
+                "marker": str(item["marker"]),
+                "label": str(item["label"]),
+                "objective": str(item["objective"]),
+            }
+        )
+    for item in area_events:
+        quest_chain.append(
+            {
+                "constant_index": int(item["constant_index"]),
+                "kind": "area_event",
+                "task_id": int(item["task_id"]),
+                "task_type": int(item["task_type"]),
+                "event_id": int(item["event_id"]),
+                "condition_id": int(item["condition_id"]),
+                "label": str(item["name"]),
+                "objective": str(item["description"]),
+            }
+        )
+    quest_chain.sort(key=lambda item: int(item["constant_index"]))
+    for order, item in enumerate(quest_chain, start=1):
+        item["order"] = order
+
     return {
         "source": TASK_CFG_SOURCE,
         "constant_count": len(constants),
@@ -286,10 +316,12 @@ def collect_task_cfg_hints(
         "area_event_count": len(area_events),
         "act_marker_count": len(act_markers),
         "act_task_count": len(act_tasks),
+        "quest_chain_count": len(quest_chain),
         "text_hints": text_hints,
         "area_events": area_events,
         "act_markers": act_markers,
         "act_tasks": act_tasks,
+        "quest_chain": quest_chain,
     }
 
 
@@ -298,6 +330,7 @@ def _emit_python_module(payload: dict[str, object]) -> str:
     area_events = payload["area_events"]
     act_markers = payload["act_markers"]
     act_tasks = payload["act_tasks"]
+    quest_chain = payload["quest_chain"]
     return (
         "from __future__ import annotations\n\n"
         "TASK_CFG_HINT_SOURCE = "
@@ -317,6 +350,9 @@ def _emit_python_module(payload: dict[str, object]) -> str:
         + "\n\n"
         "RECOVERED_ACT_TASKS = "
         + pformat(act_tasks, width=96, sort_dicts=False)
+        + "\n\n"
+        "RECOVERED_QUEST_CHAIN = "
+        + pformat(quest_chain, width=96, sort_dicts=False)
         + "\n"
     )
 
