@@ -915,6 +915,8 @@ class GameServer:
                 session,
                 session.tasks.submit(int(values.get("task_id") or 0)),
             )
+        elif name == "s_task_lock_trigger":
+            pass
         elif name == "s_task_sync_info":
             task_id = int(values.get("TaskId") or 0)
             params = list(values.get("ParamList") or [])
@@ -996,6 +998,16 @@ class GameServer:
                 await self._send_area_event_completion_for_task(
                     writer, session, completed_task_id
                 )
+        elif name == "s_act_client_trigger":
+            await self._send(
+                writer,
+                session,
+                "c_act_client_trigger_update",
+                session.activities.act_client_trigger(
+                    int(values.get("ActId") or 0),
+                    int(values.get("Id") or 0),
+                ),
+            )
         elif name == "s_training_enter":
             await self._enter_requested_stage(
                 writer,

@@ -77,6 +77,9 @@ environment details are intentionally omitted from Git.
   activity/task panels that can be reached from world UI probes:
   stage-activity info, activity-shop info, entrust-task list, secret-area task,
   USJ task, offline-PVP task, battlefield-task info, and group-map opening.
+- Activity client triggers now keep session state and reply with
+  `c_act_client_trigger_update` for `s_act_client_trigger`; `s_task_lock_trigger`
+  is accepted as a no-op because no recovered response packet exists.
 - The recovered lottery packet family is now partially implemented for
   compatibility: `s_lottery_load`, `s_lottery_choose_up`, and `s_lottery_draw`
   return schema-matched `c_lottery_load`, `c_lottery_choose_up`, and

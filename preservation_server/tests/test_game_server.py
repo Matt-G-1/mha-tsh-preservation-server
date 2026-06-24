@@ -4486,6 +4486,14 @@ def test_activity_state_returns_empty_compatibility_payloads() -> None:
     }
     assert state.group_open_map() == {"MapAttackArea": []}
     assert state.requested_group_maps == 1
+    assert state.act_client_trigger(17, 3) == {
+        "ActId": 17,
+        "List": [{"Id": 3, "State": 1}],
+    }
+    assert state.act_client_trigger(17, 5) == {
+        "ActId": 17,
+        "List": [{"Id": 3, "State": 1}, {"Id": 5, "State": 1}],
+    }
 
 
 def test_world_state_records_movement_frames_and_errors() -> None:
@@ -9608,6 +9616,8 @@ async def _run_activity_and_side_task_requests() -> None:
         ("s_offlinepvp_task", {}),
         ("s_battlefield_task_info", {}),
         ("s_group_open_map", {}),
+        ("s_act_client_trigger", {"ActId": 17, "Id": 3}),
+        ("s_task_lock_trigger", {"task_id": 100602, "IsLock": 1}),
         ("s_theater_open", {}),
         ("s_theater_unlock", {"StageId": 880101}),
         ("s_theater_bonus", {"CfgType": 1, "BonusIdx": 2}),
@@ -9647,6 +9657,7 @@ async def _run_activity_and_side_task_requests() -> None:
         "c_offlinepvp_task",
         "c_battlefield_task_info",
         "c_group_open_map",
+        "c_act_client_trigger_update",
         "c_theater_open",
         "c_theater_unlock",
         "c_theater_bonus",
@@ -9706,25 +9717,29 @@ async def _run_activity_and_side_task_requests() -> None:
     assert codec.decode_message("c_group_open_map", replies[11][1]) == {
         "MapAttackArea": []
     }
-    theater_open = codec.decode_message("c_theater_open", replies[12][1])
+    assert codec.decode_message("c_act_client_trigger_update", replies[12][1]) == {
+        "ActId": 17,
+        "List": [{"Id": 3, "State": 1}],
+    }
+    theater_open = codec.decode_message("c_theater_open", replies[13][1])
     assert len(theater_open["StageInfo"]) == len(ALLSVR_STAGES)
     assert theater_open["StageInfo"][0]["Id"] == 880101
     assert theater_open["StageInfo"][0]["Status"] == 1
     assert theater_open["UserContri"] == 0
-    assert codec.decode_message("c_theater_unlock", replies[13][1]) == {
+    assert codec.decode_message("c_theater_unlock", replies[14][1]) == {
         "StageId": 880101,
         "Status": 1,
     }
-    assert codec.decode_message("c_theater_bonus", replies[14][1]) == {
+    assert codec.decode_message("c_theater_bonus", replies[15][1]) == {
         "CfgType": 1,
         "BonusIdx": 2,
         "Reward": [{"Id": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 1}],
     }
-    assert codec.decode_message("c_theater_chapterbonus", replies[15][1]) == {
+    assert codec.decode_message("c_theater_chapterbonus", replies[16][1]) == {
         "chapterid": 1,
         "starIdx": 3,
     }
-    assert codec.decode_message("c_theater_finish", replies[16][1]) == {
+    assert codec.decode_message("c_theater_finish", replies[17][1]) == {
         "newChapterInfo": [{"Id": 1, "Status": 1}],
         "newStageInfo": [{"Id": 880101, "Status": 1}],
     }

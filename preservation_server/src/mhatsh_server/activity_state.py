@@ -8,6 +8,7 @@ class ActivityState:
     requested_activity_types: list[int] = field(default_factory=list)
     requested_group_maps: int = 0
     entrust_list_version: int = 1
+    client_triggers: dict[int, set[int]] = field(default_factory=dict)
 
     def stage_activity_info(self) -> dict[str, object]:
         return {"ProgressInfo": []}
@@ -42,3 +43,17 @@ class ActivityState:
     def group_open_map(self) -> dict[str, object]:
         self.requested_group_maps += 1
         return {"MapAttackArea": []}
+
+    def act_client_trigger(self, act_id: int, trigger_id: int) -> dict[str, object]:
+        numeric_act_id = int(act_id)
+        numeric_trigger_id = int(trigger_id)
+        triggers = self.client_triggers.setdefault(numeric_act_id, set())
+        if numeric_trigger_id > 0:
+            triggers.add(numeric_trigger_id)
+        return {
+            "ActId": numeric_act_id,
+            "List": [
+                {"Id": item, "State": 1}
+                for item in sorted(triggers)
+            ],
+        }
