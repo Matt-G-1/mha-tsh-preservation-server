@@ -4415,6 +4415,12 @@ def test_stage_progress_persists_across_server_instances(tmp_path: Path) -> None
     asyncio.run(_run_stage_progress_persistence(tmp_path))
 
 
+def test_area_event_task_progress_restores_from_stage_progress(
+    tmp_path: Path,
+) -> None:
+    asyncio.run(_run_area_event_task_progress_persistence(tmp_path))
+
+
 def test_stage_family_progress_persists_across_server_instances(
     tmp_path: Path,
 ) -> None:
@@ -4736,6 +4742,75 @@ async def _run_stage_progress_persistence(tmp_path: Path) -> None:
         {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Amount": 2},
         {"ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID, "Amount": 1},
     ]
+
+
+async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    profile_path = tmp_path / "profiles.json"
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_PROFILE_STORE": str(profile_path),
+            "MHATSH_ROSTER_MODE": "verified",
+        },
+    ):
+        first_game = GameServer(registry)
+        first_writer = BufferWriter()
+        first_session = Session(
+            seed=1,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x61726561),
+            urs="local-guest",
+            uid=4242,
+        )
+        first_game._configure_session(first_session)
+        area_over = codec.encode_message(
+            "s_area_event_fight_over",
+            {"StageId": 21111, "IsWin": 1, "UseTime": 12},
+        )
+        await first_game._dispatch(
+            first_session,
+            registry.protocol_ids["s_area_event_fight_over"],
+            area_over,
+            first_writer,
+        )
+        decoder = FrameDecoder(RollingXor(0x61726561))
+        replies = decoder.feed(bytes(first_writer.data))
+        assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+            "c_area_event_stage_pass",
+            "c_area_event_info",
+            "c_task_info_update",
+        ]
+        task_update = codec.decode_message("c_task_info_update", replies[2][1])
+        assert task_update["task_info"]["Id"] == 280101
+        assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+
+        second_game = GameServer(registry)
+        second_session = Session(
+            seed=2,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x61726562),
+            urs="local-guest",
+            uid=4242,
+        )
+        second_game._configure_session(second_session)
+
+    raw_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    saved_stage = raw_profile["stage_progress"]["local-guest"]["21111"]
+    assert saved_stage["status"] == 1
+    assert saved_stage["pass_count"] == 1
+
+    restored_area_tasks = second_session.tasks.task_info(
+        RECOVERED_AREA_EVENT_TASK_TYPE
+    )
+    restored_first_task = restored_area_tasks["tasks"][0]
+    assert restored_first_task["Id"] == 280101
+    assert restored_first_task["Status"] == TASK_STATUS_FINISHED
+    assert restored_first_task["Cond"][0]["CompCount"] == 1
+    assert 280101 in restored_area_tasks["finishs"]
 
 
 async def _run_stage_family_progress_persistence(tmp_path: Path) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Iterable
 
 from .beginner_quest import (
     STARTER_GUIDE_STEP,
@@ -135,6 +136,18 @@ class TaskState:
             condition.completed_count = max(condition.completed_count, 1)
         self._finish(live_task)
         return self.task_update(live_task, action_type=2)
+
+    def seed_completed_area_event_stages(
+        self, stage_ids: Iterable[int]
+    ) -> None:
+        for stage_id in stage_ids:
+            task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID.get(int(stage_id))
+            if task is None:
+                continue
+            live_task = self._task(task.id)
+            for condition in live_task.conditions:
+                condition.completed_count = max(condition.completed_count, 1)
+            self._finish(live_task)
 
     def should_spawn_beginner_npc(self, task_id: int) -> bool:
         if task_id != STARTER_TASK.id:

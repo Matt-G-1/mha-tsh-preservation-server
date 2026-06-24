@@ -2143,6 +2143,11 @@ class GameServer:
         session.stage.load_family_progress(
             self.profile_store.stage_family_progress.get(session.urs, {})
         )
+        session.tasks.seed_completed_area_event_stages(
+            stage_id
+            for stage_id, completion in session.stage.completions.items()
+            if completion.status == 1 and completion.pass_count > 0
+        )
         session.world_tasks.city_level = self.city_level
         if self.skip_starter_quest:
             session.tasks.skip_starter_quest()

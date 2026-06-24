@@ -598,6 +598,11 @@ environment details are intentionally omitted from Git.
   in the condition params, and marks the matching task finished once when an
   area-event stage is won, starting with `280101` -> stage `21111` for
   "首次出击".
+- Recovered area-event task completion now restores from saved stage progress:
+  when a profile already has a passed area-event stage, the next session seeds
+  the paired recovered task as finished with its condition complete. This keeps
+  quest state from regressing after reconnects or server restarts without
+  introducing a separate hand-authored task save format.
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.
