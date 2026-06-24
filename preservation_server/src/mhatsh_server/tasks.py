@@ -97,6 +97,16 @@ class TaskRecord:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class QuestNpcReference:
+    npc_id: int
+    task_id: int
+    quest_order: int
+    label: str
+    objective: str
+    drama_refs: tuple[str, ...] = ()
+
+
 class TaskState:
     def __init__(self) -> None:
         self.tasks: dict[int, TaskRecord] = {
@@ -403,6 +413,40 @@ RECOVERED_ACT_TASK_RECORDS = _recovered_act_task_records()
 RECOVERED_ACT_TASKS_BY_ID = {task.id: task for task in RECOVERED_ACT_TASK_RECORDS}
 RECOVERED_ACT_TASK_ORDER = {
     task.id: index for index, task in enumerate(RECOVERED_ACT_TASK_RECORDS)
+}
+
+
+def _recovered_quest_npc_references() -> tuple[QuestNpcReference, ...]:
+    references: list[QuestNpcReference] = []
+    tasks = sorted(
+        (*RECOVERED_ACT_TASK_RECORDS, *RECOVERED_AREA_EVENT_TASK_RECORDS),
+        key=lambda task: (task.quest_order or 999999, task.id),
+    )
+    for task in tasks:
+        if task.quest_order <= 0:
+            continue
+        for npc_id in task.nearby_npc_ids:
+            references.append(
+                QuestNpcReference(
+                    npc_id=int(npc_id),
+                    task_id=task.id,
+                    quest_order=task.quest_order,
+                    label=task.label,
+                    objective=task.objective,
+                    drama_refs=task.drama_refs,
+                )
+            )
+    return tuple(references)
+
+
+RECOVERED_QUEST_NPC_REFERENCES = _recovered_quest_npc_references()
+RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID: dict[int, tuple[QuestNpcReference, ...]] = {
+    npc_id: tuple(
+        reference
+        for reference in RECOVERED_QUEST_NPC_REFERENCES
+        if reference.npc_id == npc_id
+    )
+    for npc_id in sorted({reference.npc_id for reference in RECOVERED_QUEST_NPC_REFERENCES})
 }
 
 

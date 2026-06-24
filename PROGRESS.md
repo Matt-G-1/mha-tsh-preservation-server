@@ -604,6 +604,11 @@ environment details are intentionally omitted from Git.
   found sparse task keys such as `CreateNpc`, `SceneId`, `AccNpc`, and
   `SubNpc`, but the main early chain does not yet expose enough stable
   coordinate data to spawn those NPCs authoritatively.
+- The task runtime now also builds an internal recovered quest-NPC reference
+  index from those rows. The ordered chain currently references 23 NPC IDs,
+  including early unknown/model-unverified quest IDs like `6669` alongside
+  cataloged NPCs such as `5012`, giving the next NPC/dialog pass a concrete
+  task-to-NPC map without adding speculative scene spawns.
 - Non-area-event `act*` task markers are now promoted into task state as
   recovered records with derived task type, label, objective, and source
   marker metadata. The starter task remains first for the archived client path,

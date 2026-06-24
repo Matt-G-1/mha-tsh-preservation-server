@@ -189,6 +189,8 @@ from mhatsh_server.tasks import (
     RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID,
     RECOVERED_AREA_EVENT_TASK_RECORDS,
     RECOVERED_AREA_EVENT_TASK_TYPE,
+    RECOVERED_QUEST_NPC_REFERENCES,
+    RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID,
     STARTER_GUIDE_ID,
     STARTER_GUIDE_STEP,
     STARTER_TASK,
@@ -4022,6 +4024,15 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         "xht_103",
         "\u533a\u57df\u4e8b\u4ef6|280101|1",
         "act_event1-1",
+    )
+    assert len({reference.npc_id for reference in RECOVERED_QUEST_NPC_REFERENCES}) == 23
+    assert RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID[6669][0].task_id == 100602
+    assert RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID[6669][0].label == (
+        "\u62ef\u6551\u5e02\u6c11"
+    )
+    assert RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID[5012][0].task_id == 100902
+    assert RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID[5012][0].drama_refs == (
+        "act1111",
     )
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
