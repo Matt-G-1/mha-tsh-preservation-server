@@ -91,11 +91,14 @@ class RosterState:
         return {
             "UserUId": user_uid,
             "HeroId": card.hero_id,
-            "Fighting": 1,
+            "Fighting": self.card_fighting(card),
             "Vitality": 100,
             "ShapeId": card.shape_id,
             "MLv": self.hero_level,
         }
+
+    def card_fighting(self, card: RosterCard) -> int:
+        return int(playable_card(card.character, card.card_uid)["Fighting"])
 
     def scene_hero_change(self, user_uid: int) -> dict[str, object]:
         return {
@@ -120,10 +123,4 @@ class RosterState:
         }
 
     def _card_to_protocol(self, card: RosterCard) -> dict[str, object]:
-        values = playable_card(
-            card.character,
-            card.card_uid,
-            level=self.hero_level,
-        )
-        values["Fighting"] = int(card.card_uid == self.active_card_uid)
-        return values
+        return playable_card(card.character, card.card_uid, level=self.hero_level)

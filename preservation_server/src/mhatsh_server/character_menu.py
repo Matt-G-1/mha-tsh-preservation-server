@@ -252,8 +252,15 @@ class CharacterMenuState:
             ]
         }
 
-    def training_hero_info(self, roster: RosterState) -> dict[str, object]:
+    def training_hero_info(
+        self, roster: RosterState, hero_id: int = 0
+    ) -> dict[str, object]:
         active = roster.active_card
+        if hero_id:
+            for card in roster.cards.values():
+                if card.hero_id == int(hero_id):
+                    active = card
+                    break
         active_skill_level = fight_style_for_character(
             active.character
         ).protocol_skill_levels(roster.hero_level)

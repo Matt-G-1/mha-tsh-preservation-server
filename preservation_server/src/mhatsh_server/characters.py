@@ -9,6 +9,13 @@ CATALOG_SOURCE = (
     "User-supplied AXMD raw-rip list plus en_hero_cfg evidence, 2026-06-15"
 )
 
+# hero_cfg VmInfo.TrainCardList uses these built-in card defaults.
+DEFAULT_CARD_FIGHTING = 9999
+DEFAULT_CARD_EXP = 9999
+DEFAULT_CARD_SATIETY = 694
+DEFAULT_CARD_WORKOUT_LEVEL = 10
+DEFAULT_CARD_RESONATE_LEVEL = 5
+
 
 @dataclass(frozen=True, slots=True)
 class PlayableCharacter:
@@ -413,14 +420,14 @@ def playable_card(
         "Uid": card_uid,
         "HeroId": character.hero_id,
         "Lv": max(1, int(level)),
-        "Exp": 0,
+        "Exp": DEFAULT_CARD_EXP,
         "ShapeId": character.shape_id,
         "FashionId": 0,
-        "Fighting": 0,
-        "Satiety": 0,
-        "WorkoutLv": 0,
+        "Fighting": DEFAULT_CARD_FIGHTING,
+        "Satiety": DEFAULT_CARD_SATIETY,
+        "WorkoutLv": DEFAULT_CARD_WORKOUT_LEVEL,
         "WorkoutItem": [],
-        "ResonateLv": 0,
+        "ResonateLv": DEFAULT_CARD_RESONATE_LEVEL,
         "ResonatePiece": [],
         "IsLock": 0,
         "IsLockSkill": [],

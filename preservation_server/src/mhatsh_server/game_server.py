@@ -68,6 +68,8 @@ STARTER_SCENE_ID = 1000
 STARTER_SCENE_X = 4221
 STARTER_SCENE_Y = 19931
 STARTER_SCENE_Z = 0
+LOCAL_TEAM_UID = 10001
+DEFAULT_AGENCY_STAGE_ID = 21111
 
 def _env_enabled(name: str, default: str) -> bool:
     return os.environ.get(name, default).lower() not in {"0", "false", "no", "skip"}
@@ -736,6 +738,92 @@ class GameServer:
                     [int(item) for item in list(values.get("Extra") or [])],
                 ),
             )
+        elif name == "s_team_search":
+            roster = self._ensure_roster(session)
+            play_id = int(values.get("PlayId") or 0)
+            extra = [int(item) for item in list(values.get("Extra") or [])]
+            await self._send(
+                writer,
+                session,
+                "c_team_search",
+                {
+                    "PlayId": play_id,
+                    "SearchList": [
+                        self._team_search_info(session, roster, play_id, extra)
+                    ],
+                    "IsAuto": int(values.get("IsAuto") or 0),
+                },
+            )
+        elif name == "s_team_search_multi":
+            roster = self._ensure_roster(session)
+            extra = [int(item) for item in list(values.get("Extra") or [])]
+            await self._send(
+                writer,
+                session,
+                "c_team_search_multi",
+                {
+                    "List": [
+                        {
+                            "PlayId": int(play_id),
+                            "SearchList": [
+                                self._team_search_info(
+                                    session, roster, int(play_id), extra
+                                )
+                            ],
+                        }
+                        for play_id in list(values.get("PlayId") or [])
+                    ],
+                    "IsAuto": int(values.get("IsAuto") or 0),
+                },
+            )
+        elif name == "s_team_new":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_team_new",
+                {
+                    "TeamInfo": self._team_info(
+                        session, roster, int(values.get("PlayId") or 0)
+                    )
+                },
+            )
+        elif name == "s_team_apply_join":
+            await self._send(writer, session, "c_team_apply_join", {"IsSucc": 1})
+        elif name == "s_team_match":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_team_match",
+                {
+                    "MatchVal": [
+                        int(item) for item in list(values.get("MatchVal") or [])
+                    ]
+                },
+            )
+            await self._send(
+                writer,
+                session,
+                "c_team_new",
+                {"TeamInfo": self._team_info(session, roster, 11, matching=1)},
+            )
+        elif name == "s_team_ready":
+            await self._send(
+                writer,
+                session,
+                "c_team_ready",
+                {"Uid": session.uid, "IsReady": int(values.get("IsReady") or 0)},
+            )
+        elif name == "s_team_play_start":
+            await self._enter_requested_stage(
+                writer,
+                session,
+                self._team_play_stage_id(
+                    int(values.get("PlayId") or 0),
+                    [int(item) for item in list(values.get("Extra") or [])],
+                ),
+            )
         elif name == "s_area_event_switch_hero":
             roster = self._ensure_roster(session)
             try:
@@ -925,7 +1013,9 @@ class GameServer:
                 writer,
                 session,
                 "c_training_hero_info",
-                session.character_menu.training_hero_info(roster),
+                session.character_menu.training_hero_info(
+                    roster, int(values.get("HeroId") or 0)
+                ),
             )
         elif name == "s_attached_card_book":
             await self._send(
@@ -2389,7 +2479,9 @@ class GameServer:
                 int(values.get("iImageLevel") or 0),
             )
         elif name == "s_client_error":
-            session.world.record_client_error(str(values.get("Msg") or ""))
+            msg = str(values.get("Msg") or "")
+            session.world.record_client_error(msg)
+            await self._recover_waiting_client_error(writer, session, msg)
         elif name == "s_time_ping":
             # Local replies can beat the archived client's callback setup.
             if self.ping_response_delay:
@@ -2406,6 +2498,130 @@ class GameServer:
         else:
             session.world.record_unhandled_message(name, protocol_id, values)
             LOG.warning("unhandled %d %s %s", protocol_id, name, rendered)
+
+    async def _recover_waiting_client_error(
+        self, writer: asyncio.StreamWriter, session: Session, msg: str
+    ) -> None:
+        if "wait[c_team_search" in msg:
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_team_search",
+                {
+                    "PlayId": 0,
+                    "SearchList": [self._team_search_info(session, roster, 0, [])],
+                    "IsAuto": 0,
+                },
+            )
+            return
+        if "wait[c_training_info" not in msg:
+            return
+        roster = self._ensure_roster(session)
+        await self._send(
+            writer,
+            session,
+            "c_training_info",
+            session.character_menu.training_info(roster),
+        )
+
+    def _team_search_info(
+        self,
+        session: Session,
+        roster: RosterState,
+        play_id: int,
+        extra: list[int],
+    ) -> dict[str, Any]:
+        active = roster.active_card
+        return {
+            "Uid": LOCAL_TEAM_UID,
+            "Leader": session.uid,
+            "Lv": self.player_level,
+            "TotalScore": roster.card_fighting(active),
+            "Message": "Local Preservation Team",
+            "SearcLv": 0,
+            "Extra": [
+                {"Key": index + 1, "Val": int(value)}
+                for index, value in enumerate(extra)
+            ],
+            "Members": [
+                {
+                    "Uid": session.uid,
+                    "Name": "Local Hero",
+                    "Lv": self.player_level,
+                    "TopLv": 0,
+                    "MId": active.hero_id,
+                    "AvatarId": 0,
+                    "AvatarFrameId": 0,
+                    "LeagueUid": 0,
+                }
+            ],
+            "Robot": [],
+        }
+
+    def _team_info(
+        self,
+        session: Session,
+        roster: RosterState,
+        play_id: int,
+        *,
+        matching: int = 0,
+    ) -> dict[str, Any]:
+        active = roster.active_card
+        return {
+            "Uid": LOCAL_TEAM_UID,
+            "Leader": session.uid,
+            "Lv": self.player_level,
+            "TotalScore": roster.card_fighting(active),
+            "Message": "Local Preservation Team",
+            "SearcLv": 0,
+            "Applys": [],
+            "Members": [self._team_member_info(session, roster)],
+            "PlayId": play_id,
+            "AutoAcc": 1,
+            "Matching": matching,
+            "Extra": [],
+            "Robots": [],
+        }
+
+    def _team_member_info(
+        self, session: Session, roster: RosterState
+    ) -> dict[str, Any]:
+        active = roster.active_card
+        return {
+            "Uid": session.uid,
+            "Name": "Local Hero",
+            "Index": 1,
+            "Lv": self.player_level,
+            "TopLv": 0,
+            "MId": active.hero_id,
+            "MLv": roster.hero_level,
+            "RecentHeroList": [{"HeroId": active.hero_id, "Lv": roster.hero_level}],
+            "AvatarId": 0,
+            "AvatarFrameId": 0,
+            "ShapeId": active.shape_id,
+            "IsReady": 1,
+            "OffTime": 0,
+            "Fighting": roster.card_fighting(active),
+            "Vitality": 100,
+            "ServerName": 1,
+            "LeagueUid": 0,
+            "VoiceId": 0,
+            "Title": 0,
+            "Extra": [],
+        }
+
+    def _team_play_stage_id(self, play_id: int, extra: list[int]) -> int:
+        if play_id == 11:
+            return DEFAULT_AGENCY_STAGE_ID
+        for value in extra:
+            try:
+                stage_candidate_by_id(int(value))
+            except KeyError:
+                continue
+            else:
+                return int(value)
+        return DEFAULT_AGENCY_STAGE_ID
 
     def _apply_verify_identity(self, session: Session, raw_verify: Any) -> None:
         if not isinstance(raw_verify, str):
@@ -2748,7 +2964,7 @@ class GameServer:
             "Exp": 0,
             "HeroId": active.hero_id,
             "CardUid": active.card_uid,
-            "Fighting": roster.hero_level * 1000 + active.hero_id,
+            "Fighting": roster.card_fighting(active),
             "AvatarId": 0,
             "AvatarFrameId": 0,
             "RobotId": 0,

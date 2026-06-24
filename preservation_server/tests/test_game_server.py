@@ -67,6 +67,11 @@ from mhatsh_server.mail import MailState, MailRecord
 from mhatsh_server.characters import (
     CATALOG_SOURCE,
     CHIBI_MODEL_ASSETS,
+    DEFAULT_CARD_EXP,
+    DEFAULT_CARD_FIGHTING,
+    DEFAULT_CARD_RESONATE_LEVEL,
+    DEFAULT_CARD_SATIETY,
+    DEFAULT_CARD_WORKOUT_LEVEL,
     DEATH_ARMS,
     DEATH_ARMS_DEMO_SPAWN,
     DEMO_CAST_MAP_SPAWNS,
@@ -576,7 +581,7 @@ def roster_card(
     character,
     card_uid: int,
     *,
-    fighting: int = 0,
+    fighting: int = DEFAULT_CARD_FIGHTING,
     level: int = 1,
 ) -> dict[str, object]:
     values = playable_card(character, card_uid, level=level)
@@ -587,6 +592,16 @@ def roster_card(
 def test_starter_identity_matches_archived_midoriya_config() -> None:
     assert STARTER_HERO_ID == 1011
     assert STARTER_SHAPE_ID == 1001
+
+
+def test_playable_card_uses_recovered_training_defaults() -> None:
+    card = playable_card(STARTER_CHARACTER, STARTER_CARD_UID, level=70)
+    assert card["Lv"] == 70
+    assert card["Exp"] == DEFAULT_CARD_EXP
+    assert card["Fighting"] == DEFAULT_CARD_FIGHTING
+    assert card["Satiety"] == DEFAULT_CARD_SATIETY
+    assert card["WorkoutLv"] == DEFAULT_CARD_WORKOUT_LEVEL
+    assert card["ResonateLv"] == DEFAULT_CARD_RESONATE_LEVEL
 
 
 def test_world_config_hints_promote_recovered_caps() -> None:
@@ -4782,7 +4797,6 @@ async def _run_player_responses() -> None:
             roster_card(
                 character,
                 STARTER_CARD_UID + index,
-                fighting=int(index == 0),
             )
             for index, character in enumerate(INITIAL_PLAYABLE_ROSTER)
         ],
@@ -4972,7 +4986,6 @@ async def _run_expanded_roster_cards() -> None:
         roster_card(
             character,
             STARTER_CARD_UID + index,
-            fighting=int(index == 0),
             level=PLAYER_LEVEL_CAP,
         )
         for index, character in enumerate(VERIFIED_PLAYABLE_ROSTER)
@@ -5457,7 +5470,7 @@ async def _run_character_roster_requests() -> None:
     assert codec.decode_message("c_team_change_hero", replies[0][1]) == {
         "UserUId": 4242,
         "HeroId": 1061,
-        "Fighting": 1,
+        "Fighting": DEFAULT_CARD_FIGHTING,
         "Vitality": 100,
         "ShapeId": 1006,
         "MLv": 1,
@@ -5487,6 +5500,75 @@ async def _run_character_roster_requests() -> None:
         "PlayId": 7,
         "Extra": [{"Key": "1", "Val": 11}, {"Key": "2", "Val": 22}],
     }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x44556678)
+    team_search = codec.encode_message(
+        "s_team_search",
+        {"PlayId": 11, "Extra": [7, 0, 0], "IsAuto": 1},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_team_search"],
+        team_search,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x44556678))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_team_search"
+    decoded_team_search = codec.decode_message("c_team_search", reply_body)
+    assert decoded_team_search["PlayId"] == 11
+    assert decoded_team_search["IsAuto"] == 1
+    [team_result] = decoded_team_search["SearchList"]
+    assert team_result["Leader"] == 4242
+    assert team_result["Lv"] == 1
+    assert team_result["TotalScore"] == DEFAULT_CARD_FIGHTING
+    assert team_result["Members"][0]["MId"] == 1061
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x44556679)
+    team_play_start = codec.encode_message(
+        "s_team_play_start",
+        {"PlayId": 11, "Extra": [7, 0, 0]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_team_play_start"],
+        team_play_start,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x44556679))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 21111
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x4455667A)
+    team_match = codec.encode_message(
+        "s_team_match",
+        {"MatchVal": [211, 222, 237, 241, 264]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_team_match"],
+        team_match,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x4455667A))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_team_match",
+        "c_team_new",
+    ]
+    assert codec.decode_message("c_team_match", replies[0][1]) == {
+        "MatchVal": [211, 222, 237, 241, 264]
+    }
+    team_info = codec.decode_message("c_team_new", replies[1][1])["TeamInfo"]
+    assert team_info["Leader"] == 4242
+    assert team_info["Matching"] == 1
 
     writer.data.clear()
     session.outbound = RollingXor(0x55667788)
@@ -6773,6 +6855,30 @@ async def _run_character_menu_requests() -> None:
     ]
 
     writer.data.clear()
+    session.outbound = RollingXor(0x1122448B)
+    requested_training = codec.encode_message("s_training_hero_info", {"HeroId": 1061})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_training_hero_info"],
+        requested_training,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x1122448B))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_training_hero_info"
+    requested_info = codec.decode_message("c_training_hero_info", reply_body)
+    expected_iida_card_uid = STARTER_CARD_UID + next(
+        index
+        for index, character in enumerate(VERIFIED_PLAYABLE_ROSTER)
+        if character.hero_id == 1061
+    )
+    assert requested_info["TrainingData"]["HeroId"] == 1061
+    assert requested_info["TrainingData"]["CardUid"] == expected_iida_card_uid
+    assert requested_info["TrainingData"]["CardSkillLevel"][0]["HeroUid"] == (
+        expected_iida_card_uid
+    )
+
+    writer.data.clear()
     session.outbound = RollingXor(0x1122448A)
     support_clear = codec.encode_message(
         "s_card_support_skill",
@@ -7495,6 +7601,59 @@ async def _run_world_telemetry() -> None:
     assert writer.data == bytearray()
     assert session.world.client_errors == ["wait[c_time_ping]"]
 
+    writer.data.clear()
+    session.outbound = RollingXor(0xABCDEF07)
+    error = codec.encode_message(
+        "s_client_error",
+        {
+            "Msg": (
+                "local-guest:BlockMsg:OnConnected,SendPto[s_training_info],"
+                "wait[c_training_info,c_feedback_message]"
+            )
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_client_error"],
+        error,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xABCDEF07))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_training_info"
+    assert codec.decode_message("c_training_info", reply_body) == {
+        "HeroData": [
+            {"HeroCId": character.hero_id, "FinishList": [], "GetList": []}
+            for character in game.playable_roster
+        ]
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xABCDEF08)
+    error = codec.encode_message(
+        "s_client_error",
+        {
+            "Msg": (
+                "local-guest:BlockMsg:OnConnected,SendPto[s_team_search],"
+                "wait[c_team_search,c_feedback_message]"
+            )
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_client_error"],
+        error,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xABCDEF08))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_team_search"
+    decoded_team_search = codec.decode_message("c_team_search", reply_body)
+    assert decoded_team_search["PlayId"] == 0
+    assert decoded_team_search["IsAuto"] == 0
+    assert decoded_team_search["SearchList"][0]["Leader"] == 10001
+
+    writer.data.clear()
     await game._dispatch(session, 9999, b"", writer)
     assert writer.data == bytearray()
     assert session.world.unhandled_messages == [
