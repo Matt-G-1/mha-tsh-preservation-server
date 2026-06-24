@@ -714,7 +714,11 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     ruxue = stage_candidate_by_key("ruxue_intro_drama_scripts")
     assert ruxue.stage_id is None
     assert "zx_ruxue03_2" in ruxue.scripts
+    assert "PLOT_zx_ruxue02_05" in ruxue.audio_events
+    assert "PLOT_copyright_zx_ruxue03_2_1_06" in ruxue.audio_events
     assert "PLOT_zx_ruxue03_2_09" in ruxue.audio_events
+    assert "zx_exam_001" in ruxue.actor_sets
+    assert "zx_ruxue03_2_1_06" in ruxue.actor_sets
     assert "video/zx/chapter2/ruxue_1.flv" in ruxue.video_assets
     assert "zx_usj_007" in stage_candidate_by_key("usj_drama_scripts").scripts
     beach = stage_candidate_by_key("beach_event_scripts")
@@ -726,6 +730,9 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "zx_shangyejie1" in stage_candidate_by_key(
         "commercial_street_scripts"
     ).scripts
+    assert "zx_shangyejie_10" in stage_candidate_by_key(
+        "commercial_street_scripts"
+    ).actor_sets
     chapter1 = stage_candidate_by_key("stage_cfg_chapter1_zx_evidence")
     assert chapter1.stage_id is None
     assert "zx_2_7" in chapter1.scripts
@@ -5118,6 +5125,10 @@ def test_requested_stage_enter_packets_start_combat_stages() -> None:
     asyncio.run(_run_requested_stage_enter_packets())
 
 
+def test_verified_roster_characters_can_enter_combat_with_skill_payloads() -> None:
+    asyncio.run(_run_verified_roster_stage_entry_payloads())
+
+
 def test_stage_enter_can_emit_recovered_encounter_npcs() -> None:
     asyncio.run(_run_stage_enter_encounter_npcs())
 
@@ -6338,6 +6349,58 @@ async def _run_requested_stage_enter_packets() -> None:
         "Star": 3,
     }
     assert session.stage.completions[21111].pass_count == 1
+
+
+async def _run_verified_roster_stage_entry_payloads() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    with patch.dict(os.environ, {"MHATSH_ROSTER_MODE": "verified"}, clear=False):
+        game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x66110000),
+    )
+
+    for index, character in enumerate(VERIFIED_PLAYABLE_ROSTER):
+        assert character.hero_id is not None
+        assert character.shape_id is not None
+        writer.data.clear()
+        xor_seed = 0x66110000 + index + 1
+        session.outbound = RollingXor(xor_seed)
+        request = codec.encode_message(
+            "s_training_enter",
+            {"HeroCId": character.hero_id, "StageId": 502601},
+        )
+
+        await game._dispatch(
+            session,
+            registry.protocol_ids["s_training_enter"],
+            request,
+            writer,
+        )
+
+        decoder = FrameDecoder(RollingXor(xor_seed))
+        replies = decoder.feed(bytes(writer.data))
+        assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+            "c_stage_enter",
+            "c_frame_fighter_data",
+        ]
+        stage_enter = codec.decode_message("c_stage_enter", replies[0][1])
+        assert stage_enter["StageId"] == 502601
+        fighter = codec.decode_message("c_frame_fighter_data", replies[1][1])
+        assert fighter["HeroId"] == character.hero_id
+        assert fighter["CardUid"] == session.roster.active_card_uid
+        assert fighter["Heros"][0]["HeroId"] == character.hero_id
+        assert fighter["Heros"][0]["ShapeId"] == character.shape_id
+        assert fighter["Heros"][0]["CardSkillLevel"] == fight_style_for_character(
+            character
+        ).protocol_skill_levels(session.roster.hero_level)
+        assert session.stage.current_stage_key == "all_might_stage_502601"
+        assert session.roster.active_card.character == character
 
 
 async def _run_stage_family_info_packets() -> None:

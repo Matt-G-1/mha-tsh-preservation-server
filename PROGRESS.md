@@ -502,10 +502,23 @@ environment details are intentionally omitted from Git.
   into enterable stage definitions instead of remaining loose script evidence.
   This adds 51 recovered stage IDs, including `101002`, `404001`, and
   `801201`, while keeping exact authored spawns as future parse work.
+- The battle-stage catalog extractor now preserves all concrete `zx_*` asset
+  tokens it sees, not just the starter `battle`/`lvb`/`ruxue` prefixes. Runtime
+  evidence clusters now retain the recovered `zx_exam_*` intro exam assets,
+  `zx_shangyejie_10`, expanded `zx_ruxue02`/`zx_ruxue03_2_1` actor tokens, and
+  the full recovered ruxue/battle plot-audio set. A direct catalog comparison
+  leaves only generic search-pattern labels (`zx_battle`, `zx_lvb`,
+  `zx_ruxue`) unpromoted rather than concrete recovered asset names.
 - Fight-style resolution now produces deterministic style-effect telemetry:
   control, resource delta, mobility, defense, pressure, and per-enemy threat
   hints. Stage lifecycle compatibility now covers stage frame reports,
   play-sync echoing, is-back checks, stage leave, and quick-reborn telemetry.
+- A roster-wide combat-entry audit now drives every verified public playable
+  character through `s_training_enter` into a recovered combat stage and checks
+  the returned fighter payload for the selected HeroId, CardUid, ShapeId, and
+  recovered `CardSkillLevel` list. This proves the current 26-character roster
+  is not merely serialized in menus; each card can be selected into a stage
+  with its own combat-skill payload.
 - Stage combat resolution now uses actual encounter HP values from recovered
   and generated spawns when estimating defeated targets. Star scoring now
   distinguishes base pass, full encounter clear, and clean/fast clear, and a

@@ -32,7 +32,7 @@ def collect_asset_names(candidates: list[dict[str, Any]]) -> dict[str, set[str]]
     clusters: dict[str, set[str]] = defaultdict(set)
     for item in candidates:
         for name in item.get("names", []):
-            for token in re.findall(r"zx_(?:battle|lvb|ruxue)[a-z0-9_+]*", name):
+            for token in re.findall(r"zx_[a-z0-9_+]+", name):
                 clusters[token].add(name)
             if "BATTLE/HERO/allmight" in name or "allmight" in name.lower():
                 clusters["allmight"].add(name)
