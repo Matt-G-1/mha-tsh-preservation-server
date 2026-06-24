@@ -105,7 +105,9 @@ class StageEnemySpawn:
 
     @property
     def monster_cfg_evidence(self) -> MonsterCfgEvidence | None:
-        return MONSTER_CFG_EVIDENCE_BY_ID.get(self.enemy_id)
+        return MONSTER_CFG_EVIDENCE_BY_ID.get(
+            self.enemy_id
+        ) or STAGE_CFG_MONSTER_EVIDENCE_BY_ID.get(self.enemy_id)
 
     @property
     def display_name(self) -> str:
@@ -439,6 +441,246 @@ MONSTER_CFG_EVIDENCE_BY_ID = {
         preferred_name="Muscular",
         display_names=("Muscular",),
         animation_keys=("3016_c2_01",),
+    ),
+}
+
+
+STAGE_MONSTER_EVIDENCE_SOURCE = (
+    "analysis/mediafire_20260620/apk_extract/assets/1FO/fee3a47c0b4a95e9 and "
+    "stage_cfg encounters, parsed by scripts/derive_stage_monster_evidence.py, "
+    "2026-06-24"
+)
+STAGE_CFG_MONSTER_EVIDENCE_BY_ID = {
+    16000101: MonsterCfgEvidence(
+        monster_id=16000101,
+        preferred_name="公会BOSS-欧尔麦特-BOSS4",
+        display_names=("公会BOSS-欧尔麦特-BOSS4",),
+        animation_keys=("2001_a1_01", "3112_c1_01"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    30040104: MonsterCfgEvidence(
+        monster_id=30040104,
+        preferred_name="英雄剧场-大嘴花-精英",
+        display_names=("英雄剧场-大嘴花-精英",),
+        animation_keys=("2401_b5_01",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    30040108: MonsterCfgEvidence(
+        monster_id=30040108,
+        preferred_name="英雄剧场-大四手-BOSS",
+        display_names=("英雄剧场-大四手-BOSS",),
+        animation_keys=("2001_d1_03",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    30040109: MonsterCfgEvidence(
+        monster_id=30040109,
+        preferred_name="英雄剧场-纸片人-精英",
+        display_names=("英雄剧场-纸片人-精英",),
+        animation_keys=("2001_d1_03",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    31040301: MonsterCfgEvidence(
+        monster_id=31040301,
+        preferred_name="英雄剧情usj3-USJ脑无",
+        display_names=("英雄剧情usj3-USJ脑无",),
+        animation_keys=("3007_heroplay", "3115_1_1"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40011512: MonsterCfgEvidence(
+        monster_id=40011512,
+        preferred_name="roguelike15-冲锋牛头人-精英-技",
+        display_names=("roguelike15-冲锋牛头人-精英-技",),
+        animation_keys=("2002_b3_01", "2102_d3_01"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40011513: MonsterCfgEvidence(
+        monster_id=40011513,
+        preferred_name="roguelike15-砸地怪-精英-力",
+        display_names=("roguelike15-砸地怪-精英-力",),
+        animation_keys=("2002_b3_01", "2102_d3_01"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40011514: MonsterCfgEvidence(
+        monster_id=40011514,
+        preferred_name="roguelike15-锤子男-BOSS",
+        display_names=("roguelike15-锤子男-BOSS",),
+        animation_keys=("2002_b3_01", "2102_d3_01", "3007_b2_05"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40011801: MonsterCfgEvidence(
+        monster_id=40011801,
+        preferred_name="roguelikeBOSS关-脑无",
+        display_names=("roguelikeBOSS关-脑无",),
+        animation_keys=("3007_b2_05",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40510301: MonsterCfgEvidence(
+        monster_id=40510301,
+        preferred_name="5-1普通关3-技机甲-小怪-巡逻",
+        display_names=("5-1普通关3-技机甲-小怪-巡逻",),
+        animation_keys=("2031_61_1",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40510304: MonsterCfgEvidence(
+        monster_id=40510304,
+        preferred_name="5-1普通关3-速机甲-小怪",
+        display_names=("5-1普通关3-速机甲-小怪",),
+        animation_keys=("3543_11_1",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40525201: MonsterCfgEvidence(
+        monster_id=40525201,
+        preferred_name="5-2精英关2-速机甲小怪stop",
+        display_names=("5-2精英关2-速机甲小怪stop",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40525202: MonsterCfgEvidence(
+        monster_id=40525202,
+        preferred_name="5-2精英关2-技机甲-小怪",
+        display_names=("5-2精英关2-技机甲-小怪",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40525203: MonsterCfgEvidence(
+        monster_id=40525203,
+        preferred_name="5-2精英关2-速机甲-小怪",
+        display_names=("5-2精英关2-速机甲-小怪",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40525204: MonsterCfgEvidence(
+        monster_id=40525204,
+        preferred_name="5-2精英关2-力机甲-小怪",
+        display_names=("5-2精英关2-力机甲-小怪",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40525251: MonsterCfgEvidence(
+        monster_id=40525251,
+        preferred_name="5-2精英关2-技机甲-精英",
+        display_names=("5-2精英关2-技机甲-精英",),
+        animation_keys=("3108_c1_01_2",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40525272: MonsterCfgEvidence(
+        monster_id=40525272,
+        preferred_name="5-2精英关2-速机甲-倒地表演",
+        display_names=("5-2精英关2-速机甲-倒地表演",),
+        animation_keys=("3108_c1_01_2",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40620504: MonsterCfgEvidence(
+        monster_id=40620504,
+        preferred_name="6章6-2-5长发怪-精英",
+        display_names=("6章6-2-5长发怪-精英",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40650202: MonsterCfgEvidence(
+        monster_id=40650202,
+        preferred_name="6章5-2肌肉-小怪-精英",
+        display_names=("6章5-2肌肉-小怪-精英",),
+        animation_keys=("4309_11_0", "4309_11_1"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40650205: MonsterCfgEvidence(
+        monster_id=40650205,
+        preferred_name="6章5-2关紫色胖子枪-小怪",
+        display_names=("6章5-2关紫色胖子枪-小怪",),
+        animation_keys=("4309_11_0", "4309_11_1"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40650504: MonsterCfgEvidence(
+        monster_id=40650504,
+        preferred_name="6章5-5肌肉-精英-力",
+        display_names=("6章5-5肌肉-精英-力",),
+        animation_keys=("3510_11_1",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    40650603: MonsterCfgEvidence(
+        monster_id=40650603,
+        preferred_name="6-5-6-锤子男-BOSS",
+        display_names=("6-5-6-锤子男-BOSS",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56111503: MonsterCfgEvidence(
+        monster_id=56111503,
+        preferred_name="训练场信号塔5支线01-技机甲",
+        display_names=("训练场信号塔5支线01-技机甲",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56111505: MonsterCfgEvidence(
+        monster_id=56111505,
+        preferred_name="训练场信号塔5支线01-力机甲",
+        display_names=("训练场信号塔5支线01-力机甲",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56120303: MonsterCfgEvidence(
+        monster_id=56120303,
+        preferred_name="信号塔2支线战斗关3牛-精英",
+        display_names=("信号塔2支线战斗关3牛-精英",),
+        animation_keys=("2041_d1_01",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56121103: MonsterCfgEvidence(
+        monster_id=56121103,
+        preferred_name="信号塔2支线战斗关11巨大化-BOSS",
+        display_names=("信号塔2支线战斗关11巨大化-BOSS",),
+        animation_keys=("3525_fire01", "3525_fire03"),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56130412: MonsterCfgEvidence(
+        monster_id=56130412,
+        preferred_name="李季塔3—4--胖子冲锋枪-小怪",
+        display_names=("李季塔3—4--胖子冲锋枪-小怪",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56240652: MonsterCfgEvidence(
+        monster_id=56240652,
+        preferred_name="雄英塔4-子弹追踪1-匕首-精英",
+        display_names=("雄英塔4-子弹追踪1-匕首-精英",),
+        animation_keys=("2104_a1_03",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56240751: MonsterCfgEvidence(
+        monster_id=56240751,
+        preferred_name="雄英塔4-子弹追踪2-肌肉仔-精英",
+        display_names=("雄英塔4-子弹追踪2-肌肉仔-精英",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56250410: MonsterCfgEvidence(
+        monster_id=56250410,
+        preferred_name="塔5支线-肌肉仔-精英",
+        display_names=("塔5支线-肌肉仔-精英",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56261004: MonsterCfgEvidence(
+        monster_id=56261004,
+        preferred_name="塔6-10-面罩-精英",
+        display_names=("塔6-10-面罩-精英",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56370101: MonsterCfgEvidence(
+        monster_id=56370101,
+        preferred_name="支庆町7塔1-肌肉仔-精英",
+        display_names=("支庆町7塔1-肌肉仔-精英",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56370103: MonsterCfgEvidence(
+        monster_id=56370103,
+        preferred_name="支庆町7塔1-牛头怪换皮-精英",
+        display_names=("支庆町7塔1-牛头怪换皮-精英",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56390302: MonsterCfgEvidence(
+        monster_id=56390302,
+        preferred_name="新城区9塔3-恶徒远程-小怪",
+        display_names=("新城区9塔3-恶徒远程-小怪",),
+        animation_keys=("2102_b1_04",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
+    ),
+    56390303: MonsterCfgEvidence(
+        monster_id=56390303,
+        preferred_name="新城区9塔3-牛头怪换皮-精英",
+        display_names=("新城区9塔3-牛头怪换皮-精英",),
+        animation_keys=("2102_b1_04",),
+        source=STAGE_MONSTER_EVIDENCE_SOURCE,
     ),
 }
 

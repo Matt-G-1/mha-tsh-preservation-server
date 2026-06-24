@@ -186,6 +186,7 @@ from mhatsh_server.stages import (
     STAGE_CFG_AI_PROFILE_OVERRIDES_BY_ENEMY_ID,
     STAGE_CFG_COMBAT_ENEMY_IDS_BY_STAGE,
     STAGE_CFG_ENCOUNTER_GROUPS,
+    STAGE_CFG_MONSTER_EVIDENCE_BY_ID,
     STAGE_CFG_ROUTE_LABELS,
     StageState,
     STAGE_CFG_SCRIPT_ROUTE_GROUPS,
@@ -2667,6 +2668,27 @@ def test_monster_cfg_evidence_names_generated_enemies_and_parser_output() -> Non
     assert MONSTER_CFG_EVIDENCE_BY_ID[2472].preferred_name == "Twice"
     assert MONSTER_CFG_EVIDENCE_BY_ID[3005].preferred_name == "Faux Villain"
     assert MONSTER_CFG_EVIDENCE_BY_ID[3016].preferred_name == "Muscular"
+    assert STAGE_CFG_MONSTER_EVIDENCE_BY_ID[56390302].preferred_name == (
+        "新城区9塔3-恶徒远程-小怪"
+    )
+    assert STAGE_CFG_MONSTER_EVIDENCE_BY_ID[31040301].animation_keys == (
+        "3007_heroplay",
+        "3115_1_1",
+    )
+    assert (
+        stage_candidate_by_id(563903).encounter_spawns[1].display_name
+        == "新城区9塔3-恶徒远程-小怪"
+    )
+    assert (
+        stage_candidate_by_id(310403).encounter_spawns[0].display_name
+        == "英雄剧情usj3-USJ脑无"
+    )
+    assert (
+        stage_candidate_by_id(563903).encounter_spawns[1].to_monster_frame_seed()[
+            "Info"
+        ]["Alias"]
+        == "新城区9塔3-恶徒远程-小怪"
+    )
 
     generated_nomu = generated_stage_spawns(561203)[2]
     assert generated_nomu.enemy_id == 3007
