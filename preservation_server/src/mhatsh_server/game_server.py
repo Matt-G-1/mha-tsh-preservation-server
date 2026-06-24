@@ -937,42 +937,9 @@ class GameServer:
                 completed_task_id = int(
                     dict(task_update.get("task_info") or {}).get("Id") or task_id
                 )
-                area_stage_id = session.tasks.area_event_stage_id_for_task(
-                    completed_task_id
+                await self._send_area_event_completion_for_task(
+                    writer, session, completed_task_id
                 )
-                if area_stage_id:
-                    stage_pass = session.stage.ensure_area_event_stage_passed(
-                        area_stage_id
-                    )
-                    self.profile_store.remember_stage_progress(
-                        session.urs,
-                        session.stage.export_completions(),
-                    )
-                    await self._send(
-                        writer,
-                        session,
-                        "c_area_event_stage_pass",
-                        stage_pass,
-                    )
-                    await self._send(
-                        writer,
-                        session,
-                        "c_area_event_info",
-                        session.stage.area_event_info(area_stage_id),
-                    )
-                    roster = self._ensure_roster(session)
-                    await self._send(
-                        writer,
-                        session,
-                        "c_area_event_sync_status",
-                        session.stage.area_event_sync_status(
-                            area_stage_id,
-                            event_round=session.tasks.area_event_id_for_stage(
-                                area_stage_id
-                            ),
-                            hero_uids=[roster.active_card_uid],
-                        ),
-                    )
         elif name == "s_task_enter_stage":
             is_enter = int(values.get("IsEnter") or 0)
             await self._send(
@@ -993,6 +960,42 @@ class GameServer:
                             session,
                             active_stage_id,
                         )
+        elif name == "s_campaign_trigger_on":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_trigger_on",
+                {
+                    "FieldId": int(values.get("FieldId") or 0),
+                    "AreaId": int(values.get("AreaId") or 0),
+                },
+            )
+        elif name == "s_campaign_trigger_see":
+            pass
+        elif name == "s_campaign_trigger_interact":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_trigger_on",
+                {
+                    "FieldId": int(values.get("FieldId") or 0),
+                    "AreaId": int(values.get("AreaId") or 0),
+                },
+            )
+            task_update = session.tasks.complete_active_quest_contact_by_ids(
+                [
+                    int(values.get("FieldId") or 0),
+                    int(values.get("AreaId") or 0),
+                ]
+            )
+            if task_update is not None:
+                await self._send_task_progression(writer, session, task_update)
+                completed_task_id = int(
+                    dict(task_update.get("task_info") or {}).get("Id") or 0
+                )
+                await self._send_area_event_completion_for_task(
+                    writer, session, completed_task_id
+                )
         elif name == "s_training_enter":
             await self._enter_requested_stage(
                 writer,
@@ -2721,6 +2724,44 @@ class GameServer:
             return
         for packet_name, packet_values in session.world_tasks.complete_beginner_quest():
             await self._send(writer, session, packet_name, packet_values)
+
+    async def _send_area_event_completion_for_task(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        task_id: int,
+    ) -> None:
+        area_stage_id = session.tasks.area_event_stage_id_for_task(task_id)
+        if not area_stage_id:
+            return
+        stage_pass = session.stage.ensure_area_event_stage_passed(area_stage_id)
+        self.profile_store.remember_stage_progress(
+            session.urs,
+            session.stage.export_completions(),
+        )
+        await self._send(
+            writer,
+            session,
+            "c_area_event_stage_pass",
+            stage_pass,
+        )
+        await self._send(
+            writer,
+            session,
+            "c_area_event_info",
+            session.stage.area_event_info(area_stage_id),
+        )
+        roster = self._ensure_roster(session)
+        await self._send(
+            writer,
+            session,
+            "c_area_event_sync_status",
+            session.stage.area_event_sync_status(
+                area_stage_id,
+                event_round=session.tasks.area_event_id_for_stage(area_stage_id),
+                hero_uids=[roster.active_card_uid],
+            ),
+        )
 
     async def _send_starter_intro_stage(
         self, writer: asyncio.StreamWriter, session: Session

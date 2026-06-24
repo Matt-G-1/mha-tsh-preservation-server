@@ -277,7 +277,12 @@ class TaskState:
         update = self.complete_active_quest_contact(task_id)
         if update is not None:
             return update
-        npc_ids = _safe_int_set(params)
+        return self.complete_active_quest_contact_by_ids(params)
+
+    def complete_active_quest_contact_by_ids(
+        self, ids: Iterable[object]
+    ) -> dict[str, object] | None:
+        npc_ids = _safe_int_set(ids)
         if not npc_ids:
             return None
         for candidate in self.active_quest_contact_candidates():

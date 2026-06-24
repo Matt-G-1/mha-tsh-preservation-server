@@ -4378,6 +4378,13 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert raw_param_update is not None
     assert raw_param_update["task_info"]["Id"] == 100602
     assert 100602 in raw_param_state.finished
+    raw_trigger_state = TaskState()
+    raw_trigger_state.skip_starter_quest()
+    raw_trigger_state.complete_area_event_stage(21111)
+    trigger_update = raw_trigger_state.complete_active_quest_contact_by_ids([6669])
+    assert trigger_update is not None
+    assert trigger_update["task_info"]["Id"] == 100602
+    assert 100602 in raw_trigger_state.finished
     resolved_param_state = TaskState()
     resolved_param_state.skip_starter_quest()
     resolved_param_state.complete_area_event_stage(21311)
@@ -6999,6 +7006,10 @@ def test_task_requests_receive_stateful_protocol_responses() -> None:
     asyncio.run(_run_task_requests())
 
 
+def test_campaign_trigger_interact_can_complete_active_contact_task() -> None:
+    asyncio.run(_run_campaign_trigger_contact())
+
+
 def test_starter_intro_stage_probe_packets() -> None:
     asyncio.run(_run_starter_intro_stage_probe())
 
@@ -7472,6 +7483,88 @@ async def _run_task_requests() -> None:
         "HeroId"
     ] == STARTER_HERO_ID
     assert session.stage.current_stage_id == 21331
+
+
+async def _run_campaign_trigger_contact() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0xBADC0DE1),
+        urs="campaign-contact-user",
+    )
+    session.tasks.skip_starter_quest()
+    assert session.tasks.complete_area_event_stage(21111) is not None
+
+    trigger_on = codec.encode_message(
+        "s_campaign_trigger_on", {"FieldId": 6669, "AreaId": 0}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_campaign_trigger_on"],
+        trigger_on,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xBADC0DE1))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_campaign_trigger_on"
+    assert codec.decode_message("c_campaign_trigger_on", reply_body) == {
+        "FieldId": 6669,
+        "AreaId": 0,
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xBADC0DE2)
+    trigger_see = codec.encode_message(
+        "s_campaign_trigger_see", {"FieldId": 6669, "AreaId": 0}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_campaign_trigger_see"],
+        trigger_see,
+        writer,
+    )
+    assert writer.data == bytearray()
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xBADC0DE3)
+    trigger_interact = codec.encode_message(
+        "s_campaign_trigger_interact", {"FieldId": 6669, "AreaId": 0}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_campaign_trigger_interact"],
+        trigger_interact,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xBADC0DE3))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_campaign_trigger_on",
+        "c_task_info_update",
+        "c_task_info",
+        "c_area_event_stage_pass",
+        "c_area_event_info",
+        "c_area_event_sync_status",
+    ]
+    assert codec.decode_message("c_campaign_trigger_on", replies[0][1]) == {
+        "FieldId": 6669,
+        "AreaId": 0,
+    }
+    task_update = codec.decode_message("c_task_info_update", replies[1][1])
+    assert task_update["task_info"]["Id"] == 100602
+    assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    area_event_info = codec.decode_message("c_area_event_info", replies[4][1])
+    assert area_event_info["StageData"]["StageId"] == 21121
+    area_sync = codec.decode_message("c_area_event_sync_status", replies[5][1])
+    assert area_sync["StageId"] == 21121
+    assert area_sync["EventRound"] == 280102
+    assert session.stage.completions[21121].pass_count == 1
 
 
 async def _run_starter_intro_stage_probe() -> None:

@@ -542,6 +542,12 @@ environment details are intentionally omitted from Git.
   `c_task_trigger_sync` for the spawned scene UID. This currently applies to
   the recovered Tsukauchi contact path and keeps the trigger packet scoped to
   parser-backed active contacts rather than normal starter/map spawns.
+- Campaign trigger interactions now bridge into the same recovered active
+  contact-task path as `s_task_sync_info`: `s_campaign_trigger_on` is
+  acknowledged, `s_campaign_trigger_see` is accepted without speculative
+  replies, and `s_campaign_trigger_interact` can complete a visible
+  parser-backed contact task by recovered FieldId/AreaId/NPC IDs, then sends
+  the matching area-event stage pass/info/sync packets.
 - Completed stage rewards now also grant saved normal-item counts in the
   profile store, giving later inventory/UI packet work a persistent
   player-data backing store.
