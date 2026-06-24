@@ -180,6 +180,19 @@ class FightStyle:
     def skill_levels(self, level: int) -> list[dict[str, object]]:
         return [move.to_skill_level(level) for move in self.moves]
 
+    def protocol_skill_levels(self, level: int) -> list[dict[str, object]]:
+        recovered_ids = [
+            {"SkillId": skill_id, "SkillLevel": max(1, int(level))}
+            for skill_id in self.hero_cfg_skill_ids()
+        ]
+        recovered_skill_ids = {int(item["SkillId"]) for item in recovered_ids}
+        slot_levels = [
+            move.to_skill_level(level)
+            for move in self.moves
+            if move.slot not in recovered_skill_ids
+        ]
+        return [*recovered_ids, *slot_levels]
+
     def move_names(self) -> tuple[str, ...]:
         return tuple(move.name for move in self.moves)
 

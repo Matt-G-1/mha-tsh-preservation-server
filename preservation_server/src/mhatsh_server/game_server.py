@@ -1742,9 +1742,9 @@ class GameServer:
         self, session: Session, roster: RosterState
     ) -> dict[str, Any]:
         active = roster.active_card
-        skill_levels = fight_style_for_character(active.character).skill_levels(
-            roster.hero_level
-        )
+        skill_levels = fight_style_for_character(
+            active.character
+        ).protocol_skill_levels(roster.hero_level)
         support_skills = session.character_menu.training_support_skills(
             active.hero_id, roster
         )

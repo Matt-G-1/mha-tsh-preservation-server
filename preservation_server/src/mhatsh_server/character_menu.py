@@ -53,7 +53,7 @@ class CharacterMenuState:
                     "HeroUid": card.card_uid,
                     "SkillLevelInfo": fight_style_for_character(
                         card.character
-                    ).skill_levels(roster.hero_level),
+                    ).protocol_skill_levels(roster.hero_level),
                 }
                 for card in cards
             ]
@@ -78,7 +78,7 @@ class CharacterMenuState:
                 "HeroUid": card_uid,
                 "SkillLevelInfo": fight_style_for_character(
                     card.character
-                ).skill_levels(roster.hero_level),
+                ).protocol_skill_levels(roster.hero_level),
             }
         }
 
@@ -256,7 +256,7 @@ class CharacterMenuState:
         active = roster.active_card
         active_skill_level = fight_style_for_character(
             active.character
-        ).skill_levels(roster.hero_level)
+        ).protocol_skill_levels(roster.hero_level)
         return {
             "TrainingData": {
                 "HeroId": active.hero_id,

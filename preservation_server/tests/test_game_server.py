@@ -2137,6 +2137,11 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "Delaware Smash",
     )
     assert deku_style.skill_levels(7)[0] == {"SkillId": 1, "SkillLevel": 7}
+    assert deku_style.protocol_skill_levels(7)[:3] == [
+        {"SkillId": 1001, "SkillLevel": 7},
+        {"SkillId": 1002, "SkillLevel": 7},
+        {"SkillId": 1, "SkillLevel": 7},
+    ]
     assert {
         "BATTLE/HERO/lvgu/VO/One_For_All",
         "BATTLE/HERO/lvgu/commonATK/lvgu_pve_atk01",
@@ -4182,7 +4187,7 @@ async def _run_character_menu_requests() -> None:
                 "HeroUid": STARTER_CARD_UID,
                 "SkillLevelInfo": fight_style_for_character(
                     STARTER_CHARACTER
-                ).skill_levels(1),
+                ).protocol_skill_levels(1),
             }
         ]
     }
@@ -4218,7 +4223,7 @@ async def _run_character_menu_requests() -> None:
                     "HeroUid": STARTER_CARD_UID + 2,
                     "SkillLevelInfo": fight_style_for_character(
                         INITIAL_PLAYABLE_ROSTER[2]
-                    ).skill_levels(1),
+                    ).protocol_skill_levels(1),
                 }
             },
         ),
@@ -4559,7 +4564,9 @@ async def _run_character_menu_requests() -> None:
     assert training_info["TrainingData"]["CardSkillLevel"] == [
         {
             "HeroUid": STARTER_CARD_UID,
-            "SkillLevel": fight_style_for_character(STARTER_CHARACTER).skill_levels(1),
+            "SkillLevel": fight_style_for_character(
+                STARTER_CHARACTER
+            ).protocol_skill_levels(1),
         }
     ]
     assert training_info["TrainingData"]["SupportSkill"] == [
@@ -5238,7 +5245,7 @@ async def _run_starter_intro_stage_probe() -> None:
     assert fighter["Heros"][0]["ShapeId"] == STARTER_SHAPE_ID
     assert fighter["Heros"][0]["CardSkillLevel"] == fight_style_for_character(
         STARTER_CHARACTER
-    ).skill_levels(1)
+    ).protocol_skill_levels(1)
     assert session.stage.current_stage_id == STARTER_INTRO_STAGE_ID
     assert session.stage.encounter_frames[0]["Info"]["Id"] == 3002
 
