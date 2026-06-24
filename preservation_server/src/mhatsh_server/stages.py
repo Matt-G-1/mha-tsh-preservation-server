@@ -2942,6 +2942,8 @@ class StageState:
     daily_stage_counts: dict[int, int] = field(default_factory=dict)
     allsvr_level_counts: dict[int, int] = field(default_factory=dict)
     allsvr_boss_scores: dict[int, int] = field(default_factory=dict)
+    theater_unlocked_stage_ids: set[int] = field(default_factory=set)
+    theater_bonus_claims: dict[str, int] = field(default_factory=dict)
     completions: dict[int, StageCompletion] = field(default_factory=dict)
     current_usj_point_id: int = 0
 
@@ -3648,6 +3650,91 @@ class StageState:
             "AllSvrCond": self.allsvr_cond_list(),
         }
 
+    def theater_open(self) -> dict[str, object]:
+        area_ids = sorted({stage.area_id for stage in ALLSVR_STAGES})
+        return {
+            "ChapterInfo": [
+                {
+                    "Id": area_id,
+                    "Status": 1,
+                    "BonusInfo": [],
+                }
+                for area_id in area_ids
+            ],
+            "StageInfo": [
+                {
+                    "Id": stage.stage_id,
+                    "Status": int(
+                        stage.stage_id in self.theater_unlocked_stage_ids
+                        or stage.stage_id == DEFAULT_ALLSVR_STAGE.stage_id
+                        or self.allsvr_level_counts.get(stage.stage_id, 0) > 0
+                    ),
+                    "StarList": (
+                        [1, 2, 3]
+                        if self.allsvr_level_counts.get(stage.stage_id, 0) > 0
+                        else []
+                    ),
+                    "FullStarTime": 0,
+                    "DramaFinish": [],
+                    "ViewTimes": self.allsvr_level_counts.get(stage.stage_id, 0),
+                }
+                for stage in ALLSVR_STAGES
+            ],
+            "BonusInfo": [
+                {"Idx": int(key.split(":", 1)[1]), "BonusTime": value}
+                for key, value in sorted(self.theater_bonus_claims.items())
+                if key.startswith("bonus:")
+            ],
+            "GlobalBonusInfo": [],
+            "UserContri": self.allsvr_total_score(),
+            "GlobalContri": self.allsvr_total_score(),
+        }
+
+    def theater_unlock(self, stage_id: int = 0) -> dict[str, object]:
+        resolved_stage_id = int(stage_id or DEFAULT_ALLSVR_STAGE.stage_id)
+        self.theater_unlocked_stage_ids.add(resolved_stage_id)
+        return {"StageId": resolved_stage_id, "Status": 1}
+
+    def theater_bonus(self, cfg_type: int = 0, bonus_idx: int = 0) -> dict[str, object]:
+        claim_key = f"bonus:{int(bonus_idx)}"
+        self.theater_bonus_claims[claim_key] = self.theater_bonus_claims.get(
+            claim_key,
+            0,
+        ) + 1
+        return {
+            "CfgType": int(cfg_type),
+            "BonusIdx": int(bonus_idx),
+            "Reward": [{"Id": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 1}],
+        }
+
+    def theater_chapter_bonus(
+        self,
+        chapter_id: int = 0,
+        star_idx: int = 0,
+    ) -> dict[str, object]:
+        claim_key = f"chapter:{int(chapter_id)}:{int(star_idx)}"
+        self.theater_bonus_claims[claim_key] = self.theater_bonus_claims.get(
+            claim_key,
+            0,
+        ) + 1
+        return {"chapterid": int(chapter_id), "starIdx": int(star_idx)}
+
+    def theater_finish(self, values: dict[str, object]) -> dict[str, object]:
+        stage_id = int(values.get("StageId") or self.current_stage_id or 0)
+        result = int(values.get("Result") or 0)
+        if stage_id:
+            self.theater_unlocked_stage_ids.add(stage_id)
+            if result:
+                self.allsvr_level_counts[stage_id] = max(
+                    1,
+                    self.allsvr_level_counts.get(stage_id, 0),
+                )
+        stage = ALLSVR_STAGE_BY_ID.get(stage_id, DEFAULT_ALLSVR_STAGE)
+        return {
+            "newChapterInfo": [{"Id": stage.area_id, "Status": 1}],
+            "newStageInfo": [{"Id": stage.stage_id, "Status": int(bool(result))}],
+        }
+
     def usj_cycle_id(self) -> dict[str, object]:
         return {"CycleId": 1}
 
@@ -3971,6 +4058,19 @@ class StageState:
         self.allsvr_boss_scores = self._int_section(
             values.get("allsvr_boss_scores", {})
         )
+        self.theater_unlocked_stage_ids = set(
+            self._int_section(values.get("theater_unlocked_stage_ids", {}))
+        )
+        self.theater_bonus_claims = {}
+        bonus_claims = values.get("theater_bonus_claims", {})
+        if isinstance(bonus_claims, dict):
+            for key, value in bonus_claims.items():
+                try:
+                    numeric_value = int(value)
+                except (TypeError, ValueError):
+                    continue
+                if isinstance(key, str) and numeric_value >= 0:
+                    self.theater_bonus_claims[key] = numeric_value
 
     def export_completions(self) -> dict[int, dict[str, int | list[int]]]:
         return {
@@ -3984,6 +4084,10 @@ class StageState:
             "daily_stage_counts": dict(sorted(self.daily_stage_counts.items())),
             "allsvr_level_counts": dict(sorted(self.allsvr_level_counts.items())),
             "allsvr_boss_scores": dict(sorted(self.allsvr_boss_scores.items())),
+            "theater_unlocked_stage_ids": {
+                stage_id: 1 for stage_id in sorted(self.theater_unlocked_stage_ids)
+            },
+            "theater_bonus_claims": dict(sorted(self.theater_bonus_claims.items())),
         }
 
     @staticmethod

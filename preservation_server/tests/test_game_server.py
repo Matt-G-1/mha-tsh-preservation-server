@@ -6827,6 +6827,20 @@ async def _run_activity_and_side_task_requests() -> None:
         ("s_offlinepvp_task", {}),
         ("s_battlefield_task_info", {}),
         ("s_group_open_map", {}),
+        ("s_theater_open", {}),
+        ("s_theater_unlock", {"StageId": 880101}),
+        ("s_theater_bonus", {"CfgType": 1, "BonusIdx": 2}),
+        ("s_theater_chapterbonus", {"chapterid": 1, "starIdx": 3}),
+        (
+            "s_stage_theater",
+            {
+                "StageId": 880101,
+                "Extra": {"HeroUid": STARTER_CARD_UID},
+                "Result": 1,
+                "Score": [3, 2, 1],
+                "DramaFinish": [],
+            },
+        ),
     ]
 
     for request_name, request_values in request_cases:
@@ -6852,6 +6866,11 @@ async def _run_activity_and_side_task_requests() -> None:
         "c_offlinepvp_task",
         "c_battlefield_task_info",
         "c_group_open_map",
+        "c_theater_open",
+        "c_theater_unlock",
+        "c_theater_bonus",
+        "c_theater_chapterbonus",
+        "c_theater_finish",
     ]
     assert codec.decode_message("c_stage_activity_info", replies[0][1]) == {
         "ProgressInfo": []
@@ -6906,6 +6925,29 @@ async def _run_activity_and_side_task_requests() -> None:
     assert codec.decode_message("c_group_open_map", replies[11][1]) == {
         "MapAttackArea": []
     }
+    theater_open = codec.decode_message("c_theater_open", replies[12][1])
+    assert len(theater_open["StageInfo"]) == len(ALLSVR_STAGES)
+    assert theater_open["StageInfo"][0]["Id"] == 880101
+    assert theater_open["StageInfo"][0]["Status"] == 1
+    assert theater_open["UserContri"] == 0
+    assert codec.decode_message("c_theater_unlock", replies[13][1]) == {
+        "StageId": 880101,
+        "Status": 1,
+    }
+    assert codec.decode_message("c_theater_bonus", replies[14][1]) == {
+        "CfgType": 1,
+        "BonusIdx": 2,
+        "Reward": [{"Id": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 1}],
+    }
+    assert codec.decode_message("c_theater_chapterbonus", replies[15][1]) == {
+        "chapterid": 1,
+        "starIdx": 3,
+    }
+    assert codec.decode_message("c_theater_finish", replies[16][1]) == {
+        "newChapterInfo": [{"Id": 1, "Status": 1}],
+        "newStageInfo": [{"Id": 880101, "Status": 1}],
+    }
+    assert session.stage.allsvr_level_counts[880101] == 1
     assert session.activities.requested_activity_types == [17]
     assert session.activities.requested_group_maps == 1
 

@@ -1289,6 +1289,13 @@ class GameServer:
                 "c_stage_leave",
                 session.stage.leave_stage(int(values.get("StageId") or 0)),
             )
+        elif name == "s_stage_theater":
+            await self._send(
+                writer,
+                session,
+                "c_theater_finish",
+                session.stage.theater_finish(values),
+            )
         elif name == "s_stage_quick_reborn":
             session.stage.record_quick_reborn(int(values.get("RebornCount") or 0))
         elif name == "s_stage_activity_info":
@@ -1309,6 +1316,40 @@ class GameServer:
                 session,
                 "c_relax_stage_sync_data",
                 session.stage.relax_stage_sync_data(),
+            )
+        elif name == "s_theater_open":
+            await self._send(
+                writer,
+                session,
+                "c_theater_open",
+                session.stage.theater_open(),
+            )
+        elif name == "s_theater_unlock":
+            await self._send(
+                writer,
+                session,
+                "c_theater_unlock",
+                session.stage.theater_unlock(int(values.get("StageId") or 0)),
+            )
+        elif name == "s_theater_bonus":
+            await self._send(
+                writer,
+                session,
+                "c_theater_bonus",
+                session.stage.theater_bonus(
+                    int(values.get("CfgType") or 0),
+                    int(values.get("BonusIdx") or 0),
+                ),
+            )
+        elif name == "s_theater_chapterbonus":
+            await self._send(
+                writer,
+                session,
+                "c_theater_chapterbonus",
+                session.stage.theater_chapter_bonus(
+                    int(values.get("chapterid") or 0),
+                    int(values.get("starIdx") or 0),
+                ),
             )
         elif name == "s_relax_stage_get_box":
             await self._send(
