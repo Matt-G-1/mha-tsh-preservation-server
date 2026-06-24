@@ -903,6 +903,19 @@ class GameServer:
                         "c_area_event_info",
                         session.stage.area_event_info(area_stage_id),
                     )
+                    roster = self._ensure_roster(session)
+                    await self._send(
+                        writer,
+                        session,
+                        "c_area_event_sync_status",
+                        session.stage.area_event_sync_status(
+                            area_stage_id,
+                            event_round=session.tasks.area_event_id_for_stage(
+                                area_stage_id
+                            ),
+                            hero_uids=[roster.active_card_uid],
+                        ),
+                    )
         elif name == "s_task_enter_stage":
             is_enter = int(values.get("IsEnter") or 0)
             await self._send(

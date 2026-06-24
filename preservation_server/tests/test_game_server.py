@@ -5630,7 +5630,11 @@ async def _run_contact_sync_progress_persistence(tmp_path: Path) -> None:
             "c_task_info",
             "c_area_event_stage_pass",
             "c_area_event_info",
+            "c_area_event_sync_status",
         ]
+        area_sync = codec.decode_message("c_area_event_sync_status", replies[5][1])
+        assert area_sync["StageId"] == 21121
+        assert area_sync["EventRound"] == 280102
 
         second_game = GameServer(registry)
         second_session = Session(
@@ -7172,6 +7176,7 @@ async def _run_task_requests() -> None:
         "c_task_info",
         "c_area_event_stage_pass",
         "c_area_event_info",
+        "c_area_event_sync_status",
     ]
     assert codec.decode_message("c_task_sync_info", replies[0][1]) == {
         "TaskId": 100602,
@@ -7210,6 +7215,9 @@ async def _run_task_requests() -> None:
         "DropCountTimes": 0,
         "Star": 3,
     }
+    area_sync = codec.decode_message("c_area_event_sync_status", replies[5][1])
+    assert area_sync["StageId"] == 21121
+    assert area_sync["EventRound"] == 280102
     assert session.stage.completions[21121].pass_count == 1
     assert session.tasks.complete_area_event_stage(21311) is not None
 
@@ -7237,6 +7245,7 @@ async def _run_task_requests() -> None:
         "c_task_info",
         "c_area_event_stage_pass",
         "c_area_event_info",
+        "c_area_event_sync_status",
     ]
     assert codec.decode_message("c_task_sync_info", replies[0][1]) == {
         "TaskId": 0,
@@ -7249,6 +7258,11 @@ async def _run_task_requests() -> None:
     assert resolved_stage_pass["FirstPass"] == 1
     resolved_area_event_info = codec.decode_message("c_area_event_info", replies[4][1])
     assert resolved_area_event_info["StageData"]["StageId"] == 21321
+    resolved_area_sync = codec.decode_message(
+        "c_area_event_sync_status", replies[5][1]
+    )
+    assert resolved_area_sync["StageId"] == 21321
+    assert resolved_area_sync["EventRound"] == 280302
     assert session.stage.completions[21321].pass_count == 1
 
     writer.data.clear()
