@@ -520,6 +520,11 @@ environment details are intentionally omitted from Git.
 - Contact/dialogue-style recovered quest completions now send
   `c_area_event_sync_status` after their linked stage-pass/info packets. This
   keeps contact tasks and combat tasks on the same area-event UI update path.
+- `s_area_event_enter_stage` now resolves blank or zero `StageId` requests to
+  the current active recovered area-event stage from the parsed quest order.
+  This prevents the client from falling back into the intro/generated stage
+  path when the quest UI asks to enter the next available area-event battle
+  without repeating the canonical stage ID.
 - Completed stage rewards now also grant saved normal-item counts in the
   profile store, giving later inventory/UI packet work a persistent
   player-data backing store.

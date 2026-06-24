@@ -1150,9 +1150,12 @@ class GameServer:
             )
         elif name == "s_area_event_enter_stage":
             hero_uids = [int(item) for item in list(values.get("HerosUId") or [])]
+            requested_stage_id = int(values.get("StageId") or 0)
             stage_id = session.tasks.canonical_area_event_stage_id(
-                int(values.get("StageId") or 0)
+                requested_stage_id
             )
+            if stage_id <= 0:
+                stage_id = session.tasks.active_area_event_stage_id()
             await self._send(
                 writer,
                 session,

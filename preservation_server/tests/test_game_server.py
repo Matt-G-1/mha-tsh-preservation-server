@@ -6953,6 +6953,59 @@ def test_requested_stage_enter_packets_start_combat_stages() -> None:
     asyncio.run(_run_requested_stage_enter_packets())
 
 
+async def _run_area_event_enter_uses_active_stage_when_blank() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    with patch.dict(os.environ, {"MHATSH_ROSTER_MODE": "verified"}, clear=False):
+        game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x41455230),
+    )
+    game._configure_session(session)
+    assert session.tasks.complete_area_event_stage(21111) is not None
+    assert session.tasks.complete_active_quest_contact(100602) is not None
+    assert session.tasks.active_area_event_stage_id() == 21131
+    request = codec.encode_message(
+        "s_area_event_enter_stage",
+        {"StageId": 0, "HerosUId": []},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_area_event_enter_stage"],
+        request,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x41455230))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_area_event_stage_cache_id",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+        "c_area_event_info",
+        "c_area_event_sync_status",
+    ]
+    assert codec.decode_message("c_area_event_stage_cache_id", replies[0][1]) == {
+        "StageId": 21131
+    }
+    stage_enter = codec.decode_message("c_stage_enter", replies[1][1])
+    assert stage_enter["StageId"] == 21131
+    assert stage_enter["StageUid"] == 211310001
+    sync_status = codec.decode_message("c_area_event_sync_status", replies[4][1])
+    assert sync_status["StageId"] == 21131
+    assert sync_status["EventRound"] == 280103
+
+
+def test_area_event_enter_uses_active_stage_when_stage_id_is_blank() -> None:
+    asyncio.run(_run_area_event_enter_uses_active_stage_when_blank())
+
+
 def test_verified_roster_characters_can_enter_combat_with_skill_payloads() -> None:
     asyncio.run(_run_verified_roster_stage_entry_payloads())
 
