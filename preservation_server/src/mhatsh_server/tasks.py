@@ -16,6 +16,7 @@ from .task_cfg_hints import (
     RECOVERED_QUEST_CHAIN,
     RECOVERED_QUEST_DIALOG_REFERENCES as RECOVERED_QUEST_DIALOG_HINTS,
 )
+from .npc_cfg_hints import RECOVERED_NPC_NAME_HINTS
 
 
 TASK_STATUS_AVAILABLE = 1
@@ -114,6 +115,7 @@ class QuestDialogReference:
     task_id: int
     quest_order: int
     text: str
+    resolved_npc_ids: tuple[int, ...] = ()
     nearby_stage_ids: tuple[int, ...] = ()
     drama_refs: tuple[str, ...] = ()
 
@@ -315,6 +317,96 @@ def _str_tuple(value: object) -> tuple[str, ...]:
     return tuple(str(item) for item in list(value or []))
 
 
+def _clean_npc_hint_text(value: str) -> str:
+    text = value.strip()
+    for prefix in (
+        "\u5730\u56fe\u7cfb\u7edf_",
+        "\u4e3b\u7ebf\u4efb\u52a1-",
+        "\u4e3b\u7ebf\u590d\u7528-",
+        "\u5267\u60c5\u590d\u7528-",
+        "\u5267\u60c5\u590d\u7528_",
+        "\u652f\u7ebf\u4e34\u65f6_",
+        "\u652f\u7ebf_",
+        "NPC-",
+    ):
+        if text.startswith(prefix):
+            text = text[len(prefix) :]
+            break
+    text = text.split("\uff08", 1)[0]
+    text = text.split("(", 1)[0]
+    return text.strip()
+
+
+def _clean_dialog_target_text(value: str) -> str:
+    text = value.strip()
+    for prefix in ("\u627e", "\u4e0e", "\u62dc\u8bbf"):
+        if text.startswith(prefix):
+            text = text[len(prefix) :]
+            break
+    for suffix in ("\u8c08\u8bdd", "\u5427"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)]
+    return text.strip()
+
+
+def _npc_hint_score(
+    raw_hint_text: str,
+    hint_text: str,
+    target_text: str,
+    dialog_text: str,
+) -> int:
+    if not hint_text:
+        return 999
+    if hint_text == target_text:
+        score = 0
+    elif hint_text in dialog_text:
+        score = 2
+    else:
+        return 999
+    if any(
+        marker in raw_hint_text
+        for marker in (
+            "\u6536\u85cf\u7269",
+            "\u85cf\u54c1",
+            "\u652f\u7ebf",
+            "\u4e34\u65f6",
+            "\u63a2\u6d4b",
+        )
+    ):
+        score += 5
+    return score
+
+
+def _resolve_dialog_npc_ids(text: str, raw_npc_ids: tuple[int, ...]) -> tuple[int, ...]:
+    target_text = _clean_dialog_target_text(text)
+    scored_candidates: list[tuple[int, tuple[int, ...]]] = []
+    for hint in RECOVERED_NPC_NAME_HINTS:
+        raw_hint_text = str(hint["text"])
+        hint_text = _clean_npc_hint_text(raw_hint_text)
+        if len(hint_text) < 2:
+            continue
+        score = _npc_hint_score(raw_hint_text, hint_text, target_text, text)
+        if score >= 999:
+            continue
+        scored_candidates.append((score, _int_tuple(hint.get("nearest_npc_ids"))))
+    if not scored_candidates:
+        return raw_npc_ids
+    best_score = min(score for score, _ in scored_candidates)
+    candidates: list[int] = []
+    for score, npc_ids in scored_candidates:
+        if score != best_score:
+            continue
+        for npc_id in npc_ids:
+            if npc_id not in candidates:
+                candidates.append(npc_id)
+    raw_matches = tuple(npc_id for npc_id in candidates if npc_id in raw_npc_ids)
+    if raw_matches:
+        return raw_matches
+    if candidates:
+        return tuple(candidates)
+    return raw_npc_ids
+
+
 STARTER_TASK = TaskRecord(
     id=STARTER_GUIDE_ID,
     type=STARTER_TASK_TYPE,
@@ -487,6 +579,10 @@ def _recovered_quest_dialog_references() -> tuple[QuestDialogReference, ...]:
                     task_id=int(item["task_id"]),
                     quest_order=int(item["quest_order"]),
                     text=str(item["text"]),
+                    resolved_npc_ids=_resolve_dialog_npc_ids(
+                        str(item["text"]),
+                        _int_tuple(item.get("nearby_npc_ids")),
+                    ),
                     nearby_stage_ids=_int_tuple(item.get("nearby_stage_ids")),
                     drama_refs=_str_tuple(item.get("drama_refs")),
                 )
@@ -517,6 +613,22 @@ RECOVERED_QUEST_DIALOG_REFERENCES_BY_TASK_ID: dict[
     )
     for task_id in sorted(
         {reference.task_id for reference in RECOVERED_QUEST_DIALOG_REFERENCES}
+    )
+}
+RECOVERED_QUEST_DIALOG_REFERENCES_BY_RESOLVED_NPC_ID: dict[
+    int, tuple[QuestDialogReference, ...]
+] = {
+    npc_id: tuple(
+        reference
+        for reference in RECOVERED_QUEST_DIALOG_REFERENCES
+        if npc_id in reference.resolved_npc_ids
+    )
+    for npc_id in sorted(
+        {
+            npc_id
+            for reference in RECOVERED_QUEST_DIALOG_REFERENCES
+            for npc_id in reference.resolved_npc_ids
+        }
     )
 }
 
