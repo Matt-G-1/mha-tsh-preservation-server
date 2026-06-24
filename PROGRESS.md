@@ -77,6 +77,12 @@ environment details are intentionally omitted from Git.
   activity/task panels that can be reached from world UI probes:
   stage-activity info, activity-shop info, entrust-task list, secret-area task,
   USJ task, offline-PVP task, battlefield-task info, and group-map opening.
+- The recovered lottery packet family is now partially implemented for
+  compatibility: `s_lottery_load`, `s_lottery_choose_up`, and `s_lottery_draw`
+  return schema-matched `c_lottery_load`, `c_lottery_choose_up`, and
+  `c_lottery_draw` payloads with session draw counters, guarantee progress,
+  and persisted item rewards. Official banner/drop tables are still unrecovered;
+  current rewards are clearly local placeholder items.
 - The All-Server/Theater activity stage family is now parsed from the recovered
   `act_allsvr_stage_cfg.lua` asset: 84 regular stages and 9 boss stages are
   cataloged, exposed through `c_act_allsvr_stage_info`, and enterable through

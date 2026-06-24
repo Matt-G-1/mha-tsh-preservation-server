@@ -9305,6 +9305,10 @@ def test_activity_and_side_task_requests_receive_empty_state_replies() -> None:
     asyncio.run(_run_activity_and_side_task_requests())
 
 
+def test_lottery_requests_return_stateful_draw_payloads() -> None:
+    asyncio.run(_run_lottery_requests())
+
+
 def test_secret_area_requests_receive_recovered_mode_state() -> None:
     asyncio.run(_run_secret_area_requests())
 
@@ -9586,6 +9590,83 @@ async def _run_activity_and_side_task_requests() -> None:
     assert session.stage.allsvr_level_counts[880101] == 1
     assert session.activities.requested_activity_types == [17]
     assert session.activities.requested_group_maps == 1
+
+
+async def _run_lottery_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x33445566),
+        urs="lottery-user",
+    )
+
+    for request_name, request_values in [
+        ("s_lottery_load", {}),
+        ("s_lottery_choose_up", {"DrawId": 7, "UpRatioId": 1021}),
+        ("s_lottery_draw", {"DrawId": 7, "Times": 10, "ClientConsumeItemCount": 0}),
+        ("s_lottery_draw", {"DrawId": 7, "Times": 1, "ClientConsumeItemCount": 0}),
+    ]:
+        await game._dispatch(
+            session,
+            registry.protocol_ids[request_name],
+            codec.encode_message(request_name, request_values),
+            writer,
+        )
+
+    decoder = FrameDecoder(RollingXor(0x33445566))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_lottery_load",
+        "c_lottery_choose_up",
+        "c_lottery_draw",
+        "c_lottery_draw",
+    ]
+    assert codec.decode_message("c_lottery_load", replies[0][1]) == {
+        "DrawInfo": [
+            {
+                "DrawId": 1,
+                "HaveDraw": 1,
+                "LastFreeTime": 0,
+                "UpRatioId": 0,
+            }
+        ],
+        "GuaranteesInfo": [{"GuaranteesType": 1, "ProcessInfo": []}],
+    }
+    assert codec.decode_message("c_lottery_choose_up", replies[1][1]) == {
+        "DrawId": 7,
+        "UpRatioId": 1021,
+    }
+    ten_draw = codec.decode_message("c_lottery_draw", replies[2][1])
+    assert ten_draw["DrawId"] == 7
+    assert ten_draw["Times"] == 10
+    assert ten_draw["OneTimes"] == 0
+    assert ten_draw["TenTimes"] == 1
+    assert len(ten_draw["RewardList"]) == 10
+    assert ten_draw["RewardList"][0] == {
+        "AddLog": [
+            {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "count": 1, "extra": []}
+        ],
+        "IsImportant": 1,
+    }
+    assert ten_draw["RewardList"][1]["IsImportant"] == 0
+
+    one_draw = codec.decode_message("c_lottery_draw", replies[3][1])
+    assert one_draw["Times"] == 1
+    assert one_draw["OneTimes"] == 1
+    assert one_draw["TenTimes"] == 1
+    assert one_draw["GuaranteesInfo"][0]["ProcessInfo"]
+    assert game.profile_store.normal_item_list("lottery-user") == [
+        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Amount": 2},
+        {"ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID, "Amount": 2},
+        {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "Amount": 4},
+        {"ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 3},
+    ]
 
 
 async def _run_time_ping() -> None:

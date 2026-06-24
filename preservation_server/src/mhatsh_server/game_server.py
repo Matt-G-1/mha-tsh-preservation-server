@@ -27,6 +27,7 @@ from .characters import (
 )
 from .combat import fight_style_for_character
 from .intro import SCHOOL_MIDORIYA_INTRO_COSTUME
+from .lottery import LotteryState
 from .profile_store import ProfileStore
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .roguelike_stages import ROGUELIKE_STAGES
@@ -83,6 +84,7 @@ class Session:
     world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
     activities: ActivityState = field(default_factory=ActivityState)
     character_menu: CharacterMenuState = field(default_factory=CharacterMenuState)
+    lottery: LotteryState = field(default_factory=LotteryState)
     stage: StageState = field(default_factory=StageState)
     roster: RosterState | None = None
     stage_card_uid: int = 0
@@ -1737,6 +1739,34 @@ class GameServer:
                     int(values.get("ActType") or 0)
                 ),
             )
+        elif name == "s_lottery_load":
+            await self._send(writer, session, "c_lottery_load", session.lottery.load())
+        elif name == "s_lottery_choose_up":
+            await self._send(
+                writer,
+                session,
+                "c_lottery_choose_up",
+                session.lottery.choose_up(
+                    int(values.get("DrawId") or 0),
+                    int(values.get("UpRatioId") or 0),
+                ),
+            )
+        elif name == "s_lottery_draw":
+            draw_result = session.lottery.draw(
+                int(values.get("DrawId") or 0),
+                int(values.get("Times") or 0),
+            )
+            self._grant_stage_reward_list(
+                session,
+                [
+                    reward
+                    for group in list(draw_result.get("RewardList") or [])
+                    if isinstance(group, dict)
+                    for reward in list(group.get("AddLog") or [])
+                    if isinstance(reward, dict)
+                ],
+            )
+            await self._send(writer, session, "c_lottery_draw", draw_result)
         elif name == "s_entrust_task_list":
             await self._send(
                 writer,
