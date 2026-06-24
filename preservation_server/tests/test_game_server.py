@@ -195,6 +195,8 @@ from mhatsh_server.tasks import (
     RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID,
     RECOVERED_AREA_EVENT_TASK_RECORDS,
     RECOVERED_AREA_EVENT_TASK_TYPE,
+    RECOVERED_QUEST_CONTACT_CANDIDATES,
+    RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID,
     RECOVERED_QUEST_DIALOG_REFERENCES,
     RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID,
     RECOVERED_QUEST_DIALOG_REFERENCES_BY_RESOLVED_NPC_ID,
@@ -4168,7 +4170,31 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_RESOLVED_NPC_ID[5037][0].task_id == (
         137003
     )
+    assert len(RECOVERED_QUEST_CONTACT_CANDIDATES) == 12
+    assert all(
+        not candidate.can_spawn_on_map
+        for candidate in RECOVERED_QUEST_CONTACT_CANDIDATES
+    )
+    first_contact = RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID[100602][0]
+    assert first_contact.raw_npc_ids == (6669,)
+    assert first_contact.resolved_npc_ids == (6669,)
+    assert first_contact.resolved_npc_names == (
+        "\u9ad8\u9a6c\u5c3e\u5973\u5b66\u751f",
+    )
+    assert first_contact.scene_npc_ids == ()
+    assert not first_contact.has_scene_npc_rows
+    assert not first_contact.can_spawn_on_map
+    tsukauchi_contact = RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID[102203][0]
+    assert tsukauchi_contact.raw_npc_ids == (5008,)
+    assert tsukauchi_contact.resolved_npc_ids == (5009,)
+    assert tsukauchi_contact.resolved_npc_names == (
+        "\u585a\u5185\u76f4\u6b63",
+    )
+    assert tsukauchi_contact.scene_npc_ids == (5009,)
+    assert tsukauchi_contact.has_scene_npc_rows
+    assert not tsukauchi_contact.can_spawn_on_map
     assert state.active_quest_dialog_references() == ()
+    assert state.active_quest_contact_candidates() == ()
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
     assert area_task_update["task_info"]["Id"] == 280101
@@ -4181,6 +4207,7 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         100602,
     ]
     assert state.active_quest_dialog_references() == (first_dialogue,)
+    assert state.active_quest_contact_candidates() == (first_contact,)
     assert state.complete_area_event_stage(21111) is None
     assert RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID[21311].id == 280301
     out_of_order_state = TaskState()

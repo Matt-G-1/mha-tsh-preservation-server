@@ -17,6 +17,7 @@ from .task_cfg_hints import (
     RECOVERED_QUEST_DIALOG_REFERENCES as RECOVERED_QUEST_DIALOG_HINTS,
 )
 from .npc_cfg_hints import RECOVERED_NPC_NAME_HINTS
+from .characters import MAP_CHARACTERS
 
 
 TASK_STATUS_AVAILABLE = 1
@@ -119,6 +120,28 @@ class QuestDialogReference:
     resolved_npc_names: tuple[str, ...] = ()
     nearby_stage_ids: tuple[int, ...] = ()
     drama_refs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class QuestContactCandidate:
+    task_id: int
+    quest_order: int
+    text: str
+    raw_npc_ids: tuple[int, ...]
+    resolved_npc_ids: tuple[int, ...]
+    resolved_npc_names: tuple[str, ...]
+    scene_npc_ids: tuple[int, ...] = ()
+    placement_verified: bool = False
+    nearby_stage_ids: tuple[int, ...] = ()
+    drama_refs: tuple[str, ...] = ()
+
+    @property
+    def has_scene_npc_rows(self) -> bool:
+        return bool(self.scene_npc_ids)
+
+    @property
+    def can_spawn_on_map(self) -> bool:
+        return self.has_scene_npc_rows and self.placement_verified
 
 
 class TaskState:
@@ -263,6 +286,22 @@ class TaskState:
             reference
             for reference in RECOVERED_QUEST_DIALOG_REFERENCES
             if reference.task_id in active_task_ids
+        )
+
+    def active_quest_contact_candidates(
+        self,
+    ) -> tuple[QuestContactCandidate, ...]:
+        active_task_ids = {
+            task.id
+            for task in self.tasks.values()
+            if task.id not in self.finished
+            and task.quest_order > 0
+            and self._is_visible(task)
+        }
+        return tuple(
+            candidate
+            for candidate in RECOVERED_QUEST_CONTACT_CANDIDATES
+            if candidate.task_id in active_task_ids
         )
 
     def _task(self, task_id: int) -> TaskRecord:
@@ -435,6 +474,19 @@ def _resolve_dialog_npc_names(
     for score, name in scored_names:
         if score == best_score and name not in output:
             output.append(name)
+    return tuple(output)
+
+
+def _scene_npc_ids_for_resolved_ids(
+    resolved_npc_ids: tuple[int, ...],
+) -> tuple[int, ...]:
+    output: list[int] = []
+    for npc_id in resolved_npc_ids:
+        character = MAP_CHARACTERS.get(npc_id)
+        if character is None or not character.is_spawn_verified:
+            continue
+        if character.npc_id is not None and character.npc_id not in output:
+            output.append(character.npc_id)
     return tuple(output)
 
 
@@ -664,6 +716,53 @@ RECOVERED_QUEST_DIALOG_REFERENCES_BY_RESOLVED_NPC_ID: dict[
             for reference in RECOVERED_QUEST_DIALOG_REFERENCES
             for npc_id in reference.resolved_npc_ids
         }
+    )
+}
+
+
+def _recovered_quest_contact_candidates() -> tuple[QuestContactCandidate, ...]:
+    candidates: list[QuestContactCandidate] = []
+    seen: set[tuple[int, str]] = set()
+    for reference in RECOVERED_QUEST_DIALOG_REFERENCES:
+        key = (reference.task_id, reference.text)
+        if key in seen:
+            continue
+        seen.add(key)
+        raw_npc_ids = tuple(
+            item.npc_id
+            for item in RECOVERED_QUEST_DIALOG_REFERENCES
+            if item.task_id == reference.task_id and item.text == reference.text
+        )
+        candidates.append(
+            QuestContactCandidate(
+                task_id=reference.task_id,
+                quest_order=reference.quest_order,
+                text=reference.text,
+                raw_npc_ids=raw_npc_ids,
+                resolved_npc_ids=reference.resolved_npc_ids,
+                resolved_npc_names=reference.resolved_npc_names,
+                scene_npc_ids=_scene_npc_ids_for_resolved_ids(
+                    reference.resolved_npc_ids,
+                ),
+                placement_verified=False,
+                nearby_stage_ids=reference.nearby_stage_ids,
+                drama_refs=reference.drama_refs,
+            )
+        )
+    return tuple(candidates)
+
+
+RECOVERED_QUEST_CONTACT_CANDIDATES = _recovered_quest_contact_candidates()
+RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID: dict[
+    int, tuple[QuestContactCandidate, ...]
+] = {
+    task_id: tuple(
+        candidate
+        for candidate in RECOVERED_QUEST_CONTACT_CANDIDATES
+        if candidate.task_id == task_id
+    )
+    for task_id in sorted(
+        {candidate.task_id for candidate in RECOVERED_QUEST_CONTACT_CANDIDATES}
     )
 }
 
