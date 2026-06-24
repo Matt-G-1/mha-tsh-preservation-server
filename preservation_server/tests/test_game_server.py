@@ -956,7 +956,18 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         56390306,
     )
     assert stage_cfg_route.combat_enemy_ids == (56390301, 56390302, 56390303)
+    assert [spawn.enemy_id for spawn in stage_cfg_route.encounter_spawns] == [
+        56390301,
+        56390302,
+        56390303,
+    ]
+    assert stage_cfg_route.encounter_spawns[0].placement_source == "stage_cfg_authored"
     assert stage_cfg_route.source == "parsed from packed stage_cfg constant routes, 2026-06-23"
+    generated_route_only = stage_candidate_by_id(201005)
+    assert generated_route_only.combat_enemy_ids == (20100502,)
+    assert [spawn.enemy_id for spawn in generated_route_only.encounter_spawns] == [
+        20100502,
+    ]
     assert len(STAGE_CFG_SCRIPT_ROUTE_GROUPS) == 71
     assert stage_candidate_by_id(310405).key == "stage_cfg_route_310405"
     assert stage_candidate_by_id(310405).scripts == ("zx_usj_003", "zx_usj_004")
@@ -1061,9 +1072,12 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         30050204,
         30050205,
     )
-    assert raw_only_training.combat_enemy_ids == ()
-    assert tuple(spawn.enemy_id for spawn in raw_only_training.encounter_spawns) == tuple(
-        spawn.enemy_id for spawn in generated_stage_spawns(300502)
+    assert raw_only_training.combat_enemy_ids == raw_only_training.enemy_group_ids
+    assert tuple(spawn.enemy_id for spawn in raw_only_training.encounter_spawns) == (
+        30050201,
+        30050202,
+        30050204,
+        30050205,
     )
     assert stage_candidate_by_id(160001).enemy_group_ids == (16000101,)
     assert tuple(spawn.enemy_id for spawn in stage_candidate_by_id(563903).encounter_spawns) == (

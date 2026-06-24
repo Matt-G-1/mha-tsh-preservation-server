@@ -389,6 +389,14 @@ environment details are intentionally omitted from Git.
   `combat_enemy_ids` layer separately from raw `enemy_group_ids`, and
   encounter generation uses the filtered combat list first so helper rows do
   not become accidental battle targets.
+- Route-backed `stage_cfg_route_*` definitions now use their recovered raw
+  encounter groups as combat IDs only when the filtered combat cross-check has
+  no row yet. This turns route-only stages such as `201005`, `300502`, and
+  `561112` into stage-specific encounters instead of generic generated enemy
+  probes, while stages with filtered combat evidence such as `563903` still
+  keep NPC/object/helper rows out of battle. Global activity monster rosters,
+  such as `act_daily_stage` metadata, are intentionally not promoted this way
+  until a true per-stage mapping is recovered.
 - Those stage encounter IDs are now cross-checked against packed
   `monster_cfg` evidence through `scripts/derive_stage_monster_evidence.py`.
   The extractor recovers 137 target IDs, marks 75 as combat candidates, and

@@ -331,7 +331,14 @@ class BattleStageDefinition:
             return tuple(spawn.enemy_id for spawn in self.enemy_spawns)
         if self.stage_id is None:
             return ()
-        return STAGE_CFG_COMBAT_ENEMY_IDS_BY_STAGE.get(int(self.stage_id), ())
+        filtered_combat_ids = STAGE_CFG_COMBAT_ENEMY_IDS_BY_STAGE.get(
+            int(self.stage_id), ()
+        )
+        if filtered_combat_ids:
+            return filtered_combat_ids
+        if self.key.startswith("stage_cfg_route_") and self.enemy_group_ids:
+            return self.enemy_group_ids
+        return ()
 
     @property
     def encounter_target_count(self) -> int:
