@@ -9607,10 +9607,15 @@ async def _run_lottery_requests() -> None:
     )
 
     for request_name, request_values in [
+        ("s_team_recruit", {"Msg": "local recruit", "Channels": [1, 2]}),
         ("s_lottery_load", {}),
         ("s_lottery_choose_up", {"DrawId": 7, "UpRatioId": 1021}),
         ("s_lottery_draw", {"DrawId": 7, "Times": 10, "ClientConsumeItemCount": 0}),
         ("s_lottery_draw", {"DrawId": 7, "Times": 1, "ClientConsumeItemCount": 0}),
+        ("s_act_exlottery_info", {"ActId": 17}),
+        ("s_act_exlottery_draw", {"DrawId": 9, "Times": 10}),
+        ("s_grid_box_lottery", {"ActId": 5, "LotteryType": 2, "CouponCount": 3}),
+        ("s_act_magic_shop_draw", {}),
     ]:
         await game._dispatch(
             session,
@@ -9622,12 +9627,18 @@ async def _run_lottery_requests() -> None:
     decoder = FrameDecoder(RollingXor(0x33445566))
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_team_recruit",
         "c_lottery_load",
         "c_lottery_choose_up",
         "c_lottery_draw",
         "c_lottery_draw",
+        "c_act_exlottery_info",
+        "c_act_exlottery_draw",
+        "c_grid_box_lottery",
+        "c_act_lottery_info",
     ]
-    assert codec.decode_message("c_lottery_load", replies[0][1]) == {
+    assert codec.decode_message("c_team_recruit", replies[0][1]) == {}
+    assert codec.decode_message("c_lottery_load", replies[1][1]) == {
         "DrawInfo": [
             {
                 "DrawId": 1,
@@ -9638,11 +9649,11 @@ async def _run_lottery_requests() -> None:
         ],
         "GuaranteesInfo": [{"GuaranteesType": 1, "ProcessInfo": []}],
     }
-    assert codec.decode_message("c_lottery_choose_up", replies[1][1]) == {
+    assert codec.decode_message("c_lottery_choose_up", replies[2][1]) == {
         "DrawId": 7,
         "UpRatioId": 1021,
     }
-    ten_draw = codec.decode_message("c_lottery_draw", replies[2][1])
+    ten_draw = codec.decode_message("c_lottery_draw", replies[3][1])
     assert ten_draw["DrawId"] == 7
     assert ten_draw["Times"] == 10
     assert ten_draw["OneTimes"] == 0
@@ -9656,16 +9667,34 @@ async def _run_lottery_requests() -> None:
     }
     assert ten_draw["RewardList"][1]["IsImportant"] == 0
 
-    one_draw = codec.decode_message("c_lottery_draw", replies[3][1])
+    one_draw = codec.decode_message("c_lottery_draw", replies[4][1])
     assert one_draw["Times"] == 1
     assert one_draw["OneTimes"] == 1
     assert one_draw["TenTimes"] == 1
     assert one_draw["GuaranteesInfo"][0]["ProcessInfo"]
+    ex_info = codec.decode_message("c_act_exlottery_info", replies[5][1])
+    assert ex_info["ActId"] == 17
+    assert ex_info["GuaranteeInfo"]
+    ex_draw = codec.decode_message("c_act_exlottery_draw", replies[6][1])
+    assert ex_draw["DrawId"] == 9
+    assert ex_draw["Times"] == 10
+    assert len(ex_draw["RewardList"]) == 10
+    assert ex_draw["GuaranteeInfo"]
+    assert codec.decode_message("c_grid_box_lottery", replies[7][1]) == {
+        "ActId": 5,
+        "LotteryType": 2,
+        "GainList": [
+            LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID,
+            LOCAL_STAGE_STYLE_REWARD_ITEM_ID,
+            LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+        ],
+    }
+    assert codec.decode_message("c_act_lottery_info", replies[8][1]) == {"Info": []}
     assert game.profile_store.normal_item_list("lottery-user") == [
-        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Amount": 2},
-        {"ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID, "Amount": 2},
-        {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "Amount": 4},
-        {"ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 3},
+        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Amount": 5},
+        {"ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID, "Amount": 5},
+        {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "Amount": 6},
+        {"ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 5},
     ]
 
 

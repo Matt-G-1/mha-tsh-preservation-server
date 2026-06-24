@@ -1739,6 +1739,8 @@ class GameServer:
                     int(values.get("ActType") or 0)
                 ),
             )
+        elif name == "s_team_recruit":
+            await self._send(writer, session, "c_team_recruit", {})
         elif name == "s_lottery_load":
             await self._send(writer, session, "c_lottery_load", session.lottery.load())
         elif name == "s_lottery_choose_up":
@@ -1767,6 +1769,47 @@ class GameServer:
                 ],
             )
             await self._send(writer, session, "c_lottery_draw", draw_result)
+        elif name == "s_act_exlottery_info":
+            await self._send(
+                writer,
+                session,
+                "c_act_exlottery_info",
+                session.lottery.exlottery_info(int(values.get("ActId") or 0)),
+            )
+        elif name == "s_act_exlottery_draw":
+            draw_result = session.lottery.exlottery_draw(
+                int(values.get("DrawId") or 0),
+                int(values.get("Times") or 0),
+            )
+            self._grant_stage_reward_list(
+                session,
+                [
+                    reward
+                    for group in list(draw_result.get("RewardList") or [])
+                    if isinstance(group, dict)
+                    for reward in list(group.get("AddLog") or [])
+                    if isinstance(reward, dict)
+                ],
+            )
+            await self._send(writer, session, "c_act_exlottery_draw", draw_result)
+        elif name == "s_grid_box_lottery":
+            await self._send(
+                writer,
+                session,
+                "c_grid_box_lottery",
+                session.lottery.grid_box_lottery(
+                    int(values.get("ActId") or 0),
+                    int(values.get("LotteryType") or 0),
+                    int(values.get("CouponCount") or 0),
+                ),
+            )
+        elif name == "s_act_magic_shop_draw":
+            await self._send(
+                writer,
+                session,
+                "c_act_lottery_info",
+                session.lottery.act_lottery_info(),
+            )
         elif name == "s_entrust_task_list":
             await self._send(
                 writer,

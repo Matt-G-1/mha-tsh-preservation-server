@@ -85,6 +85,39 @@ class LotteryState:
             "GuaranteesInfo": self._guarantees_info(),
         }
 
+    def exlottery_info(self, act_id: int) -> dict[str, object]:
+        return {
+            "ActId": int(act_id),
+            "GuaranteeInfo": self._exlottery_guarantee_info(),
+        }
+
+    def exlottery_draw(self, draw_id: int, times: int) -> dict[str, object]:
+        normalized_times = self._normalized_times(times)
+        rewards = self._draw_rewards(int(draw_id), normalized_times)
+        return {
+            "DrawId": int(draw_id) if int(draw_id) > 0 else DEFAULT_DRAW_ID,
+            "Times": normalized_times,
+            "RewardList": [
+                {"AddLog": [reward], "IsImportant": int(index == 0)}
+                for index, reward in enumerate(rewards)
+            ],
+            "GuaranteeInfo": self._exlottery_guarantee_info(),
+        }
+
+    def grid_box_lottery(
+        self, act_id: int, lottery_type: int, coupon_count: int
+    ) -> dict[str, object]:
+        count = max(1, min(10, int(coupon_count) if int(coupon_count) > 0 else 1))
+        rewards = self._draw_rewards(int(act_id) + int(lottery_type), count)
+        return {
+            "ActId": int(act_id),
+            "LotteryType": int(lottery_type),
+            "GainList": [int(reward["ItemId"]) for reward in rewards],
+        }
+
+    def act_lottery_info(self) -> dict[str, object]:
+        return {"Info": []}
+
     def _banner(self, draw_id: int) -> LotteryBanner:
         normalized_draw_id = int(draw_id) if int(draw_id) > 0 else DEFAULT_DRAW_ID
         return self.banners.setdefault(
@@ -126,4 +159,10 @@ class LotteryState:
                     )
                 ],
             }
+        ]
+
+    def _exlottery_guarantee_info(self) -> list[dict[str, int]]:
+        return [
+            {"GuaranteeId": important_id, "DrawNum": times}
+            for important_id, times in sorted(self.guarantee_progress.items())
         ]

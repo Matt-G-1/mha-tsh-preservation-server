@@ -81,8 +81,10 @@ environment details are intentionally omitted from Git.
   compatibility: `s_lottery_load`, `s_lottery_choose_up`, and `s_lottery_draw`
   return schema-matched `c_lottery_load`, `c_lottery_choose_up`, and
   `c_lottery_draw` payloads with session draw counters, guarantee progress,
-  and persisted item rewards. Official banner/drop tables are still unrecovered;
-  current rewards are clearly local placeholder items.
+  and persisted item rewards. Nearby compatibility now also covers
+  `s_act_exlottery_info`, `s_act_exlottery_draw`, `s_grid_box_lottery`,
+  `s_act_magic_shop_draw`, and `s_team_recruit`. Official banner/drop tables are
+  still unrecovered; current rewards are clearly local placeholder items.
 - The All-Server/Theater activity stage family is now parsed from the recovered
   `act_allsvr_stage_cfg.lua` asset: 84 regular stages and 9 boss stages are
   cataloged, exposed through `c_act_allsvr_stage_info`, and enterable through
