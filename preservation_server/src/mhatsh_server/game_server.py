@@ -592,6 +592,19 @@ class GameServer:
                     int(values.get("IsLock") or 0),
                 ),
             )
+        elif name == "s_card_support_skill":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_card_support_skill",
+                session.character_menu.card_support_skill(
+                    hero_cid=int(values.get("HeroCId") or 0),
+                    index=int(values.get("Index") or 0),
+                    support_hero_cid=int(values.get("SupportHeroCId") or 0),
+                    roster=roster,
+                ),
+            )
         elif name == "s_skill_get_skill_level_list":
             roster = self._ensure_roster(session)
             await self._send(

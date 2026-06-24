@@ -14,6 +14,7 @@ class CharacterMenuState:
         default_factory=list
     )
     attached_card_slots: dict[int, dict[int, int]] = field(default_factory=dict)
+    support_skill_slots: dict[int, dict[int, int]] = field(default_factory=dict)
 
     def card_show_info(self) -> dict[str, object]:
         active_cards = {
@@ -173,6 +174,42 @@ class CharacterMenuState:
                 self.attached_card_slots.pop(hero_id, None)
         return self.attached_card_info(roster)
 
+    def card_support_skill(
+        self,
+        *,
+        hero_cid: int,
+        index: int,
+        support_hero_cid: int,
+        roster: RosterState,
+    ) -> dict[str, object]:
+        hero_cid = int(hero_cid)
+        index = int(index)
+        support_hero_cid = int(support_hero_cid)
+        owned_hero_ids = {card.hero_id for card in roster.cards.values()}
+        if hero_cid in owned_hero_ids and index > 0:
+            slots = self.support_skill_slots.setdefault(hero_cid, {})
+            if support_hero_cid in owned_hero_ids:
+                slots[index] = support_hero_cid
+            else:
+                slots.pop(index, None)
+            if not slots:
+                self.support_skill_slots.pop(hero_cid, None)
+        return self.card_support_skill_info()
+
+    def card_support_skill_info(self) -> dict[str, object]:
+        return {
+            "Supports": [
+                {
+                    "HeroCId": hero_cid,
+                    "Index": index,
+                    "SupportHeroCId": support_hero_cid,
+                    "IsAuto": 0,
+                }
+                for hero_cid, slots in sorted(self.support_skill_slots.items())
+                for index, support_hero_cid in sorted(slots.items())
+            ]
+        }
+
     def equip_list(self) -> dict[str, object]:
         return {"UidList": []}
 
@@ -240,7 +277,7 @@ class CharacterMenuState:
                 "EquipHideAttr": [],
                 "AttachedCardBuff": [],
                 "ActiveCards": [],
-                "SupportSkill": [],
+                "SupportSkill": self._training_support_skills(active.hero_id, roster),
             }
         }
 
@@ -274,3 +311,24 @@ class CharacterMenuState:
             card
             for card in sorted(roster.cards.values(), key=lambda item: item.card_uid)
         ]
+
+    def _training_support_skills(
+        self, hero_cid: int, roster: RosterState
+    ) -> list[dict[str, object]]:
+        cards_by_hero_id = {card.hero_id: card for card in roster.cards.values()}
+        entries: list[dict[str, object]] = []
+        for index, support_hero_cid in sorted(
+            self.support_skill_slots.get(hero_cid, {}).items()
+        ):
+            support_card = cards_by_hero_id.get(support_hero_cid)
+            if support_card is None:
+                continue
+            entries.append(
+                {
+                    "Index": index,
+                    "HeroId": support_card.hero_id,
+                    "ShapeId": support_card.shape_id,
+                    "FashionId": 0,
+                }
+            )
+        return entries

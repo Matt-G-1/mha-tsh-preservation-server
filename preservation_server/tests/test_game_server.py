@@ -4253,6 +4253,37 @@ async def _run_character_menu_requests() -> None:
         "IsLock": 1,
     }
 
+    support_hero = INITIAL_PLAYABLE_ROSTER[1]
+    writer.data.clear()
+    session.outbound = RollingXor(0xBBCCDDEF)
+    support_skill = codec.encode_message(
+        "s_card_support_skill",
+        {
+            "HeroCId": STARTER_HERO_ID,
+            "Index": 1,
+            "SupportHeroCId": support_hero.hero_id,
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_card_support_skill"],
+        support_skill,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xBBCCDDEF))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_card_support_skill"
+    assert codec.decode_message("c_card_support_skill", reply_body) == {
+        "Supports": [
+            {
+                "HeroCId": STARTER_HERO_ID,
+                "Index": 1,
+                "SupportHeroCId": support_hero.hero_id,
+                "IsAuto": 0,
+            }
+        ]
+    }
+
     writer.data.clear()
     session.outbound = RollingXor(0xCCDDEEFF)
     await game._dispatch(
@@ -4425,6 +4456,33 @@ async def _run_character_menu_requests() -> None:
             "SkillLevel": fight_style_for_character(STARTER_CHARACTER).skill_levels(1),
         }
     ]
+    assert training_info["TrainingData"]["SupportSkill"] == [
+        {
+            "Index": 1,
+            "HeroId": support_hero.hero_id,
+            "ShapeId": support_hero.shape_id,
+            "FashionId": 0,
+        }
+    ]
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x1122448A)
+    support_clear = codec.encode_message(
+        "s_card_support_skill",
+        {"HeroCId": STARTER_HERO_ID, "Index": 1, "SupportHeroCId": 0},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_card_support_skill"],
+        support_clear,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x1122448A))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_card_support_skill"
+    assert codec.decode_message("c_card_support_skill", reply_body) == {
+        "Supports": []
+    }
 
     writer.data.clear()
     session.outbound = RollingXor(0x22448811)
