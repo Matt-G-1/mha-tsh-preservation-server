@@ -511,6 +511,15 @@ environment details are intentionally omitted from Git.
 - Stage clears now emit deterministic pass drops, first-clear rewards, stars,
   best clear time, and pass counts. The local profile store persists that
   stage-progress state across server restarts.
+- Generic `s_stage_report` wins now also bridge back into recovered
+  area-event quest progression. When the client finishes a recovered
+  area-event stage through the normal battle-report path instead of the
+  area-event-specific fight-over packet, the server now emits the matching
+  stage-pass/info/sync packets, advances the paired task, refreshes the visible
+  task list, and persists both stage and task state.
+- Contact/dialogue-style recovered quest completions now send
+  `c_area_event_sync_status` after their linked stage-pass/info packets. This
+  keeps contact tasks and combat tasks on the same area-event UI update path.
 - Completed stage rewards now also grant saved normal-item counts in the
   profile store, giving later inventory/UI packet work a persistent
   player-data backing store.
@@ -659,6 +668,11 @@ environment details are intentionally omitted from Git.
   `192` (`NpcId=71104`, `ShapeId=2993`, preload shapes `2993` and `2994`).
   Automated tests keep that costume out of the normal starter and verified
   playable rosters.
+- Starter-intro stage entry now deploys intro-only fighter presentation where
+  recovered evidence supports it: the `299301` intro cluster can render
+  Midoriya with the school-uniform `ShapeId=2993`, while the All Might
+  `502601` intro/drama battle can render the owned All Might card for the
+  stage without switching the player's active roster card in world state.
 - The user-supplied All Might silhouette/subtitle screenshot did not match the
   recovered `1294fd82be3620d3` FLV frames. The closer local leads are the
   `zx_ruxue*` drama scripts and copyright-prefixed `zx_ruxue` assets in the
@@ -687,9 +701,10 @@ Current limitations:
    The earlier login-drama path and the newer stage-enter intro probe are still
    candidate-driven until controlled client logs confirm the exact intro stage
    and transition behavior.
-   The school-uniform Midoriya shape is cataloged for intro-only use, but the
-   stage/fighter packet layer that would deploy it during the back-alley or
-   All Might tutorial scene still needs to be implemented and live-tested.
+   The school-uniform Midoriya shape and All Might intro-stage fighter override
+   are implemented in the stage/fighter packet layer, but the exact archived
+   back-alley/QTE transition sequence still needs controlled client validation
+   and any missing stage-order glue.
 3. Seven map/NPC protocol rows are proven and render in the client, but the
    current nearby placements are local demonstration coordinates rather than
    archived authored placements. The `demo_cast` placement is visibly crowded,
