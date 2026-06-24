@@ -1567,6 +1567,11 @@ class GameServer:
                         stage=stage,
                     ),
                 )
+                await self._send_area_event_stage_report_progression(
+                    writer,
+                    session,
+                    stage_result,
+                )
         elif name == "s_frame_monster_data":
             session.stage.record_monster_frame_data(values)
         elif name == "s_stage_frame_report":
@@ -2136,6 +2141,47 @@ class GameServer:
         if session.stage.current_stage_id:
             return stage_candidate_or_generated(session.stage.current_stage_id)
         return self.intro_stage_candidate
+
+    async def _send_area_event_stage_report_progression(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        stage_result: dict[str, Any],
+    ) -> None:
+        if int(stage_result.get("Result") or 0) != 1:
+            return
+        stage_id = session.tasks.canonical_area_event_stage_id(
+            int(stage_result.get("StageId") or 0)
+        )
+        event_round = session.tasks.area_event_id_for_stage(stage_id)
+        if event_round <= 0:
+            return
+        roster = self._ensure_roster(session)
+        await self._send(
+            writer,
+            session,
+            "c_area_event_stage_pass",
+            session.stage.area_event_stage_pass(stage_id),
+        )
+        await self._send(
+            writer,
+            session,
+            "c_area_event_info",
+            session.stage.area_event_info(stage_id),
+        )
+        task_update = session.tasks.complete_area_event_stage(stage_id)
+        if task_update is not None:
+            await self._send_task_progression(writer, session, task_update)
+        await self._send(
+            writer,
+            session,
+            "c_area_event_sync_status",
+            session.stage.area_event_sync_status(
+                stage_id,
+                event_round=event_round,
+                hero_uids=[roster.active_card_uid],
+            ),
+        )
 
     async def _enter_requested_stage(
         self,

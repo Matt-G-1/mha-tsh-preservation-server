@@ -5027,6 +5027,10 @@ def test_area_event_task_progress_restores_from_stage_progress(
     asyncio.run(_run_area_event_task_progress_persistence(tmp_path))
 
 
+def test_stage_report_progresses_area_event_tasks(tmp_path: Path) -> None:
+    asyncio.run(_run_area_event_stage_report_progression(tmp_path))
+
+
 def test_contact_sync_progress_persists_area_event_stage_state(
     tmp_path: Path,
 ) -> None:
@@ -5456,6 +5460,106 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
     assert restored_first_task["Cond"][0]["CompCount"] == 1
     assert 280101 in restored_area_tasks["finishs"]
     assert second_session.stage.area_event_login_data(
+        normal_lineup=[STARTER_CARD_UID]
+    )["CacheStageId"] == 21121
+
+
+async def _run_area_event_stage_report_progression(tmp_path: Path) -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    profile_path = tmp_path / "profiles.json"
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_PROFILE_STORE": str(profile_path),
+            "MHATSH_ROSTER_MODE": "verified",
+            "MHATSH_STAGE_REPORT_RESPONSE": "complete",
+        },
+    ):
+        game = GameServer(registry)
+        writer = BufferWriter()
+        session = Session(
+            seed=1,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x53545231),
+            urs="local-guest",
+            uid=4242,
+        )
+        game._configure_session(session)
+        session.stage.enter_recovered_stage(stage_candidate_by_id(21111))
+        report = codec.encode_message(
+            "s_stage_report",
+            {
+                "Id": 21111,
+                "Result": 1,
+                "MaxCombo": 23,
+                "AllDmg": 7100,
+                "ItemNum": [{"ItemId": 1001, "Amount": 2}],
+                "EndReport": {
+                    "RoundTimeUse": 32,
+                    "RoundFighterDpsTotal": 7100,
+                    "RoundFighterComboMax": 23,
+                },
+            },
+        )
+        await game._dispatch(
+            session,
+            registry.protocol_ids["s_stage_report"],
+            report,
+            writer,
+        )
+
+        decoder = FrameDecoder(RollingXor(0x53545231))
+        replies = decoder.feed(bytes(writer.data))
+        assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+            "c_stage_drop",
+            "c_stage_result",
+            "c_stage_end_gm",
+            "c_area_event_stage_pass",
+            "c_area_event_info",
+            "c_task_info_update",
+            "c_task_info",
+            "c_area_event_sync_status",
+        ]
+        result = codec.decode_message("c_stage_result", replies[1][1])
+        assert result["StageId"] == 21111
+        area_pass = codec.decode_message("c_area_event_stage_pass", replies[3][1])
+        assert area_pass["Star"] == [1]
+        task_update = codec.decode_message("c_task_info_update", replies[5][1])
+        assert task_update["task_info"]["Id"] == 280101
+        assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+        refreshed_tasks = codec.decode_message("c_task_info", replies[6][1])
+        assert [task["Id"] for task in refreshed_tasks["tasks"][:4]] == [
+            STARTER_TASK.id,
+            1010,
+            280101,
+            100602,
+        ]
+        area_sync = codec.decode_message("c_area_event_sync_status", replies[7][1])
+        assert area_sync["StageId"] == 21111
+        assert area_sync["EventRound"] == 280101
+
+        restored_game = GameServer(registry)
+        restored_session = Session(
+            seed=2,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x53545232),
+            urs="local-guest",
+            uid=4242,
+        )
+        restored_game._configure_session(restored_session)
+
+    raw_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    assert raw_profile["stage_progress"]["local-guest"]["21111"]["status"] == 1
+    assert 280101 in raw_profile["finished_tasks"]["local-guest"]
+    restored_task_info = restored_session.tasks.task_info(
+        RECOVERED_AREA_EVENT_TASK_TYPE
+    )
+    assert restored_task_info["tasks"][0]["Id"] == 280101
+    assert restored_task_info["tasks"][0]["Status"] == TASK_STATUS_FINISHED
+    assert restored_session.stage.area_event_login_data(
         normal_lineup=[STARTER_CARD_UID]
     )["CacheStageId"] == 21121
 
