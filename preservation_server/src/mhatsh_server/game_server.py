@@ -26,6 +26,7 @@ from .characters import (
     scene_npc_from_spawn,
 )
 from .combat import fight_style_for_character
+from .intro import SCHOOL_MIDORIYA_INTRO_COSTUME
 from .profile_store import ProfileStore
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .roguelike_stages import ROGUELIKE_STAGES
@@ -2266,6 +2267,14 @@ class GameServer:
         support_skills = session.character_menu.training_support_skills(
             active.hero_id, roster
         )
+        shape_id = active.shape_id
+        is_school_intro_midoriya = (
+            session.stage.current_stage_id == STARTER_INTRO_STAGE_ID
+            and active.character.model_asset_id
+            == SCHOOL_MIDORIYA_INTRO_COSTUME.owner_model_asset_id
+        )
+        if is_school_intro_midoriya:
+            shape_id = SCHOOL_MIDORIYA_INTRO_COSTUME.shape_id
         return {
             "Uid": session.uid,
             "X": STARTER_SCENE_X,
@@ -2286,7 +2295,7 @@ class GameServer:
                 {
                     "Mid": active.card_uid,
                     "HeroId": active.hero_id,
-                    "ShapeId": active.shape_id,
+                    "ShapeId": shape_id,
                     "FashionId": 0,
                     "PeakAttrId": 0,
                     "Infos": [],

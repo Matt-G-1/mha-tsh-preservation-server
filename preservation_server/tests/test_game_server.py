@@ -7344,7 +7344,7 @@ async def _run_starter_intro_stage_probe() -> None:
     fighter = codec.decode_message("c_frame_fighter_data", replies[2][1])
     assert fighter["HeroId"] == STARTER_HERO_ID
     assert fighter["CardUid"] == STARTER_CARD_UID
-    assert fighter["Heros"][0]["ShapeId"] == STARTER_SHAPE_ID
+    assert fighter["Heros"][0]["ShapeId"] == SCHOOL_MIDORIYA_INTRO_COSTUME.shape_id
     assert fighter["Heros"][0]["CardSkillLevel"] == fight_style_for_character(
         STARTER_CHARACTER
     ).protocol_skill_levels(1)
@@ -7818,6 +7818,10 @@ async def _run_requested_stage_enter_packets() -> None:
         "c_frame_fighter_data",
     ]
     assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 299301
+    intro_fighter = codec.decode_message("c_frame_fighter_data", replies[1][1])
+    assert intro_fighter["Heros"][0]["ShapeId"] == (
+        SCHOOL_MIDORIYA_INTRO_COSTUME.shape_id
+    )
     assert session.stage.current_stage_key == "starter_intro_299301"
 
     writer.data.clear()
@@ -7839,6 +7843,8 @@ async def _run_requested_stage_enter_packets() -> None:
         "c_frame_fighter_data",
     ]
     assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 400101
+    normal_fighter = codec.decode_message("c_frame_fighter_data", replies[1][1])
+    assert normal_fighter["Heros"][0]["ShapeId"] == STARTER_SHAPE_ID
     assert session.stage.current_stage_key == "roguelike_stage_400101"
 
     writer.data.clear()
