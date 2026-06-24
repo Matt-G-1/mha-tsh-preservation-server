@@ -552,6 +552,13 @@ environment details are intentionally omitted from Git.
   `801203`, and `1001101`, while preserving stronger `zx`, asset-header,
   stage-cfg, and USJ ownership for conflicting IDs. The numeric index parser
   also now captures the 42-script `562502` stage branch.
+- Nonnumeric drama-family recovery now groups 496 extracted script hooks into
+  28 evidence-only clusters, including activity/event scripts, chase and bus
+  QTEs, city patrol branches, stage/PVP/card guides, campaign openings,
+  training-yard extras, beach QTEs, TX branches, XHT extras, and uppercase ZX
+  branches. These stay non-enterable until stronger stage IDs or quest routes
+  are recovered, but the server catalog now preserves them for quest/tutorial
+  ordering work.
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.

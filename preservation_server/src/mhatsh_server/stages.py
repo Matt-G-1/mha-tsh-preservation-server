@@ -24,6 +24,10 @@ from .act_daily_stages import (
     ACT_DAILY_STAGES,
 )
 from .combat import CombatResolution, FightStyle
+from .drama_family_stages import (
+    DRAMA_FAMILY_STAGE_SOURCE,
+    DRAMA_FAMILY_STAGES,
+)
 from .empty_shop_stages import (
     DEFAULT_EMPTY_SHOP_STAGE,
     EMPTY_SHOP_STAGE_BY_CHALLENGE_INDEX,
@@ -2337,6 +2341,19 @@ def _prefixed_numeric_drama_stage_definitions() -> tuple[BattleStageDefinition, 
     )
 
 
+def _drama_family_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    return tuple(
+        BattleStageDefinition(
+            key=stage.key,
+            label=stage.label,
+            stage_id=None,
+            scripts=stage.scripts,
+            source=DRAMA_FAMILY_STAGE_SOURCE,
+        )
+        for stage in DRAMA_FAMILY_STAGES
+    )
+
+
 def _area_event_stage_definitions() -> tuple[BattleStageDefinition, ...]:
     occupied_ids = (
         EXPLICIT_RECOVERED_STAGE_IDS
@@ -2799,6 +2816,7 @@ RECOVERED_BATTLE_STAGES = (
     *_secret_area_stage_definitions(),
     *_allsvr_stage_definitions(),
     *_empty_shop_stage_definitions(),
+    *_drama_family_stage_definitions(),
     BattleStageDefinition(
         key="battle_drama_zx_only",
         label="battle drama scripts without recovered numeric stage id",

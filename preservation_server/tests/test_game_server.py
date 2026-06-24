@@ -104,6 +104,11 @@ from mhatsh_server.combat_action_hints import RECOVERED_HERO_ACTION_HINTS_BY_MOD
 from mhatsh_server.combat_internal_action_hints import (
     RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL,
 )
+from mhatsh_server.drama_family_stages import (
+    DRAMA_FAMILY_STAGE_BY_KEY,
+    DRAMA_FAMILY_STAGE_SOURCE,
+    DRAMA_FAMILY_STAGES,
+)
 from mhatsh_server.herochip_stages import (
     HEROCHIP_STAGE_BY_ID,
     HEROCHIP_STAGE_SOURCE,
@@ -239,6 +244,18 @@ def _load_prefixed_numeric_drama_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_prefixed_numeric_drama_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_prefixed_numeric_drama_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_drama_family_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_drama_family_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_drama_family_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -785,6 +802,54 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "zx_tyj_dilei02" in training_yard.scripts
     assert "zx_touqiu" in training_yard.scripts
     assert "video/zx/chapter2/touqiu.flv" in training_yard.video_assets
+    stage_guide = stage_candidate_by_key("stage_guide_drama_scripts")
+    assert stage_guide.stage_id is None
+    assert stage_guide.source == DRAMA_FAMILY_STAGE_SOURCE
+    assert stage_guide.scripts == (
+        "stageguide04_1",
+        "stageguide_00",
+        "stageguide_01",
+        "stageguide_02",
+        "stageguide_04",
+        "stageguide_05",
+        "stageguide_09",
+        "stageguide_10",
+    )
+    assert "pvpguide_007" in stage_candidate_by_key(
+        "pvp_guide_drama_scripts"
+    ).scripts
+    assert "chase_qte_qiche5" in stage_candidate_by_key(
+        "chase_drama_scripts"
+    ).scripts
+    assert "cp_1000801_3" in stage_candidate_by_key(
+        "city_patrol_drama_scripts"
+    ).scripts
+    assert "act_70110502try" in stage_candidate_by_key(
+        "activity_misc_drama_scripts"
+    ).scripts
+    assert "beachqte14" in stage_candidate_by_key(
+        "beach_qte_drama_scripts"
+    ).scripts
+    assert "bus_3_23" in stage_candidate_by_key("bus_route_drama_scripts").scripts
+    assert "huodong_ljhs10" in stage_candidate_by_key(
+        "field_activity_drama_scripts"
+    ).scripts
+    assert "sj_5010503" in stage_candidate_by_key(
+        "scenario_journey_drama_scripts"
+    ).scripts
+    assert "txbw_8" in stage_candidate_by_key("tx_branch_drama_scripts").scripts
+    assert "xht_903301_1" in stage_candidate_by_key(
+        "xht_extra_drama_scripts"
+    ).scripts
+    assert "ZX-3-2-5-1" in stage_candidate_by_key(
+        "zx_uppercase_branch_scripts"
+    ).scripts
+    assert "tc_1001101_1" in stage_candidate_by_key(
+        "tc_extra_drama_scripts"
+    ).scripts
+    assert "nightarea-speciel" in stage_candidate_by_key(
+        "night_branch_drama_scripts"
+    ).scripts
 
     relax_stage = stage_candidate_by_id(400301)
     assert relax_stage.key == "relax_stage_400301"
@@ -1253,6 +1318,72 @@ def test_prefixed_numeric_drama_stage_parser_tracks_prefixed_stage_groups() -> N
     )
     assert 301202 not in PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS
     assert 702301 not in PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS
+
+
+def test_drama_family_stage_parser_groups_nonnumeric_script_families() -> None:
+    module = _load_drama_family_stage_hint_script()
+    hints = module.collect_drama_family_stage_hints(ROOT / module.DEFAULT_DRAMA_INDEX)
+
+    generated_rows = {
+        family["key"]: family
+        for family in hints["families"]
+        if isinstance(family, dict)
+    }
+    assert hints["family_count"] == 28
+    assert hints["script_count"] == 496
+    assert DRAMA_FAMILY_STAGE_SOURCE == hints["source"]
+    assert len(DRAMA_FAMILY_STAGES) == hints["family_count"]
+    assert len(DRAMA_FAMILY_STAGE_BY_KEY["activity_misc_drama_scripts"].scripts) == 91
+    assert len(DRAMA_FAMILY_STAGE_BY_KEY["chase_drama_scripts"].scripts) == 34
+    assert generated_rows["stage_guide_drama_scripts"]["scripts"] == (
+        "stageguide04_1",
+        "stageguide_00",
+        "stageguide_01",
+        "stageguide_02",
+        "stageguide_04",
+        "stageguide_05",
+        "stageguide_09",
+        "stageguide_10",
+    )
+    assert generated_rows["pvp_guide_drama_scripts"]["scripts"] == (
+        "pvp_guide_camera",
+        "pvpguide_001",
+        "pvpguide_002",
+        "pvpguide_003",
+        "pvpguide_004",
+        "pvpguide_005",
+        "pvpguide_006",
+        "pvpguide_007",
+    )
+    assert "cp_1000801_3" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "city_patrol_drama_scripts"
+    ].scripts
+    assert "tyj_890003_1" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "training_yard_extra_drama_scripts"
+    ].scripts
+    assert "beachqte14" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "beach_qte_drama_scripts"
+    ].scripts
+    assert "bus_3_23" in DRAMA_FAMILY_STAGE_BY_KEY["bus_route_drama_scripts"].scripts
+    assert "huodong_ljhs10" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "field_activity_drama_scripts"
+    ].scripts
+    assert "sj_5010503" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "scenario_journey_drama_scripts"
+    ].scripts
+    assert "txbw_8" in DRAMA_FAMILY_STAGE_BY_KEY["tx_branch_drama_scripts"].scripts
+    assert "xht_903301_1" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "xht_extra_drama_scripts"
+    ].scripts
+    assert "ZX-3-2-5-1" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "zx_uppercase_branch_scripts"
+    ].scripts
+    assert "tc_1001101_1" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "tc_extra_drama_scripts"
+    ].scripts
+    assert "nightarea-speciel" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "night_branch_drama_scripts"
+    ].scripts
 
 
 def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
