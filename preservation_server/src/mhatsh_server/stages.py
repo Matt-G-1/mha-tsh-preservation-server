@@ -2,6 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .allsvr_stages import (
+    ALLSVR_BOSS_STAGE_BY_BOSS_AND_DIFFICULTY,
+    ALLSVR_BOSS_STAGE_BY_ID,
+    ALLSVR_BOSS_STAGES,
+    ALLSVR_COND_IDS,
+    ALLSVR_STAGE_BY_ID,
+    ALLSVR_STAGE_SOURCE,
+    ALLSVR_STAGES,
+    DEFAULT_ALLSVR_BOSS_STAGE,
+    DEFAULT_ALLSVR_STAGE,
+)
 from .area_event_stages import (
     AREA_EVENT_STAGE_BY_ID,
     AREA_EVENT_STAGES,
@@ -2102,6 +2113,8 @@ def _asset_numeric_drama_stage_definitions() -> tuple[BattleStageDefinition, ...
         EXPLICIT_RECOVERED_STAGE_IDS
         | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
         | {stage.stage_id for stage in RELAX_STAGES}
+        | {stage.stage_id for stage in ALLSVR_STAGES}
+        | {stage.stage_id for stage in ALLSVR_BOSS_STAGES}
     )
     return tuple(
         BattleStageDefinition(
@@ -2281,6 +2294,44 @@ def _secret_area_stage_definitions() -> tuple[BattleStageDefinition, ...]:
         for stage in SECRET_AREA_STAGES
         if stage.stage_id not in occupied_ids
     )
+
+
+def _allsvr_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | set(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+        | set(STAGE_CFG_SCRIPT_ROUTE_GROUPS)
+        | {stage.stage_id for stage in AREA_EVENT_STAGES}
+        | {stage.stage_id for stage in ACT_DAILY_STAGES}
+        | {stage.stage_id for stage in USJ_STAGES}
+        | {stage.stage_id for stage in HEROCHIP_STAGES}
+        | {stage.stage_id for stage in ROGUELIKE_STAGES}
+        | {stage.stage_id for stage in RELAX_STAGES}
+        | {stage.stage_id for stage in SECRET_AREA_STAGES}
+    )
+    regular = tuple(
+        BattleStageDefinition(
+            key=f"allsvr_stage_{stage.stage_id}",
+            label=stage.label,
+            stage_id=stage.stage_id,
+            source=ALLSVR_STAGE_SOURCE,
+        )
+        for stage in ALLSVR_STAGES
+        if stage.stage_id not in occupied_ids
+    )
+    occupied_ids = occupied_ids | {stage.stage_id for stage in ALLSVR_STAGES}
+    bosses = tuple(
+        BattleStageDefinition(
+            key=f"allsvr_boss_stage_{stage.stage_id}",
+            label=stage.label,
+            stage_id=stage.stage_id,
+            source=ALLSVR_STAGE_SOURCE,
+        )
+        for stage in ALLSVR_BOSS_STAGES
+        if stage.stage_id not in occupied_ids
+    )
+    return regular + bosses
 
 
 RECOVERED_BATTLE_STAGES = (
@@ -2530,6 +2581,7 @@ RECOVERED_BATTLE_STAGES = (
     *_zx_numeric_stage_definitions(),
     *_relax_stage_definitions(),
     *_secret_area_stage_definitions(),
+    *_allsvr_stage_definitions(),
     BattleStageDefinition(
         key="battle_drama_zx_only",
         label="battle drama scripts without recovered numeric stage id",
@@ -2888,6 +2940,8 @@ class StageState:
     is_back_checks: list[int] = field(default_factory=list)
     pressure_scores: dict[int, int] = field(default_factory=dict)
     daily_stage_counts: dict[int, int] = field(default_factory=dict)
+    allsvr_level_counts: dict[int, int] = field(default_factory=dict)
+    allsvr_boss_scores: dict[int, int] = field(default_factory=dict)
     completions: dict[int, StageCompletion] = field(default_factory=dict)
     current_usj_point_id: int = 0
 
@@ -3496,6 +3550,104 @@ class StageState:
             ],
         }
 
+    def allsvr_stage(self, level_id: int | None = None):
+        return ALLSVR_STAGE_BY_ID.get(int(level_id or 0), DEFAULT_ALLSVR_STAGE)
+
+    def allsvr_boss_stage(self, boss_id: int = 0, difficulty: int = 0):
+        return ALLSVR_BOSS_STAGE_BY_BOSS_AND_DIFFICULTY.get(
+            (int(boss_id or 0), int(difficulty or 0)),
+            DEFAULT_ALLSVR_BOSS_STAGE,
+        )
+
+    def allsvr_total_score(self) -> int:
+        return sum(self.allsvr_level_counts.values()) * 100 + sum(
+            self.allsvr_boss_scores.values()
+        )
+
+    def allsvr_cond_list(self) -> list[dict[str, object]]:
+        score = self.allsvr_total_score()
+        return [
+            {"Id": cond_id, "State": int(score >= cond_id * 100)}
+            for cond_id in ALLSVR_COND_IDS
+        ]
+
+    def allsvr_stage_info(self, act_id: int = 0) -> dict[str, object]:
+        boss_stage = DEFAULT_ALLSVR_BOSS_STAGE
+        return {
+            "ActId": int(act_id),
+            "AreaInfo": {
+                "Id": DEFAULT_ALLSVR_STAGE.area_id,
+                "Difficult": DEFAULT_ALLSVR_STAGE.difficulty,
+                "LevelList": [{"Id": stage.stage_id} for stage in ALLSVR_STAGES],
+            },
+            "AllSvrScore": self.allsvr_total_score(),
+            "AllSvrCond": self.allsvr_cond_list(),
+            "BossInfo": {
+                "Id": boss_stage.boss_id,
+                "Count": self.allsvr_boss_scores.get(boss_stage.stage_id, 0),
+                "BestScore": self.allsvr_boss_scores.get(boss_stage.stage_id, 0),
+                "TodayScore": self.allsvr_boss_scores.get(boss_stage.stage_id, 0),
+            },
+        }
+
+    def allsvr_stage_update_level(
+        self,
+        act_id: int = 0,
+        level_id: int = 0,
+    ) -> dict[str, object]:
+        stage = self.allsvr_stage(level_id)
+        self.allsvr_level_counts[stage.stage_id] = (
+            self.allsvr_level_counts.get(stage.stage_id, 0) + 1
+        )
+        return {
+            "ActId": int(act_id),
+            "AreaInfo": {
+                "Id": stage.area_id,
+                "RewardList": [
+                    {
+                        "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                        "count": 1,
+                        "extra": [],
+                    }
+                ],
+                "LevelList": [
+                    {
+                        "Id": candidate.stage_id,
+                        "Count": self.allsvr_level_counts.get(candidate.stage_id, 0),
+                    }
+                    for candidate in ALLSVR_STAGES
+                    if candidate.area_id == stage.area_id
+                ],
+            },
+        }
+
+    def allsvr_stage_update_boss(
+        self,
+        act_id: int = 0,
+        boss_id: int = 0,
+        difficulty: int = 0,
+    ) -> dict[str, object]:
+        stage = self.allsvr_boss_stage(boss_id, difficulty)
+        score = self.allsvr_boss_scores.get(stage.stage_id, 0) + 100
+        self.allsvr_boss_scores[stage.stage_id] = score
+        return {
+            "ActId": int(act_id),
+            "BossInfo": {
+                "Id": stage.boss_id,
+                "Count": 1,
+                "Score": score,
+                "BestScore": score,
+                "TodayScore": score,
+            },
+        }
+
+    def allsvr_stage_reward(self, act_id: int = 0) -> dict[str, object]:
+        return {
+            "ActId": int(act_id),
+            "AllSvrScore": self.allsvr_total_score(),
+            "AllSvrCond": self.allsvr_cond_list(),
+        }
+
     def usj_cycle_id(self) -> dict[str, object]:
         return {"CycleId": 1}
 
@@ -3813,6 +3965,12 @@ class StageState:
         self.daily_stage_counts = self._int_section(
             values.get("daily_stage_counts", {})
         )
+        self.allsvr_level_counts = self._int_section(
+            values.get("allsvr_level_counts", {})
+        )
+        self.allsvr_boss_scores = self._int_section(
+            values.get("allsvr_boss_scores", {})
+        )
 
     def export_completions(self) -> dict[int, dict[str, int | list[int]]]:
         return {
@@ -3824,6 +3982,8 @@ class StageState:
         return {
             "pressure_scores": dict(sorted(self.pressure_scores.items())),
             "daily_stage_counts": dict(sorted(self.daily_stage_counts.items())),
+            "allsvr_level_counts": dict(sorted(self.allsvr_level_counts.items())),
+            "allsvr_boss_scores": dict(sorted(self.allsvr_boss_scores.items())),
         }
 
     @staticmethod

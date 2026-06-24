@@ -865,6 +865,38 @@ class GameServer:
                 int(values.get("Id") or 0),
                 hero_id=int(values.get("HeroId") or 0),
             )
+        elif name == "s_act_allsvr_stage_enter":
+            act_id = int(values.get("ActId") or 0)
+            level_id = int(values.get("LevelId") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_act_allsvr_stage_update_level",
+                session.stage.allsvr_stage_update_level(act_id, level_id),
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                session.stage.allsvr_stage(level_id).stage_id,
+                hero_id=int(values.get("Cid") or 0),
+            )
+        elif name == "s_act_allsvr_stage_boss":
+            act_id = int(values.get("ActId") or 0)
+            boss_id = int(values.get("BossId") or 0)
+            difficulty = int(values.get("Diffcult") or 0)
+            stage = session.stage.allsvr_boss_stage(boss_id, difficulty)
+            await self._send(
+                writer,
+                session,
+                "c_act_allsvr_stage_update_boss",
+                session.stage.allsvr_stage_update_boss(act_id, boss_id, difficulty),
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                stage.stage_id,
+                hero_id=int(values.get("Cid") or 0),
+            )
         elif name == "s_act_daily_stage_choose":
             await self._send(
                 writer,
@@ -1269,6 +1301,12 @@ class GameServer:
             await self._send(
                 writer,
                 session,
+                "c_act_allsvr_stage_info",
+                session.stage.allsvr_stage_info(),
+            )
+            await self._send(
+                writer,
+                session,
                 "c_relax_stage_sync_data",
                 session.stage.relax_stage_sync_data(),
             )
@@ -1446,6 +1484,34 @@ class GameServer:
                 session.stage.act_secret_record_list(
                     int(values.get("ActId") or 0),
                 ),
+            )
+        elif name == "s_all_server_cond_get_info":
+            await self._send(
+                writer,
+                session,
+                "c_all_server_cond_get_info",
+                {
+                    "ServerCondInfo": [
+                        {"Id": item["Id"], "Status": item["State"], "PlayerList": []}
+                        for item in session.stage.allsvr_cond_list()
+                    ]
+                },
+            )
+        elif name == "s_all_server_cond_get_reward":
+            cond_id = int(values.get("Id") or 0)
+            cond_state = next(
+                (
+                    item["State"]
+                    for item in session.stage.allsvr_cond_list()
+                    if item["Id"] == cond_id
+                ),
+                0,
+            )
+            await self._send(
+                writer,
+                session,
+                "c_all_server_cond_get_reward",
+                {"Id": cond_id, "Status": cond_state},
             )
         elif name == "s_usj_task":
             await self._send(

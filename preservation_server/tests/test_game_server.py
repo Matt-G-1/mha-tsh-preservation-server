@@ -8,6 +8,13 @@ import struct
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+from mhatsh_server.allsvr_stages import (
+    ALLSVR_BOSS_STAGE_BY_ID,
+    ALLSVR_BOSS_STAGES,
+    ALLSVR_STAGE_BY_ID,
+    ALLSVR_STAGE_SOURCE,
+    ALLSVR_STAGES,
+)
 from mhatsh_server.activity_state import ActivityState
 from mhatsh_server.area_event_stages import (
     AREA_EVENT_STAGE_BY_ID,
@@ -282,6 +289,18 @@ def _load_relax_stage_hint_script():
     return module
 
 
+def _load_allsvr_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_allsvr_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_allsvr_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_secret_area_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_secret_area_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
@@ -533,8 +552,8 @@ def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> Non
 
 def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "battle_stage_candidate_catalog" in STAGE_CATALOG_SOURCE
-    assert len(RECOVERED_BATTLE_STAGES) >= 740
-    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 733
+    assert len(RECOVERED_BATTLE_STAGES) >= 833
+    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 826
     stage_ids = [
         stage.stage_id for stage in RECOVERED_BATTLE_STAGES if stage.stage_id is not None
     ]
@@ -705,6 +724,15 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert stage_candidate_by_id(101608).key == "secret_area_stage_101608"
     assert stage_candidate_by_id(101101).key == "zx_stage_101101"
     assert stage_candidate_by_id(101201).key == "asset_drama_stage_101201"
+
+    allsvr_stage = stage_candidate_by_id(880101)
+    assert allsvr_stage.key == "allsvr_stage_880101"
+    assert allsvr_stage.label == "Entrance 1 Difficulty 1"
+    assert allsvr_stage.source == ALLSVR_STAGE_SOURCE
+    assert stage_candidate_by_id(8832034).label == "Neon City - 3 Difficulty 4"
+    allsvr_boss_stage = stage_candidate_by_id(880312)
+    assert allsvr_boss_stage.key == "allsvr_boss_stage_880312"
+    assert allsvr_boss_stage.label == "Sidero Nightmare"
 
     stage_cfg_route = stage_candidate_by_id(563903)
     assert stage_cfg_route.key == "stage_cfg_route_563903"
@@ -1211,6 +1239,40 @@ def test_relax_stage_hint_parser_tracks_joint_operations_rows() -> None:
         "to cancel out Creation Stance."
     )
     assert generated_rows[400318]["difficulty_name"] == "Hard"
+
+
+def test_allsvr_stage_hint_parser_tracks_activity_rows() -> None:
+    module = _load_allsvr_stage_hint_script()
+    hints = module.collect_allsvr_stage_hints(ROOT / module.DEFAULT_ALLSVR_STAGE_ASSET)
+
+    assert hints["constant_count"] == 3470
+    assert hints["stage_count"] == 84
+    assert hints["boss_stage_count"] == 9
+    assert ALLSVR_STAGE_SOURCE == f"{hints['source']}, parsed 2026-06-24"
+    assert len(ALLSVR_STAGES) == hints["stage_count"]
+    assert len(ALLSVR_BOSS_STAGES) == hints["boss_stage_count"]
+    assert ALLSVR_STAGES[0].stage_id == 880101
+    assert ALLSVR_STAGES[0].label == "Entrance 1 Difficulty 1"
+    assert ALLSVR_STAGE_BY_ID[8832034].label == "Neon City - 3 Difficulty 4"
+    assert ALLSVR_BOSS_STAGE_BY_ID[880110].label == "Humarise Member Safe"
+    assert ALLSVR_BOSS_STAGE_BY_ID[880312].label == "Sidero Nightmare"
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[880101]["prompt"] == (
+        "I'm very nervous, but I won't let everyone down!"
+    )
+    assert generated_rows[8812014]["label"] == "Green Forest - 1 Difficulty 4"
+    assert generated_rows[8832034]["area_id"] == 32
+    boss_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["boss_stages"]
+        if isinstance(stage, dict)
+    }
+    assert boss_rows[880211]["difficulty_name"] == "Danger"
 
 
 def test_secret_area_stage_hint_parser_tracks_stage_key_rows() -> None:
@@ -5746,6 +5808,61 @@ async def _run_requested_stage_enter_packets() -> None:
     assert session.stage.current_stage_key == "all_might_stage_502601"
 
     writer.data.clear()
+    session.outbound = RollingXor(0x5511223E)
+    allsvr = codec.encode_message(
+        "s_act_allsvr_stage_enter",
+        {"ActId": 51, "LevelId": 880101, "Cid": 1041},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_allsvr_stage_enter"],
+        allsvr,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5511223E))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_act_allsvr_stage_update_level",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    allsvr_update = codec.decode_message(
+        "c_act_allsvr_stage_update_level", replies[0][1]
+    )
+    assert allsvr_update["ActId"] == 51
+    assert allsvr_update["AreaInfo"]["Id"] == 1
+    assert allsvr_update["AreaInfo"]["LevelList"][0] == {"Id": 880101, "Count": 1}
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 880101
+    assert session.stage.current_stage_key == "allsvr_stage_880101"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x5511223F)
+    allsvr_boss = codec.encode_message(
+        "s_act_allsvr_stage_boss",
+        {"ActId": 51, "BossId": 3, "Diffcult": 3, "Cid": 1041, "BuffList": []},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_allsvr_stage_boss"],
+        allsvr_boss,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5511223F))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_act_allsvr_stage_update_boss",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    allsvr_boss_update = codec.decode_message(
+        "c_act_allsvr_stage_update_boss", replies[0][1]
+    )
+    assert allsvr_boss_update["BossInfo"]["Id"] == 3
+    assert allsvr_boss_update["BossInfo"]["Score"] == 100
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 880312
+    assert session.stage.current_stage_key == "allsvr_boss_stage_880312"
+
+    writer.data.clear()
     session.outbound = RollingXor(0x55112239)
     pressure_hero = codec.encode_message(
         "s_pressure_hero_fight",
@@ -6711,6 +6828,7 @@ async def _run_activity_and_side_task_requests() -> None:
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_stage_activity_info",
+        "c_act_allsvr_stage_info",
         "c_relax_stage_sync_data",
         "c_relax_stage_boxinfo",
         "c_relax_stage_sync_cond",
@@ -6725,12 +6843,17 @@ async def _run_activity_and_side_task_requests() -> None:
     assert codec.decode_message("c_stage_activity_info", replies[0][1]) == {
         "ProgressInfo": []
     }
-    relax_sync = codec.decode_message("c_relax_stage_sync_data", replies[1][1])
+    allsvr_info = codec.decode_message("c_act_allsvr_stage_info", replies[1][1])
+    assert allsvr_info["ActId"] == 0
+    assert len(allsvr_info["AreaInfo"]["LevelList"]) == len(ALLSVR_STAGES)
+    assert allsvr_info["AreaInfo"]["LevelList"][0] == {"Id": 880101}
+    assert allsvr_info["BossInfo"]["Id"] == 1
+    relax_sync = codec.decode_message("c_relax_stage_sync_data", replies[2][1])
     assert len(relax_sync["RoundData"]) == len(RELAX_STAGES)
     assert relax_sync["RoundData"][0] == {"Id": 400301, "Status": 0, "Reward": 0}
     assert relax_sync["RoundData"][-1] == {"Id": 400318, "Status": 0, "Reward": 0}
     assert relax_sync["DailyBoxTimes"] == 0
-    assert codec.decode_message("c_relax_stage_boxinfo", replies[2][1]) == {
+    assert codec.decode_message("c_relax_stage_boxinfo", replies[3][1]) == {
         "BoxInfo": [
             {
                 "Uid": 10001,
@@ -6742,24 +6865,24 @@ async def _run_activity_and_side_task_requests() -> None:
             }
         ]
     }
-    assert codec.decode_message("c_relax_stage_sync_cond", replies[3][1]) == {
+    assert codec.decode_message("c_relax_stage_sync_cond", replies[4][1]) == {
         "NewData": [{"Type": 1, "Id": 400301, "Status": 0, "Reward": 0}]
     }
-    assert codec.decode_message("c_activity_shop_info", replies[4][1]) == {
+    assert codec.decode_message("c_activity_shop_info", replies[5][1]) == {
         "BuyInfo": []
     }
-    assert codec.decode_message("c_entrust_task_list", replies[5][1]) == {
+    assert codec.decode_message("c_entrust_task_list", replies[6][1]) == {
         "Version": 1,
         "EntrustTaskData": [],
     }
-    assert codec.decode_message("c_secret_area_task", replies[6][1]) == {
+    assert codec.decode_message("c_secret_area_task", replies[7][1]) == {
         "TaskList": []
     }
-    assert codec.decode_message("c_usj_task", replies[7][1]) == {"TaskList": []}
-    assert codec.decode_message("c_offlinepvp_task", replies[8][1]) == {
+    assert codec.decode_message("c_usj_task", replies[8][1]) == {"TaskList": []}
+    assert codec.decode_message("c_offlinepvp_task", replies[9][1]) == {
         "TaskList": []
     }
-    assert codec.decode_message("c_battlefield_task_info", replies[9][1]) == {
+    assert codec.decode_message("c_battlefield_task_info", replies[10][1]) == {
         "IsFightOver": 0,
         "IsGetDayReward": 0,
         "IsGetWeekReward": 0,
@@ -6767,7 +6890,7 @@ async def _run_activity_and_side_task_requests() -> None:
         "FreshenTime": 0,
         "Tasks": [],
     }
-    assert codec.decode_message("c_group_open_map", replies[10][1]) == {
+    assert codec.decode_message("c_group_open_map", replies[11][1]) == {
         "MapAttackArea": []
     }
     assert session.activities.requested_activity_types == [17]
