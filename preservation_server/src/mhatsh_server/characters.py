@@ -366,6 +366,16 @@ DEMO_CAST_MAP_SPAWNS = (
     ),
 )
 
+QUEST_CONTACT_MAP_SPAWN_BY_NPC_ID = {
+    int(spawn.character.npc_id): spawn
+    for spawn in DEMO_CAST_MAP_SPAWNS
+    if spawn.character.npc_id is not None
+}
+
+
+def quest_contact_map_spawn(npc_id: int) -> MapSpawn | None:
+    return QUEST_CONTACT_MAP_SPAWN_BY_NPC_ID.get(int(npc_id))
+
 
 def map_spawns(mode: str | None = None) -> tuple[MapSpawn, ...]:
     normalized = (mode or "starter").strip().lower()

@@ -83,6 +83,7 @@ from mhatsh_server.characters import (
     map_spawns,
     playable_card,
     playable_roster,
+    quest_contact_map_spawn,
     scene_npc,
     scene_npc_from_spawn,
     support_card_book_entries,
@@ -2882,6 +2883,8 @@ def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
         5035,
         5041,
     }
+    assert quest_contact_map_spawn(5009) is DEMO_CAST_MAP_SPAWNS[3]
+    assert quest_contact_map_spawn(6669) is None
 
 
 def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
@@ -4361,6 +4364,16 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     visible_gate_tasks = [task["Id"] for task in gate_state.task_info()["tasks"]]
     assert 141003 in visible_gate_tasks
     assert visible_gate_tasks.index(104702) < visible_gate_tasks.index(141003)
+    contact_spawn_state = TaskState()
+    contact_spawn_state.skip_starter_quest()
+    assert contact_spawn_state.claim_active_quest_contact_spawn_candidates() == ()
+    contact_spawn_state.complete_area_event_stage(21311)
+    contact_spawn_candidates = (
+        contact_spawn_state.claim_active_quest_contact_spawn_candidates()
+    )
+    assert [candidate.task_id for candidate in contact_spawn_candidates] == [102203]
+    assert contact_spawn_candidates[0].scene_npc_ids == (5009,)
+    assert contact_spawn_state.claim_active_quest_contact_spawn_candidates() == ()
 
 
 def test_activity_state_returns_empty_compatibility_payloads() -> None:
@@ -4956,6 +4969,10 @@ def test_base_station_activation_progresses_certification_task(
 
 def test_area_event_completion_auto_finishes_empty_act_gate() -> None:
     asyncio.run(_run_area_event_auto_gate_progression())
+
+
+def test_area_event_progression_spawns_verified_contact_npc() -> None:
+    asyncio.run(_run_area_event_contact_npc_spawn())
 
 
 def test_finished_task_ids_persist_across_server_instances(tmp_path: Path) -> None:
@@ -5634,6 +5651,54 @@ async def _run_area_event_auto_gate_progression() -> None:
     area_sync = codec.decode_message("c_area_event_sync_status", replies[6][1])
     assert area_sync["StageId"] == 21451
     assert area_sync["EventRound"] == 280405
+
+
+async def _run_area_event_contact_npc_spawn() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x5453554B),
+        urs="contact-user",
+        uid=4242,
+    )
+    game._configure_session(session)
+    area_over = codec.encode_message(
+        "s_area_event_fight_over",
+        {"StageId": 21311, "IsWin": 1, "UseTime": 31},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_area_event_fight_over"],
+        area_over,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x5453554B))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_area_event_stage_pass",
+        "c_area_event_info",
+        "c_task_info_update",
+        "c_task_info",
+        "c_scene_npc_create",
+        "c_area_event_sync_status",
+    ]
+    task_update = codec.decode_message("c_task_info_update", replies[2][1])
+    assert task_update["task_info"]["Id"] == 280301
+    task_info = codec.decode_message("c_task_info", replies[3][1])
+    assert any(task["Id"] == 102203 for task in task_info["tasks"])
+    npc_create = codec.decode_message("c_scene_npc_create", replies[4][1])
+    assert npc_create == {
+        "NpcList": [scene_npc_from_spawn(quest_contact_map_spawn(5009))]
+    }
+    assert session.tasks.claim_active_quest_contact_spawn_candidates() == ()
 
 
 async def _run_finished_task_id_persistence(tmp_path: Path) -> None:

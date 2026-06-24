@@ -156,6 +156,7 @@ class TaskState:
         }
         self.finished: set[int] = set()
         self.spawned_task_npcs: set[int] = set()
+        self.spawned_contact_task_npcs: set[int] = set()
 
     def task_info(self, task_type: int | None = None) -> dict[str, object]:
         tasks = [
@@ -343,6 +344,20 @@ class TaskState:
             for candidate in RECOVERED_QUEST_CONTACT_CANDIDATES
             if candidate.task_id in active_task_ids
         )
+
+    def claim_active_quest_contact_spawn_candidates(
+        self,
+    ) -> tuple[QuestContactCandidate, ...]:
+        candidates = tuple(
+            candidate
+            for candidate in self.active_quest_contact_candidates()
+            if candidate.scene_npc_ids
+            and candidate.task_id not in self.spawned_contact_task_npcs
+        )
+        self.spawned_contact_task_npcs.update(
+            candidate.task_id for candidate in candidates
+        )
+        return candidates
 
     def _task(self, task_id: int) -> TaskRecord:
         task = self.tasks.get(task_id)

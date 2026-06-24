@@ -22,6 +22,7 @@ from .characters import (
     TUTORIAL_MAP_SPAWNS,
     map_spawns,
     playable_roster,
+    quest_contact_map_spawn,
     scene_npc_from_spawn,
 )
 from .combat import fight_style_for_character
@@ -2032,6 +2033,7 @@ class GameServer:
                     ]
                 },
             )
+        await self._send_active_quest_contact_npcs(writer, session)
 
     async def _send_initial_cards(
         self, writer: asyncio.StreamWriter, session: Session
@@ -2390,6 +2392,7 @@ class GameServer:
                 )
             for auto_update in session.tasks.complete_auto_act_gates():
                 await self._send_task_progression(writer, session, auto_update)
+            await self._send_active_quest_contact_npcs(writer, session)
         if int(task_info.get("Id") or 0) != STARTER_TASK_ID:
             return
         if int(task_info.get("Status") or 0) != 3:
@@ -2403,6 +2406,29 @@ class GameServer:
         roster = self._ensure_roster(session)
         await self._send_stage_enter(
             writer, session, roster, self._intro_stage_definition()
+        )
+
+    async def _send_active_quest_contact_npcs(
+        self, writer: asyncio.StreamWriter, session: Session
+    ) -> None:
+        spawns = []
+        for candidate in session.tasks.claim_active_quest_contact_spawn_candidates():
+            for npc_id in candidate.scene_npc_ids:
+                spawn = quest_contact_map_spawn(npc_id)
+                if spawn is not None:
+                    spawns.append(spawn)
+        if not spawns:
+            return
+        await self._send(
+            writer,
+            session,
+            "c_scene_npc_create",
+            {
+                "NpcList": [
+                    scene_npc_from_spawn(spawn)
+                    for spawn in spawns
+                ]
+            },
         )
 
     def _intro_stage_definition(self) -> BattleStageDefinition:
