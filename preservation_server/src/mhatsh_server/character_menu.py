@@ -277,7 +277,7 @@ class CharacterMenuState:
                 "EquipHideAttr": [],
                 "AttachedCardBuff": [],
                 "ActiveCards": [],
-                "SupportSkill": self._training_support_skills(active.hero_id, roster),
+                "SupportSkill": self.training_support_skills(active.hero_id, roster),
             }
         }
 
@@ -312,7 +312,7 @@ class CharacterMenuState:
             for card in sorted(roster.cards.values(), key=lambda item: item.card_uid)
         ]
 
-    def _training_support_skills(
+    def training_support_skills(
         self, hero_cid: int, roster: RosterState
     ) -> list[dict[str, object]]:
         cards_by_hero_id = {card.hero_id: card for card in roster.cards.values()}

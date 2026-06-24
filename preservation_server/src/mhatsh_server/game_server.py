@@ -7,7 +7,7 @@ import os
 import secrets
 import struct
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .activity_state import ActivityState
@@ -1502,12 +1502,75 @@ class GameServer:
                 pass
         if changed:
             self._remember_active_card(session, roster)
+        await self._send_stage_enter(writer, session, roster, stage)
+
+    async def _send_stage_enter(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        roster: RosterState,
+        stage: BattleStageDefinition,
+    ) -> None:
         await self._send(
             writer,
             session,
             "c_stage_enter",
             session.stage.enter_recovered_stage(stage),
         )
+        await self._send(
+            writer,
+            session,
+            "c_frame_fighter_data",
+            self._frame_fighter_data(session, roster),
+        )
+
+    def _frame_fighter_data(
+        self, session: Session, roster: RosterState
+    ) -> dict[str, Any]:
+        active = roster.active_card
+        skill_levels = fight_style_for_character(active.character).skill_levels(
+            roster.hero_level
+        )
+        support_skills = session.character_menu.training_support_skills(
+            active.hero_id, roster
+        )
+        return {
+            "Uid": session.uid,
+            "X": STARTER_SCENE_X,
+            "Y": STARTER_SCENE_Y,
+            "Face": 0,
+            "Camp": 0,
+            "Name": "Local Hero",
+            "Level": self.player_level,
+            "StageLevel": roster.hero_level,
+            "Exp": 0,
+            "HeroId": active.hero_id,
+            "CardUid": active.card_uid,
+            "Fighting": roster.hero_level * 1000 + active.hero_id,
+            "AvatarId": 0,
+            "AvatarFrameId": 0,
+            "RobotId": 0,
+            "Heros": [
+                {
+                    "Mid": active.card_uid,
+                    "HeroId": active.hero_id,
+                    "ShapeId": active.shape_id,
+                    "FashionId": 0,
+                    "PeakAttrId": 0,
+                    "Infos": [],
+                    "CardSkillLevel": skill_levels,
+                    "CardSpecLevel": [],
+                    "RuneSpecList": [],
+                    "Buffs": [],
+                    "AttachedCardBuff": [],
+                    "ActiveCards": [],
+                    "SupportSkill": support_skills,
+                }
+            ],
+            "EquipHideAttr": [],
+            "CampaignBuffArgs": [],
+            "GroupBuffs": [],
+        }
 
     async def _send_scene_player_info(
         self,
@@ -1659,18 +1722,19 @@ class GameServer:
     async def _send_starter_intro_stage(
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
-        await self._send(
-            writer,
-            session,
-            "c_stage_enter",
-            session.stage.enter_stage(
-                self.intro_stage_id,
-                stage_uid=self.intro_stage_uid,
-                level=self.intro_stage_level,
-                time_limit=self.intro_stage_time,
-                drama=self.intro_stage_drama,
-                stage_key=self.intro_stage_candidate.key,
-            ),
+        roster = self._ensure_roster(session)
+        await self._send_stage_enter(
+            writer, session, roster, self._intro_stage_definition()
+        )
+
+    def _intro_stage_definition(self) -> BattleStageDefinition:
+        return replace(
+            self.intro_stage_candidate,
+            stage_id=self.intro_stage_id,
+            stage_uid=self.intro_stage_uid,
+            level=self.intro_stage_level,
+            time_limit=self.intro_stage_time,
+            drama=self.intro_stage_drama,
         )
 
     async def _maybe_send_starter_intro_stage(

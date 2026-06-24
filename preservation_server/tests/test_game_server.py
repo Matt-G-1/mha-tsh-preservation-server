@@ -5110,6 +5110,7 @@ async def _run_starter_intro_stage_probe() -> None:
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_task_enter_stage",
         "c_stage_enter",
+        "c_frame_fighter_data",
     ]
     assert codec.decode_message("c_task_enter_stage", replies[0][1]) == {
         "IsEnter": 1
@@ -5125,7 +5126,15 @@ async def _run_starter_intro_stage_probe() -> None:
         "IsRecord": 0,
         "Extra": [],
     }
+    fighter = codec.decode_message("c_frame_fighter_data", replies[2][1])
+    assert fighter["HeroId"] == STARTER_HERO_ID
+    assert fighter["CardUid"] == STARTER_CARD_UID
+    assert fighter["Heros"][0]["ShapeId"] == STARTER_SHAPE_ID
+    assert fighter["Heros"][0]["CardSkillLevel"] == fight_style_for_character(
+        STARTER_CHARACTER
+    ).skill_levels(1)
     assert session.stage.current_stage_id == STARTER_INTRO_STAGE_ID
+    assert session.stage.encounter_frames[0]["Info"]["Id"] == 3002
 
 
 async def _run_stage_lifecycle_packets() -> None:
@@ -5386,11 +5395,18 @@ async def _run_requested_stage_enter_packets() -> None:
     )
 
     decoder = FrameDecoder(RollingXor(0x55112233))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
-    assert registry.protocol_names[reply_id] == "c_stage_enter"
-    stage_enter = codec.decode_message("c_stage_enter", reply_body)
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    stage_enter = codec.decode_message("c_stage_enter", replies[0][1])
     assert stage_enter["StageId"] == 502601
     assert stage_enter["StageUid"] == 5026010001
+    fighter = codec.decode_message("c_frame_fighter_data", replies[1][1])
+    assert fighter["HeroId"] == 1041
+    assert fighter["CardUid"] == session.roster.active_card_uid
+    assert fighter["Heros"][0]["ShapeId"] == 1003
     assert session.stage.current_stage_key == "all_might_stage_502601"
     assert session.stage.encounter_frames[0]["Info"]["Id"] == 3002
     assert session.roster is not None
@@ -5410,11 +5426,17 @@ async def _run_requested_stage_enter_packets() -> None:
     )
 
     decoder = FrameDecoder(RollingXor(0x55112234))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
-    assert registry.protocol_names[reply_id] == "c_stage_enter"
-    generated = codec.decode_message("c_stage_enter", reply_body)
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    generated = codec.decode_message("c_stage_enter", replies[0][1])
     assert generated["StageId"] == 777777
     assert generated["StageUid"] == 7777770001
+    assert codec.decode_message("c_frame_fighter_data", replies[1][1])[
+        "HeroId"
+    ] == 1041
     assert session.stage.current_stage_key == "generated_stage_777777"
     assert [frame["Info"]["Id"] for frame in session.stage.encounter_frames] == [
         2202,
@@ -5445,13 +5467,16 @@ async def _run_requested_stage_enter_packets() -> None:
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_stage_enter",
+        "c_frame_fighter_data",
         "c_area_event_info",
     ]
     area_stage_enter = codec.decode_message("c_stage_enter", replies[0][1])
     assert area_stage_enter["StageId"] == 21111
     assert area_stage_enter["StageUid"] == 211110001
+    area_fighter = codec.decode_message("c_frame_fighter_data", replies[1][1])
+    assert area_fighter["CardUid"] == STARTER_CARD_UID + 1
     assert session.stage.current_stage_key == "area_event_stage_21111"
-    area_info = codec.decode_message("c_area_event_info", replies[1][1])
+    area_info = codec.decode_message("c_area_event_info", replies[2][1])
     assert area_info["StageData"] == {
         "StageId": 21111,
         "PassedTimes": 0,
@@ -5717,6 +5742,7 @@ async def _run_stage_family_info_packets() -> None:
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_herochip_stage_sync_data",
         "c_stage_enter",
+        "c_frame_fighter_data",
     ]
     herochip_sync = codec.decode_message("c_herochip_stage_sync_data", replies[0][1])
     assert len(herochip_sync["DailyTimes"]) == len(HEROCHIP_STAGES)
@@ -5724,6 +5750,9 @@ async def _run_stage_family_info_packets() -> None:
     assert herochip_sync["PassStage"] == []
     herochip_stage = codec.decode_message("c_stage_enter", replies[1][1])
     assert herochip_stage["StageId"] == 370101
+    assert codec.decode_message("c_frame_fighter_data", replies[2][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID
     assert session.stage.current_stage_key == "herochip_stage_370101"
 
     writer.data.clear()
@@ -5776,6 +5805,7 @@ async def _run_stage_family_info_packets() -> None:
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_usj_enter_stage",
         "c_stage_enter",
+        "c_frame_fighter_data",
     ]
     assert codec.decode_message("c_usj_enter_stage", replies[0][1]) == {
         "ZoneId": 1001,
@@ -5784,6 +5814,9 @@ async def _run_stage_family_info_packets() -> None:
     }
     usj_stage_enter = codec.decode_message("c_stage_enter", replies[1][1])
     assert usj_stage_enter["StageId"] == 700101
+    assert codec.decode_message("c_frame_fighter_data", replies[2][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID
     assert session.stage.current_usj_point_id == 100101
     assert session.stage.current_stage_key == "usj_stage_700101"
 
@@ -5901,11 +5934,15 @@ async def _run_starter_guide_intro_stage_probe() -> None:
     decoder = FrameDecoder(RollingXor(0x3344AABD))
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
-        "c_stage_enter"
+        "c_stage_enter",
+        "c_frame_fighter_data",
     ]
     assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == (
         STARTER_INTRO_STAGE_ID
     )
+    assert codec.decode_message("c_frame_fighter_data", replies[1][1])[
+        "HeroId"
+    ] == STARTER_HERO_ID
     assert session.pending_starter_intro_stage is False
 
     writer.data.clear()
