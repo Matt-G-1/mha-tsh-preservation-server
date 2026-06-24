@@ -79,6 +79,7 @@ from mhatsh_server.combat import (
     HERO_SKILL_INFO_EVIDENCE_BY_MODEL,
     HERO_SUPPORT_SKILL_EVIDENCE_BY_MODEL,
     HERO_SKILL_VIDEO_EVIDENCE_BY_MODEL,
+    NON_PLAYABLE_FIGHT_STYLE_MODEL_IDS,
     fight_style_for_character,
     skill_slot_labels_for_command,
 )
@@ -1921,6 +1922,8 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert {
         character.model_asset_id for character in VERIFIED_PLAYABLE_ROSTER
     }.issubset(FIGHT_STYLES_BY_MODEL)
+    assert "h1018" in FIGHT_STYLES_BY_MODEL
+    assert NON_PLAYABLE_FIGHT_STYLE_MODEL_IDS == frozenset({"h1018"})
     assert {
         character.model_asset_id for character in VERIFIED_PLAYABLE_ROSTER
     }.issubset(HERO_CFG_COMBAT_METADATA_BY_MODEL)
@@ -2657,15 +2660,12 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert "通行百万W" in mirio_resolution.move_results[2].skill_info_variants
     assert "通行百万E" in mirio_resolution.move_results[3].skill_info_variants
 
-    jiro_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1018"])
-    assert jiro_style.recovered_skill_video_evidence() is None
-    jiro_resolution = jiro_style.resolve_usage(
-        (("ATK", 2), ("1", 1)),
-        hero_level=10,
-        reported_damage=1200,
-        target_count=1,
-    )
-    assert all(not result.video_categories for result in jiro_resolution.move_results)
+    try:
+        fight_style_for_character(PLAYABLE_CHARACTERS["h1018"])
+    except ValueError as exc:
+        assert "not public playable" in str(exc)
+    else:
+        raise AssertionError("Jiro must stay out of gameplay fight-style lookups")
 
     for character in VERIFIED_PLAYABLE_ROSTER:
         style = fight_style_for_character(character)

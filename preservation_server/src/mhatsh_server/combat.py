@@ -1727,14 +1727,30 @@ FIGHT_STYLES_BY_MODEL = {
 }
 
 
+NON_PLAYABLE_FIGHT_STYLE_MODEL_IDS = frozenset(
+    {
+        # Local hero_cfg rows exist for Kyoka Jiro, but she was not a public
+        # playable character in MHA TSH. Keep the recovered row as evidence,
+        # but keep it out of gameplay-facing lookups.
+        "h1018",
+    }
+)
+
+
 FIGHT_STYLES_BY_HERO_ID = {
-    style.hero_id: style for style in FIGHT_STYLES_BY_MODEL.values()
+    style.hero_id: style
+    for model_id, style in FIGHT_STYLES_BY_MODEL.items()
+    if model_id not in NON_PLAYABLE_FIGHT_STYLE_MODEL_IDS
 }
 
 
 def fight_style_for_character(character: PlayableCharacter) -> FightStyle:
     if character.hero_id is None:
         raise ValueError(f"{character.model_asset_id} has no verified HeroId")
+    if character.model_asset_id in NON_PLAYABLE_FIGHT_STYLE_MODEL_IDS:
+        raise ValueError(
+            f"{character.model_asset_id} has recovered local rows but is not public playable"
+        )
     try:
         return FIGHT_STYLES_BY_HERO_ID[character.hero_id]
     except KeyError:
