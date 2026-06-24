@@ -904,16 +904,25 @@ class GameServer:
                         session.stage.area_event_info(area_stage_id),
                     )
         elif name == "s_task_enter_stage":
+            is_enter = int(values.get("IsEnter") or 0)
             await self._send(
                 writer,
                 session,
                 "c_task_enter_stage",
-                session.tasks.enter_stage(int(values.get("IsEnter") or 0)),
+                session.tasks.enter_stage(is_enter),
             )
-            if int(values.get("IsEnter") or 0):
-                await self._maybe_send_starter_intro_stage(
+            if is_enter:
+                sent_intro = await self._maybe_send_starter_intro_stage(
                     writer, session, "task_enter"
                 )
+                if not sent_intro:
+                    active_stage_id = session.tasks.active_area_event_stage_id()
+                    if active_stage_id:
+                        await self._enter_requested_stage(
+                            writer,
+                            session,
+                            active_stage_id,
+                        )
         elif name == "s_training_enter":
             await self._enter_requested_stage(
                 writer,
@@ -2468,12 +2477,13 @@ class GameServer:
 
     async def _maybe_send_starter_intro_stage(
         self, writer: asyncio.StreamWriter, session: Session, trigger: str
-    ) -> None:
+    ) -> bool:
         if not self.intro_stage_enabled or self.intro_stage_trigger != trigger:
-            return
+            return False
         if session.stage.current_stage_id == self.intro_stage_id:
-            return
+            return False
         await self._send_starter_intro_stage(writer, session)
+        return True
 
     def _queue_starter_intro_stage(self, session: Session, trigger: str) -> None:
         if not self.intro_stage_enabled or self.intro_stage_trigger != trigger:

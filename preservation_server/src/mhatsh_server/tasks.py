@@ -309,6 +309,20 @@ class TaskState:
             return 0
         return int(task.source_event_id)
 
+    def active_area_event_stage_id(self) -> int:
+        candidates = sorted(
+            (
+                task
+                for task in self.tasks.values()
+                if task.id not in self.finished
+                and task.source_kind == "area_event"
+                and task.quest_order > 0
+                and self._is_visible(task)
+            ),
+            key=lambda task: (task.quest_order, task.id),
+        )
+        return int(candidates[0].source_stage_id) if candidates else 0
+
     def complete_active_base_station_task(self) -> dict[str, object] | None:
         task = self._active_base_station_task()
         if task is None:

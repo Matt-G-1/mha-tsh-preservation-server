@@ -4331,6 +4331,7 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert state.canonical_area_event_stage_id(280101) == 21111
     assert state.canonical_area_event_stage_id(290101) == 21111
     assert state.area_event_id_for_stage(290101) == 280101
+    assert state.active_area_event_stage_id() == 21131
     assert 100602 in state.finished
     assert state.active_quest_contact_candidates() == ()
     assert [task["Id"] for task in state.task_info()["tasks"][:5]] == [
@@ -4348,6 +4349,7 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert act_auto_update["task_info"]["Id"] == 1010
     assert act_auto_update["task_info"]["Status"] == TASK_STATUS_FINISHED
     assert 1010 in act_auto_state.finished
+    assert act_auto_state.active_area_event_stage_id() == 21111
     assert act_auto_state.complete_active_act_task(1010) is None
     late_act_state = TaskState()
     late_act_state.skip_starter_quest()
@@ -7158,9 +7160,20 @@ async def _run_task_requests() -> None:
         writer,
     )
     decoder = FrameDecoder(RollingXor(0xAABBCCDD))
-    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
-    assert registry.protocol_names[reply_id] == "c_task_enter_stage"
-    assert codec.decode_message("c_task_enter_stage", reply_body) == {"IsEnter": 1}
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_enter_stage",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_task_enter_stage", replies[0][1]) == {
+        "IsEnter": 1
+    }
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 21331
+    assert codec.decode_message("c_frame_fighter_data", replies[2][1])[
+        "HeroId"
+    ] == STARTER_HERO_ID
+    assert session.stage.current_stage_id == 21331
 
 
 async def _run_starter_intro_stage_probe() -> None:
