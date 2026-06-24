@@ -4717,11 +4717,36 @@ async def _run_unlocked_profile() -> None:
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_card_seeinfo",
+        "c_guide_finish",
+        "c_task_info",
+        "c_city_level_info",
+        "c_world_task_info",
     ]
     reply_id, reply_body = replies[0]
     assert registry.protocol_names[reply_id] == "c_card_seeinfo"
     guide_cards = codec.decode_message("c_card_seeinfo", reply_body)
     assert guide_cards == {"Uid": 0, "CardInfo": []}
+    assert codec.decode_message("c_guide_finish", replies[1][1]) == {
+        "Sets": [STARTER_MAP_GUIDE_SET_ID],
+        "Ids": [STARTER_MAP_GUIDE_ID],
+    }
+    guide_task_info = codec.decode_message("c_task_info", replies[2][1])
+    assert guide_task_info["finishs"] == [STARTER_TASK.id]
+    assert guide_task_info["tasks"][0]["Id"] == STARTER_TASK.id
+    assert guide_task_info["tasks"][0]["Status"] == TASK_STATUS_FINISHED
+    assert codec.decode_message("c_city_level_info", replies[3][1]) == {
+        "Level": CITY_LEVEL_CAP,
+        "ClickList": [],
+    }
+    assert codec.decode_message("c_world_task_info", replies[4][1])[
+        "FinishList"
+    ] == [
+        {
+            "Map": STARTER_WORLD_MAP_ID,
+            "Area": STARTER_WORLD_AREA_ID,
+            "TaskId": STARTER_TASK.id,
+        }
+    ]
 
     writer.data.clear()
     session.outbound = RollingXor(0x44332213)

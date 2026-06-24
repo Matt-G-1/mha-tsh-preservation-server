@@ -344,11 +344,17 @@ class GameServer:
                 int(item) for item in list(values.get("guideIdList") or [])
             ]
             session.tutorial.finish_guides(set_ids, guide_ids)
+            guide_response = {
+                "Sets": sorted(set(set_ids)),
+                "Ids": sorted(set(guide_ids)),
+            }
             if self.skip_starter_quest:
                 # The patched preservation client waits for c_card_seeinfo here.
                 # Keep this acknowledgement tiny and target a non-player UID:
                 # repeating the full 30-card self roster is ignored by the
-                # archived client's waiter and would also redo card state.
+                # archived client's waiter and would also redo card state. Still
+                # send the normal guide acknowledgement afterward so the stock
+                # guide overlay can clear its own completion callback.
                 if self.guide_response_delay:
                     await asyncio.sleep(self.guide_response_delay)
                 await self._send(
@@ -357,11 +363,30 @@ class GameServer:
                     "c_card_seeinfo",
                     {"Uid": 0, "CardInfo": []},
                 )
+                await self._send(writer, session, "c_guide_finish", guide_response)
+                if {
+                    STARTER_TASK_ID,
+                    STARTER_MAP_GUIDE_ID,
+                }.intersection(guide_response["Ids"]):
+                    await self._send(
+                        writer,
+                        session,
+                        "c_task_info",
+                        session.tasks.task_info(),
+                    )
+                    await self._send(
+                        writer,
+                        session,
+                        "c_city_level_info",
+                        session.world_tasks.city_level_info(),
+                    )
+                    await self._send(
+                        writer,
+                        session,
+                        "c_world_task_info",
+                        session.world_tasks.world_task_info(),
+                    )
                 return
-            guide_response = {
-                "Sets": sorted(set(set_ids)),
-                "Ids": sorted(set(guide_ids)),
-            }
             # The archived client installs this callback just after SendPto.
             # A same-tick local response can arrive before the waiter exists.
             if self.guide_response_delay:
