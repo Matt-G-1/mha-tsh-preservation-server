@@ -86,6 +86,11 @@ from mhatsh_server.combat_action_hints import RECOVERED_HERO_ACTION_HINTS_BY_MOD
 from mhatsh_server.combat_internal_action_hints import (
     RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL,
 )
+from mhatsh_server.herochip_stages import (
+    HEROCHIP_STAGE_BY_ID,
+    HEROCHIP_STAGE_SOURCE,
+    HEROCHIP_STAGES,
+)
 from mhatsh_server.usj_stages import (
     USJ_POINT_BY_ID,
     USJ_POINTS,
@@ -214,6 +219,18 @@ def _load_usj_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_usj_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_usj_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_herochip_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_herochip_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_herochip_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -455,8 +472,8 @@ def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> Non
 
 def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "battle_stage_candidate_catalog" in STAGE_CATALOG_SOURCE
-    assert len(RECOVERED_BATTLE_STAGES) >= 625
-    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 618
+    assert len(RECOVERED_BATTLE_STAGES) >= 632
+    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 625
     stage_ids = [
         stage.stage_id for stage in RECOVERED_BATTLE_STAGES if stage.stage_id is not None
     ]
@@ -510,6 +527,17 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         3007,
     ]
     assert stage_candidate_by_id(723706).label == "USJ point 100304 stage 723706"
+
+    herochip_stage = stage_candidate_by_id(370101)
+    assert herochip_stage.key == "herochip_stage_370101"
+    assert herochip_stage.label == "英雄的志愿"
+    assert herochip_stage.source == HEROCHIP_STAGE_SOURCE
+    assert herochip_stage.character_refs == ()
+    assert [spawn.enemy_id for spawn in herochip_stage.encounter_spawns] == [
+        2005,
+        2202,
+    ]
+    assert stage_candidate_by_id(370107).label == "精神的支柱"
 
     starter = stage_candidate_by_id(STARTER_INTRO_STAGE_ID)
     assert starter.key == "starter_intro_299301"
@@ -1021,6 +1049,33 @@ def test_usj_stage_hint_parser_tracks_point_stage_matrix() -> None:
     }
     assert generated_rows[700101]["point_id"] == 100101
     assert generated_rows[723706]["stage_order"] == 27
+
+
+def test_herochip_stage_hint_parser_tracks_trial_rows() -> None:
+    module = _load_herochip_stage_hint_script()
+    hints = module.collect_herochip_stage_hints(
+        ROOT / module.DEFAULT_HEROCHIP_STAGE_ASSET
+    )
+
+    assert hints["constant_count"] == 186
+    assert hints["stage_count"] == 7
+    assert HEROCHIP_STAGE_SOURCE == hints["source"]
+    assert len(HEROCHIP_STAGES) == hints["stage_count"]
+    assert HEROCHIP_STAGES[0].stage_id == 370101
+    assert HEROCHIP_STAGES[0].title == "英雄的志愿"
+    assert HEROCHIP_STAGES[0].hero_class_id == 124
+    assert HEROCHIP_STAGES[0].reward_item_id == 1012124
+    assert HEROCHIP_STAGES[0].unlock_stage_id == 280103
+    assert HEROCHIP_STAGE_BY_ID[370102].hero_class_id == 110
+    assert HEROCHIP_STAGE_BY_ID[370107].title == "精神的支柱"
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[370101]["title"] == HEROCHIP_STAGE_BY_ID[370101].title
+    assert generated_rows[370107]["unlock_stage_id"] == 280706
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
