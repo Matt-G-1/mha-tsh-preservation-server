@@ -957,6 +957,13 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     )
     assert stage_cfg_route.combat_enemy_ids == (56390301, 56390302, 56390303)
     assert stage_cfg_route.source == "parsed from packed stage_cfg constant routes, 2026-06-23"
+    assert len(STAGE_CFG_SCRIPT_ROUTE_GROUPS) == 71
+    assert stage_candidate_by_id(310405).key == "stage_cfg_route_310405"
+    assert stage_candidate_by_id(310405).scripts == ("zx_usj_003", "zx_usj_004")
+    assert stage_candidate_by_id(412164).scripts == ("nightarea-speciel",)
+    assert stage_candidate_by_id(606000).scripts == ("606001",)
+    assert stage_candidate_by_id(999999).scripts == ("zx_tyj01",)
+    assert stage_candidate_by_id(561225).key == "asset_drama_stage_561225"
     assert STAGE_CFG_ROUTE_LABELS[160001] == "All Might's guidance"
     assert STAGE_CFG_ROUTE_LABELS[300401] == "聚集的敌人"
     assert stage_candidate_by_id(300401).label == "聚集的敌人"
@@ -1434,6 +1441,21 @@ def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
 
     assert hints["constant_count"] == 10440
     assert hints["script_route_count"] == 217
+    routed_stage_ids = {
+        int(route["route_stage_id"])
+        for route in hints["routes"].values()
+        if isinstance(route.get("route_stage_id"), int)
+    }
+    assert len(routed_stage_ids) == 71
+    assert routed_stage_ids.issubset(set(STAGE_CFG_SCRIPT_ROUTE_GROUPS))
+    assert {
+        100004,
+        200056,
+        310405,
+        412164,
+        606000,
+        999999,
+    }.issubset(routed_stage_ids)
     assert hints["routes"]["stage160001_start"] == {
         "route_stage_id": 160001,
         "confidence": "embedded",

@@ -367,6 +367,12 @@ environment details are intentionally omitted from Git.
   the ID. Runtime coverage now represents every parsed packed `stage_cfg`
   stage/zx script string; `561115` now uses parsed mechanical combat rows with
   one authored placement and one generated fallback placement.
+- The `stage_cfg` route promotion table now covers all 71 routed stage IDs
+  reported by `scripts/derive_stage_cfg_route_hints.py`, adding 32 more
+  enterable route-backed stages while preserving stronger existing definitions
+  such as asset-owned `561225`. Newly enterable examples include USJ routes
+  `310401`/`310405`, night routes `412101`/`412164`, early area tutorial
+  routes `211066`/`211266`, and route-only script IDs such as `606000`.
 - The same packed `stage_cfg.lua` data now has an encounter-group extractor:
   `scripts/derive_stage_cfg_encounter_hints.py`. It recovers 33
   stage-to-encounter group links from script neighborhoods, adds the
