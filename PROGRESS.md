@@ -279,6 +279,14 @@ environment details are intentionally omitted from Git.
   also parses structured skill-ID neighborhoods for `h1027` through `h1032`,
   classifies human-readable labels into command buckets, and verifies that the
   promoted late-roster terms are present in the original packed constants.
+- The `skill_info` extractor now reads both recovered localized skill-info
+  assets (`language/en/skill_info.lua` and the sibling base
+  `skill_info.lua`) by default, merging structured command neighborhoods across
+  both files. Runtime combat telemetry exposes those late-roster structured
+  labels separately as `SkillInfoVariants`, so WHM/Big Three moves can carry
+  richer original sub-move labels such as WHM Bakugo's ground/air variants and
+  Mirio's localized W/E labels without overwriting the curated primary
+  `SkillInfoTerms`.
 - A separate support-skill pass now parses the packed English
   `hero_supports_cfg.lua` asset at
   `analysis/mediafire_20260620/apk_extract/assets/0QIU/17d0df31842d7982`.

@@ -74,6 +74,9 @@ from mhatsh_server.combat_action_hints import RECOVERED_HERO_ACTION_HINTS_BY_MOD
 from mhatsh_server.combat_internal_action_hints import (
     RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL,
 )
+from mhatsh_server.skill_info_structured_terms import (
+    STRUCTURED_SKILL_INFO_TERMS_BY_MODEL,
+)
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
 from mhatsh_server.schema import SchemaRegistry
 from mhatsh_server.stages import (
@@ -2225,6 +2228,13 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert whm_bakugo_style.recovered_skill_info_evidence().terms_for_command("R") == (
         "R Movie Ult (PVE)",
     )
+    assert "W芜湖起飞" in whm_bakugo_style.structured_skill_info_terms_for_command(
+        "W"
+    )
+    whm_bakugo_resolution = whm_bakugo_style.resolve_usage((("2", 1),), hero_level=70)
+    assert "W Wuhu takeoff" in whm_bakugo_resolution.move_results[2].skill_info_variants
+    assert "W芜湖起飞" in whm_bakugo_resolution.move_results[2].skill_info_variants
+    assert whm_bakugo_resolution.move_results[2].as_dict()["SkillInfoVariants"]
     assert whm_bakugo_style.recovered_support_skill_evidence() is not None
     assert whm_bakugo_style.recovered_support_skill_evidence().terms == (
         "Turbo Twister",
@@ -2350,6 +2360,15 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert mirio_skill_info.terms_for_command("E") == ("Mirio TogataE",)
     assert mirio_skill_info.terms_for_command("R") == ("通行百万R",)
 
+    assert "通行百万W" in mirio_style.structured_skill_info_terms_for_command("W")
+    assert "通行百万E" in mirio_style.structured_skill_info_terms_for_command("E")
+    mirio_resolution = mirio_style.resolve_usage(
+        (("2", 1), ("3", 1)),
+        hero_level=70,
+    )
+    assert "通行百万W" in mirio_resolution.move_results[2].skill_info_variants
+    assert "通行百万E" in mirio_resolution.move_results[3].skill_info_variants
+
     jiro_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1018"])
     assert jiro_style.recovered_skill_video_evidence() is None
     jiro_resolution = jiro_style.resolve_usage(
@@ -2390,9 +2409,10 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
         tuple(ROOT / path for path in module.DEFAULT_SKILL_INFO_ASSETS)
     )
 
+    assert len(module.DEFAULT_SKILL_INFO_ASSETS) == 2
     assert "Detroit Smash" in HERO_SKILL_INFO_EVIDENCE_BY_MODEL["h1001"].all_terms()
     assert hints["h1001"]["terms"]["Detroit Smash"]["count"] == 2
-    assert hints["h1001"]["terms"]["One For All"]["count"] == 6
+    assert hints["h1001"]["terms"]["One For All"]["count"] == 12
     assert hints["h1003"]["terms"]["I Am Here!"]["count"] == 1
     assert hints["h1008"]["terms"]["Half-Cold Half-Hot"]["count"] == 1
     assert hints["h1008"]["terms"]["Charge Ice Spear"]["count"] == 1
@@ -2400,15 +2420,15 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert hints["h1009"]["terms"]["Meteor Storm"]["count"] == 1
     assert hints["h1010"]["terms"]["Lightning Bolt"]["count"] == 1
     assert hints["h1007"]["terms"]["Gravel Strike"]["count"] == 1
-    assert hints["h1007"]["terms"]["御茶子必杀技"]["count"] == 1
+    assert hints["h1007"]["terms"]["御茶子必杀技"]["count"] == 2
     assert hints["h1012"]["terms"]["DabiQ"]["count"] == 8
     assert hints["h1012"]["terms"]["Dabi Assist Skill E"]["count"] == 1
     assert hints["h1013"]["terms"]["Kirishima Q change 2 tap"]["count"] == 1
     assert hints["h1014"]["terms"]["Tongue Swipe"]["count"] == 1
-    assert hints["h1015"]["terms"]["相泽Q1"]["count"] == 1
-    assert hints["h1015"]["terms"]["相泽大招"]["count"] == 1
-    assert hints["h1016"]["terms"]["尾白Q"]["count"] == 3
-    assert hints["h1016"]["terms"]["尾白大招"]["count"] == 1
+    assert hints["h1015"]["terms"]["相泽Q1"]["count"] == 2
+    assert hints["h1015"]["terms"]["相泽大招"]["count"] == 2
+    assert hints["h1016"]["terms"]["尾白Q"]["count"] == 6
+    assert hints["h1016"]["terms"]["尾白大招"]["count"] == 2
     assert hints["h1017"]["terms"]["Mina Perfect Dodge QTE"]["count"] == 1
     assert hints["h1020"]["terms"]["Grape Rain"]["count"] == 1
     assert hints["h1019"]["terms"]["Vicious Contact"]["count"] == 1
@@ -2418,7 +2438,7 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert hints["h1026"]["terms"]["Hawks Q open"]["count"] == 1
     assert hints["h1026"]["terms"]["Hawks ult"]["count"] == 3
     assert hints["h1027"]["terms"]["Midoriya Q"]["count"] >= 1
-    assert hints["h1027"]["terms"]["whm绿谷R"]["count"] == 1
+    assert hints["h1027"]["terms"]["whm绿谷R"]["count"] == 2
     assert "Midoriya Q" in hints["h1027"]["structured_terms"]["Q"]
     assert "Midoriya W" in hints["h1027"]["structured_terms"]["W"]
     assert "whm绿谷R" in hints["h1027"]["structured_terms"]["R"]
@@ -2426,27 +2446,35 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert hints["h1028"]["terms"]["R Movie Ult (PVE)"]["count"] == 1
     assert "Q Ground charge" in hints["h1028"]["structured_terms"]["Q"]
     assert "W Air move" in hints["h1028"]["structured_terms"]["W"]
+    assert "W芜湖起飞" in hints["h1028"]["structured_terms"]["W"]
     assert "E Drill flame" in hints["h1028"]["structured_terms"]["E"]
     assert "R Movie Ult (PVE)" in hints["h1028"]["structured_terms"]["R"]
-    assert hints["h1029"]["terms"]["whm轰Q1"]["count"] == 1
-    assert hints["h1029"]["terms"]["whm轰R"]["count"] == 1
+    assert hints["h1029"]["terms"]["whm轰Q1"]["count"] == 2
+    assert hints["h1029"]["terms"]["whm轰R"]["count"] == 2
     assert "whm轰R" in hints["h1029"]["structured_terms"]["R"]
-    assert hints["h1030"]["terms"]["测试波动普攻1"]["count"] == 2
+    assert hints["h1030"]["terms"]["测试波动普攻1"]["count"] == 4
     assert hints["h1030"]["terms"]["Wave Blast"]["count"] == 1
     assert "波动W" in hints["h1030"]["structured_terms"]["W"]
     assert "波动E1" in hints["h1030"]["structured_terms"]["E"]
     assert "波动R" in hints["h1030"]["structured_terms"]["R"]
-    assert hints["h1031"]["terms"]["天喰环R"]["count"] == 1
+    assert hints["h1031"]["terms"]["天喰环R"]["count"] == 2
     assert hints["h1031"]["terms"]["Tentacles Grasp"]["count"] == 1
     assert "天喰环Q1" in hints["h1031"]["structured_terms"]["Q"]
     assert "天喰环R" in hints["h1031"]["structured_terms"]["R"]
-    assert hints["h1032"]["terms"]["通行百万Q3"]["count"] >= 1
+    assert hints["h1032"]["terms"]["通行百万Q3"]["count"] >= 2
     assert hints["h1032"]["terms"]["Mirio TogataW"]["count"] == 1
     assert "Mirio TogataW" in hints["h1032"]["structured_terms"]["W"]
+    assert "通行百万W" in hints["h1032"]["structured_terms"]["W"]
     assert "Mirio TogataE" in hints["h1032"]["structured_terms"]["E"]
     assert "通行百万R" in hints["h1032"]["structured_terms"]["R"]
     assert hints["h1110"]["terms"]["Dagger Throw"]["count"] == 1
     assert hints["h1110"]["terms"]["Permeate Uppercut"]["count"] == 1
+    assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1028"]["W"] == tuple(
+        hints["h1028"]["structured_terms"]["W"]
+    )
+    assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1032"]["E"] == tuple(
+        hints["h1032"]["structured_terms"]["E"]
+    )
 
 
 def test_support_skill_hint_parser_tracks_hero_support_text() -> None:

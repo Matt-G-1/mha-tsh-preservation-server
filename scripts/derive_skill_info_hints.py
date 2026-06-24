@@ -18,7 +18,18 @@ DEFAULT_SKILL_INFO_ASSET = (
     / "2ZU"
     / "0a6af507ecd6f4a5"
 )
-DEFAULT_SKILL_INFO_ASSETS = (DEFAULT_SKILL_INFO_ASSET,)
+DEFAULT_SKILL_INFO_LOCALIZED_ASSET = (
+    Path("analysis")
+    / "mediafire_20260620"
+    / "apk_extract"
+    / "assets"
+    / "2ZU"
+    / "c2667c89e1b517d5"
+)
+DEFAULT_SKILL_INFO_ASSETS = (
+    DEFAULT_SKILL_INFO_ASSET,
+    DEFAULT_SKILL_INFO_LOCALIZED_ASSET,
+)
 
 STRUCTURED_SKILL_INFO_MODEL_PREFIXES = {
     "h1027": 1027,
@@ -324,10 +335,40 @@ def collect_structured_skill_info_hints(path: Path = DEFAULT_SKILL_INFO_ASSET) -
     return hints
 
 
+def _merge_structured_skill_info_hints(
+    paths: tuple[Path, ...]
+) -> dict[str, dict[str, object]]:
+    merged: dict[str, dict[str, object]] = {
+        model_id: {"command_terms": {}}
+        for model_id in STRUCTURED_SKILL_INFO_MODEL_PREFIXES
+    }
+    for path in paths:
+        structured = collect_structured_skill_info_hints(path)
+        for model_id, structured_hints in structured.items():
+            command_terms = structured_hints["command_terms"]
+            assert isinstance(command_terms, dict)
+            merged_command_terms = merged[model_id]["command_terms"]
+            assert isinstance(merged_command_terms, dict)
+            for command, terms in command_terms.items():
+                merged_terms = merged_command_terms.setdefault(command, {})
+                assert isinstance(terms, dict)
+                assert isinstance(merged_terms, dict)
+                for term, term_evidence in terms.items():
+                    merged_evidence = merged_terms.setdefault(
+                        term, {"skill_ids": [], "constant_indexes": []}
+                    )
+                    merged_evidence["skill_ids"].extend(term_evidence["skill_ids"])
+                    merged_evidence["constant_indexes"].extend(
+                        term_evidence["constant_indexes"]
+                    )
+    return merged
+
+
 def collect_skill_info_hints(
     path_or_paths: Path | tuple[Path, ...],
 ) -> dict[str, dict[str, object]]:
-    blobs = tuple((path, path.read_bytes()) for path in _coerce_paths(path_or_paths))
+    paths = _coerce_paths(path_or_paths)
+    blobs = tuple((path, path.read_bytes()) for path in paths)
     hints: dict[str, dict[str, object]] = {}
     for model_id, terms in sorted(SKILL_INFO_TERMS_BY_MODEL.items()):
         model_terms: dict[str, dict[str, object]] = {}
@@ -351,7 +392,7 @@ def collect_skill_info_hints(
                 ],
             }
         hints[model_id] = {"terms": model_terms}
-    structured = collect_structured_skill_info_hints(_coerce_paths(path_or_paths)[0])
+    structured = _merge_structured_skill_info_hints(paths)
     for model_id, structured_hints in structured.items():
         hints.setdefault(model_id, {"terms": {}})["structured_terms"] = structured_hints[
             "command_terms"

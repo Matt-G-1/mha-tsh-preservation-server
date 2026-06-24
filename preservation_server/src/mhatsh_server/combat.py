@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from .characters import PlayableCharacter
 from .combat_action_hints import RECOVERED_HERO_ACTION_HINTS_BY_MODEL
 from .combat_internal_action_hints import RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL
+from .skill_info_structured_terms import STRUCTURED_SKILL_INFO_TERMS_BY_MODEL
 from .skill_video_paths import HERO_SKILL_VIDEO_PATHS_BY_MODEL
 
 
@@ -100,6 +101,7 @@ class MoveCombatResult:
     video_categories: tuple[str, ...] = ()
     skill_video_paths: tuple[str, ...] = ()
     skill_info_terms: tuple[str, ...] = ()
+    skill_info_variants: tuple[str, ...] = ()
     skill_slot_labels: tuple[str, ...] = ()
     action_hints: tuple[str, ...] = ()
     evidence_sources: tuple[str, ...] = ()
@@ -122,6 +124,7 @@ class MoveCombatResult:
             "VideoCategories": list(self.video_categories),
             "SkillVideoPaths": list(self.skill_video_paths),
             "SkillInfoTerms": list(self.skill_info_terms),
+            "SkillInfoVariants": list(self.skill_info_variants),
             "SkillSlotLabels": list(self.skill_slot_labels),
             "ActionHints": list(self.action_hints),
             "EvidenceSources": list(self.evidence_sources),
@@ -234,6 +237,12 @@ class FightStyle:
     def recovered_support_skill_evidence(self) -> HeroSupportSkillEvidence | None:
         return HERO_SUPPORT_SKILL_EVIDENCE_BY_MODEL.get(self.model_asset_id)
 
+    def structured_skill_info_terms_for_command(self, command: str) -> tuple[str, ...]:
+        return STRUCTURED_SKILL_INFO_TERMS_BY_MODEL.get(self.model_asset_id, {}).get(
+            command,
+            (),
+        )
+
     def move_usage(
         self, button_counts: tuple[tuple[str, int], ...]
     ) -> list[dict[str, object]]:
@@ -299,6 +308,9 @@ class FightStyle:
                 if skill_info_evidence is not None
                 else ()
             )
+            skill_info_variants = self.structured_skill_info_terms_for_command(
+                move.command
+            )
             action_hints = self.action_hints_for_command(move.command)
             result_list.append(
                 MoveCombatResult(
@@ -318,12 +330,14 @@ class FightStyle:
                     video_categories=video_categories,
                     skill_video_paths=skill_video_paths,
                     skill_info_terms=skill_info_terms,
+                    skill_info_variants=skill_info_variants,
                     skill_slot_labels=skill_slot_labels_for_command(move.command),
                     action_hints=action_hints,
                     evidence_sources=_move_evidence_sources(
                         action_hints=action_hints,
                         skill_video_paths=skill_video_paths,
                         skill_info_terms=skill_info_terms,
+                        skill_info_variants=skill_info_variants,
                     ),
                 ),
             )
@@ -436,13 +450,14 @@ def _move_evidence_sources(
     action_hints: tuple[str, ...],
     skill_video_paths: tuple[str, ...],
     skill_info_terms: tuple[str, ...],
+    skill_info_variants: tuple[str, ...],
 ) -> tuple[str, ...]:
     sources = []
     if action_hints:
         sources.append("action_hints")
     if skill_video_paths:
         sources.append("skill_video")
-    if skill_info_terms:
+    if skill_info_terms or skill_info_variants:
         sources.append("skill_info")
     return tuple(sources)
 
