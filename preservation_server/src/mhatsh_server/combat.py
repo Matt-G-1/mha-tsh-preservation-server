@@ -102,6 +102,7 @@ class MoveCombatResult:
     skill_info_terms: tuple[str, ...] = ()
     skill_slot_labels: tuple[str, ...] = ()
     action_hints: tuple[str, ...] = ()
+    evidence_sources: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -123,6 +124,7 @@ class MoveCombatResult:
             "SkillInfoTerms": list(self.skill_info_terms),
             "SkillSlotLabels": list(self.skill_slot_labels),
             "ActionHints": list(self.action_hints),
+            "EvidenceSources": list(self.evidence_sources),
         }
 
 
@@ -280,41 +282,51 @@ class FightStyle:
         raw_total = sum(damage for _, _, damage in raw_results)
         reported = max(0, int(reported_damage))
         scale = (reported / raw_total) if reported and raw_total else 1.0
-        result_list = [
-            MoveCombatResult(
-                slot=move.slot,
-                command=move.command,
-                name=move.name,
-                count=count,
-                estimated_hits=count * _move_hit_count(move),
-                estimated_damage=round(raw_damage * scale),
-                control_score=count * _move_control_score(move),
-                resource_delta=count * _move_resource_delta(move),
-                mobility_score=count * _move_mobility_score(move),
-                defense_score=count * _move_defense_score(move),
-                damage_type=move.damage_type,
-                range_type=move.range_type,
-                role=move.role,
-                video_categories=(
-                    video_evidence.categories_for_command(move.command)
-                    if video_evidence is not None
-                    else ()
-                ),
-                skill_video_paths=(
-                    video_evidence.videos_for_command(move.command)
-                    if video_evidence is not None
-                    else ()
-                ),
-                skill_info_terms=(
-                    skill_info_evidence.terms_for_command(move.command)
-                    if skill_info_evidence is not None
-                    else ()
-                ),
-                skill_slot_labels=skill_slot_labels_for_command(move.command),
-                action_hints=self.action_hints_for_command(move.command),
+        result_list = []
+        for move, count, raw_damage in raw_results:
+            video_categories = (
+                video_evidence.categories_for_command(move.command)
+                if video_evidence is not None
+                else ()
             )
-            for move, count, raw_damage in raw_results
-        ]
+            skill_video_paths = (
+                video_evidence.videos_for_command(move.command)
+                if video_evidence is not None
+                else ()
+            )
+            skill_info_terms = (
+                skill_info_evidence.terms_for_command(move.command)
+                if skill_info_evidence is not None
+                else ()
+            )
+            action_hints = self.action_hints_for_command(move.command)
+            result_list.append(
+                MoveCombatResult(
+                    slot=move.slot,
+                    command=move.command,
+                    name=move.name,
+                    count=count,
+                    estimated_hits=count * _move_hit_count(move),
+                    estimated_damage=round(raw_damage * scale),
+                    control_score=count * _move_control_score(move),
+                    resource_delta=count * _move_resource_delta(move),
+                    mobility_score=count * _move_mobility_score(move),
+                    defense_score=count * _move_defense_score(move),
+                    damage_type=move.damage_type,
+                    range_type=move.range_type,
+                    role=move.role,
+                    video_categories=video_categories,
+                    skill_video_paths=skill_video_paths,
+                    skill_info_terms=skill_info_terms,
+                    skill_slot_labels=skill_slot_labels_for_command(move.command),
+                    action_hints=action_hints,
+                    evidence_sources=_move_evidence_sources(
+                        action_hints=action_hints,
+                        skill_video_paths=skill_video_paths,
+                        skill_info_terms=skill_info_terms,
+                    ),
+                ),
+            )
         estimated_total = sum(result.estimated_damage for result in result_list)
         if reported and result_list and estimated_total != reported:
             for index, result in enumerate(result_list):
@@ -417,6 +429,22 @@ def _skill_video_category(prefix: str, path: str) -> str:
     if not filename.startswith(expected_prefix):
         return ""
     return filename[len(expected_prefix) :].split("_", 1)[0].upper()
+
+
+def _move_evidence_sources(
+    *,
+    action_hints: tuple[str, ...],
+    skill_video_paths: tuple[str, ...],
+    skill_info_terms: tuple[str, ...],
+) -> tuple[str, ...]:
+    sources = []
+    if action_hints:
+        sources.append("action_hints")
+    if skill_video_paths:
+        sources.append("skill_video")
+    if skill_info_terms:
+        sources.append("skill_info")
+    return tuple(sources)
 
 
 HERO_ACTION_HINTS_BY_MODEL = {

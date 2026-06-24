@@ -1665,6 +1665,20 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "h1031": ("DODGE", "PASSIVE"),
         "h1032": ("DODGE", "PASSIVE"),
     }
+    original_evidence_gaps = {}
+    for character in VERIFIED_PLAYABLE_ROSTER:
+        resolution = fight_style_for_character(character).resolve_usage(
+            (),
+            hero_level=70,
+        )
+        missing = tuple(
+            move_result.command
+            for move_result in resolution.move_results
+            if not move_result.evidence_sources
+        )
+        if missing:
+            original_evidence_gaps[character.model_asset_id] = missing
+    assert original_evidence_gaps == {}
 
     deku_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1001"])
     assert deku_style.style_name == "One For All Rookie"
@@ -1779,10 +1793,18 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "video/skill/lvgu_break_1.flv",
         "video/skill/lvgu_rush_1.flv",
     )
+    assert deku_resolution.move_results[0].evidence_sources == (
+        "action_hints",
+        "skill_video",
+    )
     assert deku_resolution.move_results[0].as_dict()["SkillVideoPaths"] == [
         "video/skill/lvgu_atk_1.flv",
         "video/skill/lvgu_break_1.flv",
         "video/skill/lvgu_rush_1.flv",
+    ]
+    assert deku_resolution.move_results[0].as_dict()["EvidenceSources"] == [
+        "action_hints",
+        "skill_video",
     ]
     assert deku_resolution.move_results[0].skill_slot_labels == (
         "BaseSkill",
@@ -1803,6 +1825,11 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert deku_resolution.move_results[1].skill_info_terms == (
         "Smash",
         "Detroit Smash",
+    )
+    assert deku_resolution.move_results[1].evidence_sources == (
+        "action_hints",
+        "skill_video",
+        "skill_info",
     )
     assert deku_resolution.move_results[1].skill_slot_labels == (
         "FirstSkill",

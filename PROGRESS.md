@@ -299,6 +299,14 @@ environment details are intentionally omitted from Git.
   example, All Might and Midoriya ATK reports carry ATK/BREAK/RUSH video
   evidence, R reports carry R/QTE evidence, dodge reports carry DASH evidence,
   and characters without matching skill-video strings remain explicitly empty.
+- Resolved combat telemetry now also carries the exact recovered
+  `video/skill/*.flv` paths per move as `SkillVideoPaths`. The path table is
+  generated from `scripts/derive_skill_video_hints.py` and cross-checked
+  against the parser output. Move results also expose `EvidenceSources`,
+  distinguishing parser-backed action paths, skill videos, and skill text.
+  Considering those three evidence layers together, every move on every public
+  playable character now has at least one original evidence trail. Jiro remains
+  non-public-playable despite local protocol/model rows.
 - Recovered battle action/audio paths are now classified per command and
   attached to individual move results as `ActionHints`. The current parsed
   action layer covers Midoriya, Bakugo, All Might, and Ochaco, mapping recovered
@@ -423,6 +431,11 @@ environment details are intentionally omitted from Git.
   (`56111503`, `56111505`) and one authored compact-table coordinate for
   `56111505`, while the other mechanical row remains generated until its
   authored placement is recovered.
+- The current stage spawn gap audit leaves exactly three generated fallback
+  combat rows with no authored coordinate evidence from the parser:
+  `56111503`, `56240652`, and `56240771`. The spawn parser was rerun directly
+  against those IDs and recovered no positions, so they remain generated
+  placeholders rather than guessed authored placements.
 - Seeding a recovered stage now also stores per-enemy AI directives in
   `StageState`: enemy ID, display alias, profile, behavior, BT name, home
   coordinates, attack range, leash radius, skill rotation, and combat HP. This
