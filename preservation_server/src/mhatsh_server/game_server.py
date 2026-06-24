@@ -119,6 +119,9 @@ class GameServer:
         self.send_map_characters = os.environ.get(
             "MHATSH_SEND_MAP_CHARACTERS", "1"
         ).lower() not in {"0", "false", "no"}
+        self.send_stage_encounter_npcs = _env_enabled(
+            "MHATSH_SEND_STAGE_ENCOUNTER_NPCS", "0"
+        )
         self.player_level = min(
             PLAYER_LEVEL_CAP,
             max(1, int(os.environ.get("MHATSH_PLAYER_LEVEL", "1"))),
@@ -1737,6 +1740,18 @@ class GameServer:
             "c_frame_fighter_data",
             self._frame_fighter_data(session, roster),
         )
+        if self.send_stage_encounter_npcs and stage.encounter_spawns:
+            await self._send(
+                writer,
+                session,
+                "c_scene_npc_create",
+                {
+                    "NpcList": [
+                        spawn.to_scene_npc()
+                        for spawn in stage.encounter_spawns
+                    ]
+                },
+            )
 
     def _frame_fighter_data(
         self, session: Session, roster: RosterState

@@ -4967,6 +4967,10 @@ def test_requested_stage_enter_packets_start_combat_stages() -> None:
     asyncio.run(_run_requested_stage_enter_packets())
 
 
+def test_stage_enter_can_emit_recovered_encounter_npcs() -> None:
+    asyncio.run(_run_stage_enter_encounter_npcs())
+
+
 def test_stage_family_info_packets_are_stateful() -> None:
     asyncio.run(_run_stage_family_info_packets())
 
@@ -5480,6 +5484,67 @@ async def _run_stage_lifecycle_packets() -> None:
     )
     assert writer.data == bytearray()
     assert session.stage.quick_reborn_count == 2
+
+
+async def _run_stage_enter_encounter_npcs() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_ROSTER_MODE": "verified",
+            "MHATSH_SEND_STAGE_ENCOUNTER_NPCS": "1",
+        },
+        clear=False,
+    ):
+        game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x55112232),
+    )
+
+    training = codec.encode_message(
+        "s_training_enter",
+        {"HeroCId": 1041, "StageId": 502601},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_training_enter"],
+        training,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x55112232))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+        "c_scene_npc_create",
+    ]
+    npcs = codec.decode_message("c_scene_npc_create", replies[2][1])["NpcList"]
+    assert npcs == [
+        {
+            "Uid": 50260101,
+            "Id": 3002,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "Face": 0,
+            "Version": 1,
+            "ShapeId": 3002,
+            "Attach": [],
+            "HideStatus": 0,
+            "AreaId": 0,
+            "StartAnim": "",
+            "BTName": "bt_preservation_sludge_boss",
+            "ForceShow": 1,
+        }
+    ]
+    assert session.stage.ai_directives[0]["Profile"] == "sludge_boss"
 
 
 async def _run_requested_stage_enter_packets() -> None:
