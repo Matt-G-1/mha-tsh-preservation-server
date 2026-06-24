@@ -173,11 +173,15 @@ class TaskState:
 
     def accept(self, task_id: int) -> dict[str, object]:
         task = self._task(task_id)
+        if task.quest_order > 0 and not self._is_visible(task):
+            return self.task_update(task, action_type=0)
         task.status = TASK_STATUS_ACCEPTED
         return self.task_update(task, action_type=1)
 
     def submit(self, task_id: int) -> dict[str, object]:
         task = self._task(task_id)
+        if task.quest_order > 0 and not self._is_visible(task):
+            return self.task_update(task, action_type=0)
         self._finish(task)
         return self.task_update(task, action_type=2)
 

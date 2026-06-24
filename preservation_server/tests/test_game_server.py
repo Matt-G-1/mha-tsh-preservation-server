@@ -4351,6 +4351,16 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert 1010 in act_auto_state.finished
     assert act_auto_state.active_area_event_stage_id() == 21111
     assert act_auto_state.complete_active_act_task(1010) is None
+    locked_submit_state = TaskState()
+    locked_submit_state.skip_starter_quest()
+    locked_submit = locked_submit_state.submit(201103)
+    assert locked_submit["action_type"] == 0
+    assert locked_submit["task_info"]["Id"] == 201103
+    assert locked_submit["task_info"]["Status"] != TASK_STATUS_FINISHED
+    assert 201103 not in locked_submit_state.finished
+    locked_accept = locked_submit_state.accept(201103)
+    assert locked_accept["action_type"] == 0
+    assert locked_accept["task_info"]["Status"] != TASK_STATUS_ACCEPTED
     late_act_state = TaskState()
     late_act_state.skip_starter_quest()
     late_act_state.seed_finished_tasks([281203])
@@ -7231,6 +7241,26 @@ async def _run_task_requests() -> None:
         1010,
     ]
     assert unlocked_tasks["finishs"] == [STARTER_TASK.id]
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x8A9BACBE)
+    locked_future_submit = codec.encode_message(
+        "s_task_submit", {"task_id": 201103}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_submit"],
+        locked_future_submit,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x8A9BACBE))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_info_update"
+    locked_update = codec.decode_message("c_task_info_update", reply_body)
+    assert locked_update["action_type"] == 0
+    assert locked_update["task_info"]["Id"] == 201103
+    assert locked_update["task_info"]["Status"] != TASK_STATUS_FINISHED
+    assert 201103 not in session.tasks.finished
 
     writer.data.clear()
     session.outbound = RollingXor(0x99AABBCC)

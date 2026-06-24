@@ -525,6 +525,11 @@ environment details are intentionally omitted from Git.
   This prevents the client from falling back into the intro/generated stage
   path when the quest UI asks to enter the next available area-event battle
   without repeating the canonical stage ID.
+- Recovered quest `accept`/`submit` handling now refuses hidden future
+  recovered tasks instead of finishing arbitrary parsed IDs out of order. The
+  compatibility path for unknown/local task IDs remains intact, but parsed
+  quest-chain tasks must be visible through their recovered predecessor links
+  before direct task packets can accept or finish them.
 - Completed stage rewards now also grant saved normal-item counts in the
   profile store, giving later inventory/UI packet work a persistent
   player-data backing store.
