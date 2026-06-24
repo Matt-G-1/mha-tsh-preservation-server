@@ -149,6 +149,13 @@ class TaskState:
                 condition.completed_count = max(condition.completed_count, 1)
             self._finish(live_task)
 
+    def seed_finished_tasks(self, task_ids: Iterable[int]) -> None:
+        for task_id in task_ids:
+            task = self._task(int(task_id))
+            for condition in task.conditions:
+                condition.completed_count = max(condition.completed_count, 1)
+            self._finish(task)
+
     def should_spawn_beginner_npc(self, task_id: int) -> bool:
         if task_id != STARTER_TASK.id:
             return False

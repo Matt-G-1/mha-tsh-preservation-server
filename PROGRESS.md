@@ -603,6 +603,10 @@ environment details are intentionally omitted from Git.
   the paired recovered task as finished with its condition complete. This keeps
   quest state from regressing after reconnects or server restarts without
   introducing a separate hand-authored task save format.
+- Finished task IDs are now profile-backed as well, so direct task submissions,
+  starter-guide completions, and recovered area-event task completions survive
+  reconnects and server restarts even when there is no richer task-specific
+  save format yet.
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.

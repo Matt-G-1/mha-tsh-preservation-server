@@ -1201,7 +1201,7 @@ class GameServer:
             if is_win:
                 task_update = session.tasks.complete_area_event_stage(stage_id)
                 if task_update is not None:
-                    await self._send(writer, session, "c_task_info_update", task_update)
+                    await self._send_task_progression(writer, session, task_update)
         elif name == "s_area_event_reset_stage_times":
             await self._send(
                 writer,
@@ -2143,6 +2143,9 @@ class GameServer:
         session.stage.load_family_progress(
             self.profile_store.stage_family_progress.get(session.urs, {})
         )
+        session.tasks.seed_finished_tasks(
+            self.profile_store.finished_tasks.get(session.urs, ())
+        )
         session.tasks.seed_completed_area_event_stages(
             stage_id
             for stage_id, completion in session.stage.completions.items()
@@ -2254,6 +2257,10 @@ class GameServer:
         task_info = task_update.get("task_info")
         if not isinstance(task_info, dict):
             return
+        if int(task_info.get("Status") or 0) == 3:
+            self.profile_store.remember_finished_tasks(
+                session.urs, session.tasks.finished
+            )
         if int(task_info.get("Id") or 0) != STARTER_TASK_ID:
             return
         if int(task_info.get("Status") or 0) != 3:

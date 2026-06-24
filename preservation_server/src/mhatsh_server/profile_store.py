@@ -13,6 +13,7 @@ class ProfileStore:
         self.stage_progress: dict[str, dict[str, dict[str, int | list[int]]]] = {}
         self.stage_family_progress: dict[str, dict[str, dict[str, int]]] = {}
         self.normal_items: dict[str, dict[str, int]] = {}
+        self.finished_tasks: dict[str, set[int]] = {}
         self.load()
 
     def load(self) -> None:
@@ -31,6 +32,7 @@ class ProfileStore:
             raw.get("stage_family_progress")
         )
         self.normal_items = self._normal_items_map(raw.get("normal_items"))
+        self.finished_tasks = self._finished_tasks_map(raw.get("finished_tasks"))
 
     def remember_role(self, urs: str, uid: int) -> None:
         self.roles[str(urs)] = int(uid)
@@ -62,6 +64,15 @@ class ProfileStore:
             }
             for section, values in progress.items()
         }
+        self.save()
+
+    def remember_finished_tasks(
+        self, urs: str, task_ids: Iterable[int]
+    ) -> None:
+        normalized = {
+            int(task_id) for task_id in task_ids if int(task_id) > 0
+        }
+        self.finished_tasks[str(urs)] = normalized
         self.save()
 
     def grant_items(self, urs: str, rewards: Iterable[tuple[int, int]]) -> None:
@@ -100,6 +111,10 @@ class ProfileStore:
                     "stage_progress": self.stage_progress,
                     "stage_family_progress": self.stage_family_progress,
                     "normal_items": self.normal_items,
+                    "finished_tasks": {
+                        str(urs): sorted(task_ids)
+                        for urs, task_ids in self.finished_tasks.items()
+                    },
                 },
                 indent=2,
                 sort_keys=True,
@@ -199,4 +214,23 @@ class ProfileStore:
                 if numeric_item_id > 0 and numeric_count > 0:
                     item_output[str(numeric_item_id)] = numeric_count
             output[str(urs)] = item_output
+        return output
+
+    @staticmethod
+    def _finished_tasks_map(value: Any) -> dict[str, set[int]]:
+        if not isinstance(value, dict):
+            return {}
+        output: dict[str, set[int]] = {}
+        for urs, task_ids in value.items():
+            if not isinstance(task_ids, list):
+                continue
+            normalized: set[int] = set()
+            for task_id in task_ids:
+                try:
+                    numeric_task_id = int(task_id)
+                except (TypeError, ValueError):
+                    continue
+                if numeric_task_id > 0:
+                    normalized.add(numeric_task_id)
+            output[str(urs)] = normalized
         return output

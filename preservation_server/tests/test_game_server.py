@@ -4421,6 +4421,10 @@ def test_area_event_task_progress_restores_from_stage_progress(
     asyncio.run(_run_area_event_task_progress_persistence(tmp_path))
 
 
+def test_finished_task_ids_persist_across_server_instances(tmp_path: Path) -> None:
+    asyncio.run(_run_finished_task_id_persistence(tmp_path))
+
+
 def test_stage_family_progress_persists_across_server_instances(
     tmp_path: Path,
 ) -> None:
@@ -4802,6 +4806,7 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
     saved_stage = raw_profile["stage_progress"]["local-guest"]["21111"]
     assert saved_stage["status"] == 1
     assert saved_stage["pass_count"] == 1
+    assert 280101 in raw_profile["finished_tasks"]["local-guest"]
 
     restored_area_tasks = second_session.tasks.task_info(
         RECOVERED_AREA_EVENT_TASK_TYPE
@@ -4811,6 +4816,64 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
     assert restored_first_task["Status"] == TASK_STATUS_FINISHED
     assert restored_first_task["Cond"][0]["CompCount"] == 1
     assert 280101 in restored_area_tasks["finishs"]
+
+
+async def _run_finished_task_id_persistence(tmp_path: Path) -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    profile_path = tmp_path / "profiles.json"
+    task_id = 424242
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_PROFILE_STORE": str(profile_path),
+            "MHATSH_ROSTER_MODE": "verified",
+        },
+    ):
+        first_game = GameServer(registry)
+        first_writer = BufferWriter()
+        first_session = Session(
+            seed=1,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x5441534B),
+            urs="local-guest",
+            uid=4242,
+        )
+        first_game._configure_session(first_session)
+        submit = codec.encode_message("s_task_submit", {"task_id": task_id})
+        await first_game._dispatch(
+            first_session,
+            registry.protocol_ids["s_task_submit"],
+            submit,
+            first_writer,
+        )
+        decoder = FrameDecoder(RollingXor(0x5441534B))
+        [(reply_id, reply_body)] = decoder.feed(bytes(first_writer.data))
+        assert registry.protocol_names[reply_id] == "c_task_info_update"
+        task_update = codec.decode_message("c_task_info_update", reply_body)
+        assert task_update["task_info"]["Id"] == task_id
+        assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+
+        second_game = GameServer(registry)
+        second_session = Session(
+            seed=2,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x5441534C),
+            urs="local-guest",
+            uid=4242,
+        )
+        second_game._configure_session(second_session)
+
+    raw_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    assert task_id in raw_profile["finished_tasks"]["local-guest"]
+    restored_task_info = second_session.tasks.task_info()
+    assert task_id in restored_task_info["finishs"]
+    restored_task = next(
+        task for task in restored_task_info["tasks"] if task["Id"] == task_id
+    )
+    assert restored_task["Status"] == TASK_STATUS_FINISHED
 
 
 async def _run_stage_family_progress_persistence(tmp_path: Path) -> None:
