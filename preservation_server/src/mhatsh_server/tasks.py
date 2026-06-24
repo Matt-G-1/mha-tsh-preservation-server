@@ -116,6 +116,7 @@ class QuestDialogReference:
     quest_order: int
     text: str
     resolved_npc_ids: tuple[int, ...] = ()
+    resolved_npc_names: tuple[str, ...] = ()
     nearby_stage_ids: tuple[int, ...] = ()
     drama_refs: tuple[str, ...] = ()
 
@@ -407,6 +408,36 @@ def _resolve_dialog_npc_ids(text: str, raw_npc_ids: tuple[int, ...]) -> tuple[in
     return raw_npc_ids
 
 
+def _resolve_dialog_npc_names(
+    text: str,
+    resolved_npc_ids: tuple[int, ...],
+) -> tuple[str, ...]:
+    if not resolved_npc_ids:
+        return ()
+    target_text = _clean_dialog_target_text(text)
+    scored_names: list[tuple[int, str]] = []
+    for hint in RECOVERED_NPC_NAME_HINTS:
+        nearest_ids = _int_tuple(hint.get("nearest_npc_ids"))
+        if not any(npc_id in resolved_npc_ids for npc_id in nearest_ids):
+            continue
+        raw_hint_text = str(hint["text"])
+        hint_text = _clean_npc_hint_text(raw_hint_text)
+        if len(hint_text) < 2:
+            continue
+        score = _npc_hint_score(raw_hint_text, hint_text, target_text, text)
+        if score >= 999:
+            continue
+        scored_names.append((score, hint_text))
+    if not scored_names:
+        return ()
+    best_score = min(score for score, _ in scored_names)
+    output: list[str] = []
+    for score, name in scored_names:
+        if score == best_score and name not in output:
+            output.append(name)
+    return tuple(output)
+
+
 STARTER_TASK = TaskRecord(
     id=STARTER_GUIDE_ID,
     type=STARTER_TASK_TYPE,
@@ -572,16 +603,20 @@ RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID: dict[int, tuple[QuestNpcReference, ...
 def _recovered_quest_dialog_references() -> tuple[QuestDialogReference, ...]:
     references: list[QuestDialogReference] = []
     for item in RECOVERED_QUEST_DIALOG_HINTS:
+        text = str(item["text"])
+        raw_npc_ids = _int_tuple(item.get("nearby_npc_ids"))
+        resolved_npc_ids = _resolve_dialog_npc_ids(text, raw_npc_ids)
         for npc_id in _int_tuple(item.get("nearby_npc_ids")):
             references.append(
                 QuestDialogReference(
                     npc_id=npc_id,
                     task_id=int(item["task_id"]),
                     quest_order=int(item["quest_order"]),
-                    text=str(item["text"]),
-                    resolved_npc_ids=_resolve_dialog_npc_ids(
-                        str(item["text"]),
-                        _int_tuple(item.get("nearby_npc_ids")),
+                    text=text,
+                    resolved_npc_ids=resolved_npc_ids,
+                    resolved_npc_names=_resolve_dialog_npc_names(
+                        text,
+                        resolved_npc_ids,
                     ),
                     nearby_stage_ids=_int_tuple(item.get("nearby_stage_ids")),
                     drama_refs=_str_tuple(item.get("drama_refs")),

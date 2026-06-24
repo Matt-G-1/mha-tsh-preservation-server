@@ -4120,6 +4120,9 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         "\u4e0e\u9ad8\u9a6c\u5c3e\u5973\u5b66\u751f\u8c08\u8bdd"
     )
     assert first_dialogue.resolved_npc_ids == (6669,)
+    assert first_dialogue.resolved_npc_names == (
+        "\u9ad8\u9a6c\u5c3e\u5973\u5b66\u751f",
+    )
     assert first_dialogue.nearby_stage_ids == (
         280102,
         100601,
@@ -4139,12 +4142,22 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         5037,
         5038,
     )
+    assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[5000][0].resolved_npc_names == (
+        "\u6b27\u5c14\u9ea6\u7279",
+    )
     assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[5008][0].text == (
         "\u627e\u585a\u5185\u76f4\u6b63\u8c08\u8bdd"
     )
     assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[5008][0].resolved_npc_ids == (
         5009,
     )
+    assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[5008][0].resolved_npc_names == (
+        "\u585a\u5185\u76f4\u6b63",
+    )
+    assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[6000][0].resolved_npc_names == (
+        "\u5348\u591c",
+    )
+    assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[6683][0].resolved_npc_names == ()
     assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[6706][0].task_id == 563702
     assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_TASK_ID[100602] == (
         first_dialogue,
