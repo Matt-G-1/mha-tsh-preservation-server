@@ -103,6 +103,33 @@ class ProfileStore:
         if changed:
             self.save()
 
+    def deduct_items(
+        self, urs: str, items: Iterable[tuple[int, int]]
+    ) -> list[dict[str, int]]:
+        item_counts = self.normal_items.setdefault(str(urs), {})
+        changed_items: dict[int, int] = {}
+        changed = False
+        for item_id, count in items:
+            numeric_item_id = int(item_id)
+            numeric_count = int(count)
+            if numeric_item_id <= 0 or numeric_count <= 0:
+                continue
+            key = str(numeric_item_id)
+            current = int(item_counts.get(key, 0))
+            new_amount = max(0, current - numeric_count)
+            if new_amount > 0:
+                item_counts[key] = new_amount
+            else:
+                item_counts.pop(key, None)
+            changed_items[numeric_item_id] = new_amount
+            changed = True
+        if changed:
+            self.save()
+        return [
+            {"ItemId": item_id, "Amount": amount}
+            for item_id, amount in sorted(changed_items.items())
+        ]
+
     def normal_item_list(self, urs: str) -> list[dict[str, int]]:
         return [
             {"ItemId": int(item_id), "Amount": amount}

@@ -669,6 +669,59 @@ class GameServer:
                     int(values.get("IsLock") or 0),
                 ),
             )
+        elif name == "s_item_use":
+            item_amounts = self.profile_store.deduct_items(
+                session.urs,
+                [
+                    (
+                        int(values.get("ItemId") or 0),
+                        int(values.get("Amount") or 0),
+                    )
+                ],
+            )
+            await self._send_item_deduct(writer, session, item_amounts)
+        elif name == "s_item_sell":
+            item_amounts = self.profile_store.deduct_items(
+                session.urs,
+                self._normal_item_amount_pairs(
+                    list(values.get("NormalItemList") or [])
+                ),
+            )
+            await self._send(writer, session, "c_item_sell", {})
+            await self._send_item_deduct(writer, session, item_amounts)
+            await self._send_item_del(
+                writer,
+                session,
+                [int(uid) for uid in list(values.get("SpecialItemUidList") or [])],
+            )
+        elif name == "s_item_resolve":
+            item_amounts = self.profile_store.deduct_items(
+                session.urs,
+                self._normal_item_amount_pairs(
+                    list(values.get("NormalItemList") or [])
+                ),
+            )
+            await self._send_item_deduct(writer, session, item_amounts)
+            await self._send_item_del(
+                writer,
+                session,
+                [int(uid) for uid in list(values.get("SpecialItemUidList") or [])],
+            )
+        elif name == "s_item_select_reward":
+            item_amounts = self.profile_store.deduct_items(
+                session.urs,
+                [
+                    (
+                        int(values.get("ItemId") or 0),
+                        int(values.get("Amount") or 0),
+                    )
+                ],
+            )
+            await self._send_item_deduct(writer, session, item_amounts)
+        elif name == "s_item_lock":
+            # Special item lock state is not persisted yet; accepting the packet
+            # keeps inventory UI probes from falling into the unhandled path.
+            pass
         elif name == "s_card_support_skill":
             roster = self._ensure_roster(session)
             await self._send(
@@ -2540,6 +2593,53 @@ class GameServer:
             "c_item_amount",
             {"ItemList": item_amounts},
         )
+
+    async def _send_item_deduct(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        item_amounts: list[dict[str, int]],
+    ) -> None:
+        if not item_amounts:
+            return
+        await self._send(
+            writer,
+            session,
+            "c_item_deduct",
+            {"ItemList": item_amounts},
+        )
+
+    async def _send_item_del(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        item_uids: list[int],
+    ) -> None:
+        normalized = [int(uid) for uid in item_uids if int(uid) > 0]
+        if not normalized:
+            return
+        await self._send(
+            writer,
+            session,
+            "c_item_del",
+            {"ItemUid": normalized},
+        )
+
+    @staticmethod
+    def _normal_item_amount_pairs(
+        values: list[object],
+    ) -> list[tuple[int, int]]:
+        pairs: list[tuple[int, int]] = []
+        for item in values:
+            if not isinstance(item, dict):
+                continue
+            pairs.append(
+                (
+                    int(item.get("ItemId") or 0),
+                    int(item.get("Amount") or 0),
+                )
+            )
+        return pairs
 
     @staticmethod
     def _stage_reward_items(

@@ -9353,6 +9353,10 @@ def test_lottery_requests_return_stateful_draw_payloads() -> None:
     asyncio.run(_run_lottery_requests())
 
 
+def test_normal_item_action_packets_update_saved_counts() -> None:
+    asyncio.run(_run_normal_item_actions())
+
+
 def test_secret_area_requests_receive_recovered_mode_state() -> None:
     asyncio.run(_run_secret_area_requests())
 
@@ -9760,6 +9764,115 @@ async def _run_lottery_requests() -> None:
         {"ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID, "Amount": 5},
         {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "Amount": 6},
         {"ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 5},
+    ]
+
+
+async def _run_normal_item_actions() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    game.profile_store.grant_items(
+        "item-action-user",
+        [
+            (LOCAL_STAGE_PASS_REWARD_ITEM_ID, 5),
+            (LOCAL_STAGE_FIRST_REWARD_ITEM_ID, 4),
+            (LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, 2),
+            (LOCAL_STAGE_STYLE_REWARD_ITEM_ID, 1),
+        ],
+    )
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x44556677),
+        urs="item-action-user",
+    )
+
+    request_cases = [
+        (
+            "s_item_use",
+            {
+                "ItemUid": 0,
+                "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                "Amount": 2,
+                "NowAmount": 5,
+            },
+        ),
+        (
+            "s_item_sell",
+            {
+                "SellType": 1,
+                "NormalItemList": [
+                    {
+                        "ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID,
+                        "Amount": 3,
+                        "NowAmount": 4,
+                    }
+                ],
+                "SpecialItemUidList": [77],
+            },
+        ),
+        (
+            "s_item_resolve",
+            {
+                "NormalItemList": [
+                    {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "Amount": 2}
+                ],
+                "SpecialItemUidList": [88],
+            },
+        ),
+        (
+            "s_item_select_reward",
+            {
+                "ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID,
+                "Select": [1],
+                "Amount": 1,
+                "NowAmount": 1,
+            },
+        ),
+        ("s_item_lock", {"ItemUid": 99, "IsLock": 1}),
+    ]
+    for request_name, request_values in request_cases:
+        await game._dispatch(
+            session,
+            registry.protocol_ids[request_name],
+            codec.encode_message(request_name, request_values),
+            writer,
+        )
+
+    decoder = FrameDecoder(RollingXor(0x44556677))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_item_deduct",
+        "c_item_sell",
+        "c_item_deduct",
+        "c_item_del",
+        "c_item_deduct",
+        "c_item_del",
+        "c_item_deduct",
+    ]
+    assert codec.decode_message("c_item_deduct", replies[0][1]) == {
+        "ItemList": [{"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Amount": 3}]
+    }
+    assert codec.decode_message("c_item_sell", replies[1][1]) == {}
+    assert codec.decode_message("c_item_deduct", replies[2][1]) == {
+        "ItemList": [{"ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID, "Amount": 1}]
+    }
+    assert codec.decode_message("c_item_del", replies[3][1]) == {"ItemUid": [77]}
+    assert codec.decode_message("c_item_deduct", replies[4][1]) == {
+        "ItemList": [
+            {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "Amount": 0}
+        ]
+    }
+    assert codec.decode_message("c_item_del", replies[5][1]) == {"ItemUid": [88]}
+    assert codec.decode_message("c_item_deduct", replies[6][1]) == {
+        "ItemList": [{"ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 0}]
+    }
+    assert game.profile_store.normal_item_list("item-action-user") == [
+        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Amount": 3},
+        {"ItemId": LOCAL_STAGE_FIRST_REWARD_ITEM_ID, "Amount": 1},
     ]
 
 

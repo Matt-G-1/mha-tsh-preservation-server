@@ -548,6 +548,11 @@ environment details are intentionally omitted from Git.
 - Saved normal-item counts now surface through protocol packets: accounts with
   stored items receive a startup `c_item_normal_list`, and lottery/ex-lottery
   rewards send `c_item_amount` updates after the draw result.
+- Basic normal-item actions now update saved counts and reply through recovered
+  inventory schemas: `s_item_use`, `s_item_sell`, `s_item_resolve`, and
+  `s_item_select_reward` emit `c_item_deduct`/`c_item_sell`/`c_item_del` as
+  appropriate, while `s_item_lock` is accepted as a no-op until special-item
+  lock persistence is recovered.
 - The recovered stage catalog now tracks numeric `stage500` plus major
   script-only `zx_ruxue`, USJ, beach, commercial-street, and training-yard
   drama groups. Generated fallback encounters now select enemy-specific AI
