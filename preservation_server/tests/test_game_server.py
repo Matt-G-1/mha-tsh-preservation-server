@@ -2141,18 +2141,13 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         for model_id, gaps in action_gaps_by_model.items()
         if gaps
     } == {
-        "h1001": ("DODGE",),
-        "h1006": ("DODGE",),
-        "h1008": ("DODGE",),
-        "h1013": ("DODGE",),
-        "h1014": ("DODGE", "PASSIVE"),
-        "h1015": ("DODGE", "PASSIVE"),
-        "h1016": ("DODGE",),
-        "h1017": ("DODGE", "PASSIVE"),
-        "h1019": ("DODGE", "PASSIVE"),
+        "h1014": ("PASSIVE",),
+        "h1015": ("PASSIVE",),
+        "h1017": ("PASSIVE",),
+        "h1019": ("PASSIVE",),
         "h1026": ("PASSIVE",),
         "h1027": ("DODGE", "PASSIVE"),
-        "h1028": ("DODGE", "PASSIVE"),
+        "h1028": ("PASSIVE",),
         "h1029": ("DODGE", "PASSIVE"),
         "h1030": ("DODGE", "PASSIVE"),
         "h1031": ("DODGE", "PASSIVE"),

@@ -562,6 +562,10 @@ def _action_hint_command_for_model(model_asset_id: str, action: str) -> str | No
 def _action_hint_command(action: str) -> str | None:
     normalized = action.lower()
     leaf = normalized.rsplit("/", 1)[-1]
+    if "dodge" in normalized:
+        return "DODGE"
+    if "dash" in leaf:
+        return "DODGE"
     if (
         "/commonatk/" in normalized
         or "/connomatk/" in normalized
@@ -569,8 +573,6 @@ def _action_hint_command(action: str) -> str | None:
         or "commonatk" in normalized
         or "breakatk" in normalized
         or "break_atk" in normalized
-        or "dashatk" in normalized
-        or "dash_atk" in normalized
         or leaf.startswith("atk")
         or "_atk" in leaf
     ):
@@ -585,10 +587,6 @@ def _action_hint_command(action: str) -> str | None:
         return "R"
     if "skillex" in leaf or "skill_ex" in leaf:
         return "R"
-    if "dodge" in normalized:
-        return "DODGE"
-    if "dash" in leaf:
-        return "DODGE"
     if (
         "/ability/" in normalized
         or "/ability" in normalized
