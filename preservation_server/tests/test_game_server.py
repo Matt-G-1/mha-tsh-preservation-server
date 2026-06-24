@@ -5551,6 +5551,151 @@ async def _run_stage_family_info_packets() -> None:
         ],
     }
 
+    writer.data.clear()
+    session.outbound = RollingXor(0x66001129)
+    daily_choose = codec.encode_message(
+        "s_act_daily_stage_choose",
+        {"ActId": 88, "StageId": 860001},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_daily_stage_choose"],
+        daily_choose,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x66001129))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_act_daily_stage_info"
+    daily_info = codec.decode_message("c_act_daily_stage_info", reply_body)
+    assert daily_info["ActId"] == 88
+    assert len(daily_info["Count"]) == len(ACT_DAILY_STAGES)
+    assert daily_info["Count"][0] == {
+        "Id": 860001,
+        "Count": 0,
+        "Extra": {
+            "NumList": [860001, 0, 1],
+            "StrList": ["daily_stage", ""],
+        },
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x6600112A)
+    herochip_enter = codec.encode_message(
+        "s_herochip_stage_enter",
+        {"Id": 370101, "HeroUid": STARTER_CARD_UID},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_herochip_stage_enter"],
+        herochip_enter,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112A))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_herochip_stage_sync_data",
+        "c_stage_enter",
+    ]
+    herochip_sync = codec.decode_message("c_herochip_stage_sync_data", replies[0][1])
+    assert len(herochip_sync["DailyTimes"]) == len(HEROCHIP_STAGES)
+    assert herochip_sync["DailyTimes"][0] == {"Id": 370101, "Times": 0}
+    assert herochip_sync["PassStage"] == []
+    herochip_stage = codec.decode_message("c_stage_enter", replies[1][1])
+    assert herochip_stage["StageId"] == 370101
+    assert session.stage.current_stage_key == "herochip_stage_370101"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x6600112B)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_usj_cycle_id"],
+        codec.encode_message("s_usj_cycle_id", {}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112B))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_usj_cycle_id"
+    assert codec.decode_message("c_usj_cycle_id", reply_body) == {"CycleId": 1}
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x6600112C)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_usj_enter_activity_ui"],
+        codec.encode_message("s_usj_enter_activity_ui", {}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112C))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_usj_load"
+    usj_load = codec.decode_message("c_usj_load", reply_body)
+    assert len(usj_load["HeroList"]) == len(session.roster.cards)
+    assert len(usj_load["ZoneList"]) == 3
+    assert usj_load["ZoneList"][0]["ZoneId"] == 1001
+    assert usj_load["ZoneList"][0]["AccessedPath"] == [
+        point.point_id for point in USJ_POINTS[:4]
+    ]
+    assert usj_load["CurrentHeroUid"] == session.roster.active_card_uid
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x6600112D)
+    usj_enter = codec.encode_message(
+        "s_usj_enter_stage",
+        {"ZoneId": 1001, "PointId": 100101, "HeroUid": STARTER_CARD_UID},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_usj_enter_stage"],
+        usj_enter,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112D))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_usj_enter_stage",
+        "c_stage_enter",
+    ]
+    assert codec.decode_message("c_usj_enter_stage", replies[0][1]) == {
+        "ZoneId": 1001,
+        "PointId": 100101,
+        "HeroUid": STARTER_CARD_UID,
+    }
+    usj_stage_enter = codec.decode_message("c_stage_enter", replies[1][1])
+    assert usj_stage_enter["StageId"] == 700101
+    assert session.stage.current_usj_point_id == 100101
+    assert session.stage.current_stage_key == "usj_stage_700101"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x6600112E)
+    point_reward = codec.encode_message(
+        "s_usj_get_point_reward",
+        {"ZoneId": 1001, "PointList": [100101]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_usj_get_point_reward"],
+        point_reward,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112E))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_usj_get_point_reward"
+    assert codec.decode_message("c_usj_get_point_reward", reply_body) == {
+        "ZoneId": 1001,
+        "RewardList": [
+            {
+                "PointId": 100101,
+                "Reward": [
+                    {
+                        "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                        "count": 1,
+                        "extra": [],
+                    }
+                ],
+            }
+        ],
+    }
+
 
 async def _run_starter_guide_intro_stage_probe() -> None:
     registry = SchemaRegistry.from_files(

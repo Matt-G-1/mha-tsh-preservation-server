@@ -806,8 +806,20 @@ class GameServer:
         elif name in {
             "s_resource_stage_enter",
             "s_resource_stage_reenter",
-            "s_herochip_stage_enter",
         }:
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("Id") or 0),
+                card_uid=int(values.get("HeroUid") or 0),
+            )
+        elif name == "s_herochip_stage_enter":
+            await self._send(
+                writer,
+                session,
+                "c_herochip_stage_sync_data",
+                session.stage.herochip_stage_sync_data(),
+            )
             await self._enter_requested_stage(
                 writer,
                 session,
@@ -829,6 +841,57 @@ class GameServer:
                 session,
                 int(values.get("Id") or 0),
                 hero_id=int(values.get("HeroId") or 0),
+            )
+        elif name == "s_act_daily_stage_choose":
+            await self._send(
+                writer,
+                session,
+                "c_act_daily_stage_info",
+                session.stage.act_daily_stage_info(int(values.get("ActId") or 0)),
+            )
+        elif name == "s_usj_enter_activity_ui":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_usj_load",
+                session.stage.usj_load(
+                    hero_uids=sorted(roster.cards),
+                    current_hero_uid=roster.active_card_uid,
+                ),
+            )
+        elif name == "s_usj_cycle_id":
+            await self._send(
+                writer,
+                session,
+                "c_usj_cycle_id",
+                session.stage.usj_cycle_id(),
+            )
+        elif name == "s_usj_enter_stage":
+            roster = self._ensure_roster(session)
+            point_id = int(values.get("PointId") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_usj_enter_stage",
+                session.stage.usj_enter_stage(
+                    zone_id=int(values.get("ZoneId") or 0),
+                    point_id=point_id,
+                    hero_uid=int(values.get("HeroUid") or roster.active_card_uid),
+                ),
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                session.stage.usj_first_stage_for_point(point_id),
+                card_uid=int(values.get("HeroUid") or roster.active_card_uid),
+            )
+        elif name == "s_usj_enter_next_zone":
+            await self._send(
+                writer,
+                session,
+                "c_usj_enter_next_zone",
+                session.stage.usj_enter_next_zone(int(values.get("ZoneId") or 0)),
             )
         elif name == "s_area_event_enter_stage":
             hero_uids = [int(item) for item in list(values.get("HerosUId") or [])]
@@ -905,6 +968,57 @@ class GameServer:
                 session,
                 "c_resource_stage_info",
                 session.stage.resource_stage_info(roster.active_card_uid),
+            )
+        elif name == "s_usj_server_score":
+            await self._send(
+                writer,
+                session,
+                "c_usj_update_score",
+                {
+                    "ServerTotalScore": sum(session.stage.pressure_scores.values()),
+                    "List": [{"Id": 1, "State": 0}, {"Id": 2, "State": 0}],
+                },
+            )
+        elif name == "s_usj_get_point_reward":
+            point_ids = [int(item) for item in list(values.get("PointList") or [])]
+            point_reward = session.stage.usj_point_reward(
+                int(values.get("ZoneId") or 0),
+                point_ids,
+            )
+            self._grant_stage_reward_list(
+                session,
+                [
+                    reward
+                    for group in list(point_reward.get("RewardList") or [])
+                    if isinstance(group, dict)
+                    for reward in list(group.get("Reward") or [])
+                    if isinstance(reward, dict)
+                ],
+            )
+            await self._send(writer, session, "c_usj_get_point_reward", point_reward)
+        elif name == "s_usj_get_score_reward":
+            await self._send(
+                writer,
+                session,
+                "c_usj_update_score_reward",
+                session.stage.usj_score_reward(int(values.get("Id") or 0)),
+            )
+        elif name == "s_usj_get_zone_reward":
+            await self._send(
+                writer,
+                session,
+                "c_usj_get_zone_reward",
+                session.stage.usj_zone_reward(
+                    int(values.get("ZoneId") or 0),
+                    int(values.get("RewardType") or 0),
+                ),
+            )
+        elif name == "s_usj_have_show_end_reward":
+            await self._send(
+                writer,
+                session,
+                "c_usj_get_end_reward",
+                {},
             )
         elif name == "s_pressure_stage_detail":
             roster = self._ensure_roster(session)

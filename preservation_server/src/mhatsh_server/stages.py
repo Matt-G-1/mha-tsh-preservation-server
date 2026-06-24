@@ -15,7 +15,7 @@ from .act_daily_stages import (
 from .combat import CombatResolution, FightStyle
 from .herochip_stages import HEROCHIP_STAGE_SOURCE, HEROCHIP_STAGES
 from .roguelike_stages import ROGUELIKE_STAGE_SOURCE, ROGUELIKE_STAGES
-from .usj_stages import USJ_STAGE_SOURCE, USJ_STAGES
+from .usj_stages import USJ_POINT_BY_ID, USJ_POINTS, USJ_STAGE_SOURCE, USJ_STAGES
 
 
 STARTER_INTRO_STAGE_ID = 299301
@@ -2839,6 +2839,7 @@ class StageState:
     pressure_scores: dict[int, int] = field(default_factory=dict)
     daily_stage_counts: dict[int, int] = field(default_factory=dict)
     completions: dict[int, StageCompletion] = field(default_factory=dict)
+    current_usj_point_id: int = 0
 
     def enter_stage(
         self,
@@ -3098,6 +3099,198 @@ class StageState:
                 self.pressure_scores.get(stage_id, 0),
             )
 
+    def herochip_stage_sync_data(self) -> dict[str, object]:
+        return {
+            "DailyTimes": [
+                {
+                    "Id": stage.stage_id,
+                    "Times": self.completions.get(
+                        stage.stage_id, StageCompletion(stage.stage_id)
+                    ).pass_count,
+                }
+                for stage in HEROCHIP_STAGES
+            ],
+            "PassStage": [
+                stage.stage_id
+                for stage in HEROCHIP_STAGES
+                if self.completions.get(
+                    stage.stage_id, StageCompletion(stage.stage_id)
+                ).status
+            ],
+        }
+
+    def herochip_red_info(self) -> dict[str, object]:
+        return {
+            "List": [
+                stage.stage_id
+                for stage in HEROCHIP_STAGES
+                if not self.completions.get(
+                    stage.stage_id, StageCompletion(stage.stage_id)
+                ).status
+            ]
+        }
+
+    def act_daily_stage_info(self, act_id: int = 0) -> dict[str, object]:
+        return {
+            "ActId": int(act_id),
+            "Count": [
+                {
+                    "Id": stage.stage_id,
+                    "Count": self.daily_stage_counts.get(stage.stage_id, 0),
+                    "Extra": {
+                        "NumList": [
+                            stage.stage_id,
+                            stage.sub_id,
+                            stage.display_order,
+                        ],
+                        "StrList": [stage.section, stage.name],
+                    },
+                }
+                for stage in ACT_DAILY_STAGES
+            ],
+        }
+
+    def usj_cycle_id(self) -> dict[str, object]:
+        return {"CycleId": 1}
+
+    def usj_zone_id_for_point(self, point_id: int) -> int:
+        if not point_id:
+            return USJ_POINTS[0].point_id // 100 if USJ_POINTS else 0
+        return int(point_id) // 100
+
+    def usj_first_stage_for_point(self, point_id: int) -> int:
+        point = USJ_POINT_BY_ID.get(int(point_id))
+        if point is not None and point.stage_ids:
+            return point.stage_ids[0]
+        return USJ_STAGES[0].stage_id if USJ_STAGES else STARTER_INTRO_STAGE_ID
+
+    def usj_load(
+        self,
+        *,
+        hero_uids: list[int],
+        current_hero_uid: int,
+    ) -> dict[str, object]:
+        zones: dict[int, list[int]] = {}
+        for point in USJ_POINTS:
+            zones.setdefault(self.usj_zone_id_for_point(point.point_id), []).append(
+                point.point_id
+            )
+
+        current_point = self.current_usj_point_id or (
+            USJ_POINTS[0].point_id if USJ_POINTS else 0
+        )
+        current_zone = self.usj_zone_id_for_point(current_point)
+        return {
+            "ServerTotalScore": sum(self.pressure_scores.values()),
+            "UserTotalScore": sum(self.pressure_scores.values()),
+            "HeroList": [
+                {"HeroUid": int(hero_uid), "HpPercent": 100, "DeathTime": 0}
+                for hero_uid in hero_uids
+            ],
+            "ZoneList": [
+                {
+                    "ZoneId": zone_id,
+                    "AccessedPath": point_ids,
+                    "ZoneRewards": [
+                        {"RewardType": reward_type, "RewardState": 0}
+                        for reward_type in (1, 2, 3)
+                    ],
+                    "PointRewards": [
+                        {
+                            "PointId": point_id,
+                            "RewardState": int(
+                                self.pressure_scores.get(point_id, 0) > 0
+                            ),
+                        }
+                        for point_id in point_ids
+                    ],
+                    "ScoreList": [
+                        {
+                            "PointId": point_id,
+                            "Score": self.pressure_scores.get(point_id, 0),
+                        }
+                        for point_id in point_ids
+                    ],
+                }
+                for zone_id, point_ids in sorted(zones.items())
+            ],
+            "OpenZone": [
+                {"ZoneId": zone_id, "Reason": 0}
+                for zone_id in sorted(zones)
+            ],
+            "LevelRangeId": 1,
+            "CurrentZoneId": current_zone,
+            "CurrentPointId": current_point,
+            "CurrentHeroUid": int(current_hero_uid),
+            "RankReward": 0,
+            "HaveShowEndReward": 0,
+            "IsFirstTime": int(not self.pressure_scores),
+            "ThemeId": 1,
+            "NextThemeId": 0,
+            "ScoreReward": [
+                {"Id": reward_id, "State": 0}
+                for reward_id in (1, 2, 3)
+            ],
+        }
+
+    def usj_enter_stage(
+        self,
+        *,
+        zone_id: int,
+        point_id: int,
+        hero_uid: int,
+    ) -> dict[str, object]:
+        self.current_usj_point_id = int(point_id)
+        return {
+            "ZoneId": int(zone_id or self.usj_zone_id_for_point(point_id)),
+            "PointId": int(point_id),
+            "HeroUid": int(hero_uid),
+        }
+
+    def usj_enter_next_zone(self, zone_id: int) -> dict[str, object]:
+        zone_points = [
+            point.point_id
+            for point in USJ_POINTS
+            if self.usj_zone_id_for_point(point.point_id) == int(zone_id)
+        ]
+        point_id = (
+            zone_points[0]
+            if zone_points
+            else (USJ_POINTS[0].point_id if USJ_POINTS else 0)
+        )
+        return {"CurrentZoneId": int(zone_id), "CurrentPointId": point_id}
+
+    def usj_point_reward(self, zone_id: int, point_ids: list[int]) -> dict[str, object]:
+        return {
+            "ZoneId": int(zone_id),
+            "RewardList": [
+                {
+                    "PointId": int(point_id),
+                    "Reward": [
+                        {
+                            "ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+                            "count": max(
+                                1,
+                                self.pressure_scores.get(int(point_id), 0) // 100,
+                            ),
+                            "extra": [],
+                        }
+                    ],
+                }
+                for point_id in point_ids
+            ],
+        }
+
+    def usj_score_reward(self, reward_id: int) -> dict[str, object]:
+        return {
+            "List": [
+                {"Id": int(reward_id), "State": 1},
+            ]
+        }
+
+    def usj_zone_reward(self, zone_id: int, reward_type: int) -> dict[str, object]:
+        return {"ZoneId": int(zone_id), "RewardType": int(reward_type)}
+
     def usj_stage_record(
         self,
         *,
@@ -3138,7 +3331,11 @@ class StageState:
         base_score = max(0, hurt_sum // 100)
         time_score = max(0, hp_percent)
         score = base_score + time_score
-        point_id = self.current_stage_id or STARTER_INTRO_STAGE_ID
+        point_id = (
+            self.current_usj_point_id
+            or self.current_stage_id
+            or STARTER_INTRO_STAGE_ID
+        )
         self.pressure_scores[point_id] = max(
             score,
             self.pressure_scores.get(point_id, 0),
