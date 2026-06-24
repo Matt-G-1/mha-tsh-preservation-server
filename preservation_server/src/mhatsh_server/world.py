@@ -40,6 +40,10 @@ class WorldState:
     def __init__(self) -> None:
         self.last_position: ScenePosition | None = None
         self.move_count = 0
+        self.sync_position_count = 0
+        self.current_scene_line_id = 1
+        self.current_scene_obj_id = 0
+        self.last_action_id = 0
         self.frame_stats: list[ClientFrameStat] = []
         self.client_errors: list[str] = []
         self.unhandled_messages: list[dict[str, object]] = []
@@ -50,6 +54,37 @@ class WorldState:
         self.last_position = ScenePosition.from_protocol(path[-1])
         self.move_count += 1
         return self.last_position
+
+    def record_sync_position(
+        self, x: int, y: int, z: int, face: int
+    ) -> ScenePosition:
+        self.last_position = ScenePosition(x=int(x), y=int(y), z=int(z), face=int(face))
+        self.sync_position_count += 1
+        return self.last_position
+
+    def line_info(self, scene_id: int) -> dict[str, object]:
+        return {
+            "SceneId": int(scene_id),
+            "Line": self.current_scene_line_id,
+            "List": [
+                {
+                    "LineId": self.current_scene_line_id,
+                    "SceneId": int(scene_id),
+                    "Status": 1,
+                }
+            ],
+        }
+
+    def change_line(self, scene_id: int, line_id: int) -> dict[str, object]:
+        self.current_scene_line_id = max(1, int(line_id))
+        return self.line_info(scene_id)
+
+    def record_scene_obj_curid(self, cur_id: int) -> None:
+        self.current_scene_obj_id = int(cur_id)
+
+    def record_action_change(self, action_id: int) -> int:
+        self.last_action_id = int(action_id)
+        return self.last_action_id
 
     def record_frame_stat(
         self, uid: int, stage_id: int, frame: int, image_level: int

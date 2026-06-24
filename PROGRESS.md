@@ -106,6 +106,11 @@ environment details are intentionally omitted from Git.
 - World-session telemetry now records player movement (`s_scene_move`),
   frame-stat heartbeats (`s_client_stat_frame`), and client error reports
   (`s_client_error`) without sending unsafe extra replies.
+- Basic scene-session packets now have conservative compatibility coverage:
+  `s_scene_sync_pos` and `s_scene_obj_curid` update session state without a
+  speculative reply, while `s_scene_line_info`, `s_scene_line_change`,
+  `s_scene_player_info`, `s_scene_jump`, and `s_scene_action_change` receive
+  schema-matched line/player/teleport/action responses.
 - Unhandled decoded client messages are retained in the session world state,
   giving controlled live runs a concrete protocol to-do list without sending
   speculative responses.

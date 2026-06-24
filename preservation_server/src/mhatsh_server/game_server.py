@@ -2085,6 +2085,68 @@ class GameServer:
                 "c_group_open_map",
                 session.activities.group_open_map(),
             )
+        elif name == "s_scene_sync_pos":
+            session.world.record_sync_position(
+                int(values.get("X") or 0),
+                int(values.get("Y") or 0),
+                int(values.get("Z") or 0),
+                int(values.get("Face") or 0),
+            )
+        elif name == "s_scene_line_info":
+            await self._send(
+                writer,
+                session,
+                "c_scene_line_info",
+                session.world.line_info(int(values.get("SceneId") or STARTER_SCENE_ID)),
+            )
+        elif name == "s_scene_line_change":
+            await self._send(
+                writer,
+                session,
+                "c_scene_line_info",
+                session.world.change_line(
+                    int(values.get("SceneId") or STARTER_SCENE_ID),
+                    int(values.get("LineId") or 1),
+                ),
+            )
+        elif name == "s_scene_player_info":
+            roster = self._ensure_roster(session)
+            requested_uid = int(values.get("Uid") or 0)
+            if requested_uid in {0, session.uid}:
+                await self._send_scene_player_info(writer, session, roster)
+        elif name == "s_scene_jump":
+            session.world.record_sync_position(
+                int(values.get("x") or 0),
+                int(values.get("y") or 0),
+                STARTER_SCENE_Z,
+                0,
+            )
+            await self._send(
+                writer,
+                session,
+                "c_scene_player_teleport",
+                {
+                    "Uid": session.uid,
+                    "X": int(values.get("x") or 0),
+                    "Y": int(values.get("y") or 0),
+                    "Face": 0,
+                    "Effect": int(values.get("confirm") or 0),
+                },
+            )
+        elif name == "s_scene_obj_curid":
+            session.world.record_scene_obj_curid(int(values.get("CurId") or 0))
+        elif name == "s_scene_action_change":
+            await self._send(
+                writer,
+                session,
+                "c_scene_action_change",
+                {
+                    "Uid": session.uid,
+                    "ActionId": session.world.record_action_change(
+                        int(values.get("ActionId") or 0)
+                    ),
+                },
+            )
         elif name == "s_scene_move":
             session.world.record_move(list(values.get("Path") or []))
         elif name == "s_client_stat_frame":

@@ -7149,6 +7149,129 @@ async def _run_world_telemetry() -> None:
         character_action=1,
     )
 
+    sync_pos = codec.encode_message(
+        "s_scene_sync_pos",
+        {"X": 4300, "Y": 20100, "Z": 0, "Face": 180},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_sync_pos"],
+        sync_pos,
+        writer,
+    )
+    assert writer.data == bytearray()
+    assert session.world.last_position == ScenePosition(
+        x=4300,
+        y=20100,
+        z=0,
+        face=180,
+    )
+    assert session.world.sync_position_count == 1
+
+    session.outbound = RollingXor(0xABCDEF02)
+    scene_line_info = codec.encode_message("s_scene_line_info", {"SceneId": 1000})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_line_info"],
+        scene_line_info,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xABCDEF02))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_scene_line_info"
+    assert codec.decode_message("c_scene_line_info", reply_body) == {
+        "SceneId": 1000,
+        "Line": 1,
+        "List": [{"LineId": 1, "SceneId": 1000, "Status": 1}],
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xABCDEF03)
+    scene_line_change = codec.encode_message(
+        "s_scene_line_change", {"SceneId": 1000, "LineId": 2}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_line_change"],
+        scene_line_change,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xABCDEF03))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_scene_line_info"
+    assert codec.decode_message("c_scene_line_info", reply_body) == {
+        "SceneId": 1000,
+        "Line": 2,
+        "List": [{"LineId": 2, "SceneId": 1000, "Status": 1}],
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xABCDEF04)
+    player_info = codec.encode_message("s_scene_player_info", {"Uid": 10001})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_player_info"],
+        player_info,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xABCDEF04))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_scene_player_info"
+    scene_player = codec.decode_message("c_scene_player_info", reply_body)
+    assert scene_player["Uid"] == 10001
+    assert scene_player["ShowHeroId"] == STARTER_HERO_ID
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xABCDEF05)
+    scene_jump = codec.encode_message(
+        "s_scene_jump", {"sceneId": 1000, "x": 4400, "y": 20200, "confirm": 1}
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_jump"],
+        scene_jump,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xABCDEF05))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_scene_player_teleport"
+    assert codec.decode_message("c_scene_player_teleport", reply_body) == {
+        "Uid": 10001,
+        "X": 4400,
+        "Y": 20200,
+        "Face": 0,
+        "Effect": 1,
+    }
+
+    writer.data.clear()
+    scene_obj = codec.encode_message("s_scene_obj_curid", {"CurId": 1234})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_obj_curid"],
+        scene_obj,
+        writer,
+    )
+    assert writer.data == bytearray()
+    assert session.world.current_scene_obj_id == 1234
+
+    session.outbound = RollingXor(0xABCDEF06)
+    action_change = codec.encode_message("s_scene_action_change", {"ActionId": 9})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_scene_action_change"],
+        action_change,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xABCDEF06))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_scene_action_change"
+    assert codec.decode_message("c_scene_action_change", reply_body) == {
+        "Uid": 10001,
+        "ActionId": 9,
+    }
+    assert session.world.last_action_id == 9
+
+    writer.data.clear()
     frame = codec.encode_message(
         "s_client_stat_frame",
         {"uid": 10001, "iStageId": 0, "iFrame": 30000, "iImageLevel": 4},
