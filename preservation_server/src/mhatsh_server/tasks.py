@@ -108,7 +108,7 @@ class TaskState:
         tasks = [
             task.to_protocol()
             for task in sorted(self.tasks.values(), key=_task_sort_key)
-            if task_type in (None, 0, task.type)
+            if task_type in (None, 0, task.type) and self._is_visible(task)
         ]
         return {
             "tasks": tasks,
@@ -221,8 +221,41 @@ class TaskState:
         return task
 
     def _finish(self, task: TaskRecord) -> None:
+        for predecessor in self._unfinished_chain_predecessors(task):
+            self._finish_one(predecessor)
+        self._finish_one(task)
+
+    def _finish_one(self, task: TaskRecord) -> None:
+        for condition in task.conditions:
+            condition.completed_count = max(condition.completed_count, 1)
         task.status = TASK_STATUS_FINISHED
         self.finished.add(task.id)
+
+    def _unfinished_chain_predecessors(
+        self, task: TaskRecord
+    ) -> tuple[TaskRecord, ...]:
+        predecessors: list[TaskRecord] = []
+        seen = {task.id}
+        previous_id = task.previous_task_id
+        while previous_id:
+            if previous_id in seen or previous_id in self.finished:
+                break
+            seen.add(previous_id)
+            previous = self.tasks.get(previous_id)
+            if previous is None:
+                break
+            predecessors.append(previous)
+            previous_id = previous.previous_task_id
+        return tuple(reversed(predecessors))
+
+    def _is_visible(self, task: TaskRecord) -> bool:
+        if task.id == STARTER_TASK.id or task.id in self.finished:
+            return True
+        if task.quest_order <= 0:
+            return True
+        if STARTER_TASK.id not in self.finished:
+            return False
+        return task.previous_task_id == 0 or task.previous_task_id in self.finished
 
 
 STARTER_TASK = TaskRecord(

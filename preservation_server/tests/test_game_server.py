@@ -3892,14 +3892,7 @@ def test_tutorial_state_accumulates_guides_teach_and_base_station() -> None:
 
 def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     state = TaskState()
-    expected_type_one_tasks = [
-        STARTER_TASK.to_protocol(),
-        *[
-            task.to_protocol()
-            for task in RECOVERED_ACT_TASK_RECORDS
-            if task.type == STARTER_TASK.type
-        ],
-    ]
+    expected_type_one_tasks = [STARTER_TASK.to_protocol()]
 
     task_info = state.task_info(STARTER_TASK.type)
     assert task_info == {
@@ -3909,15 +3902,7 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         "IsEnd": 1,
     }
     all_task_info = state.task_info()
-    assert [task["Id"] for task in all_task_info["tasks"][:6]] == [
-        STARTER_TASK.id,
-        1010,
-        280101,
-        100602,
-        100701,
-        100902,
-    ]
-    assert expected_type_one_tasks[1]["Id"] == 1010
+    assert [task["Id"] for task in all_task_info["tasks"]] == [STARTER_TASK.id]
     assert RECOVERED_ACT_TASK_RECORDS[0].label == "\u7b49\u7ea7"
     assert RECOVERED_ACT_TASK_RECORDS[0].objective == (
         "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f"
@@ -3934,6 +3919,18 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert submit["action_type"] == 2
     assert submit["task_info"]["Status"] == TASK_STATUS_FINISHED
     assert state.task_info()["finishs"] == [STARTER_TASK.id]
+    assert [task["Id"] for task in state.task_info()["tasks"]] == [
+        STARTER_TASK.id,
+        1010,
+    ]
+    first_chain_submit = state.submit(1010)
+    assert first_chain_submit["task_info"]["Id"] == 1010
+    assert first_chain_submit["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert [task["Id"] for task in state.task_info()["tasks"][:3]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+    ]
     assert state.sync_info(STARTER_TASK.id, "guide", ["1301"]) == {
         "TaskId": STARTER_TASK.id,
         "Type": "guide",
@@ -3961,7 +3958,8 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         {"StatId": 2, "NumData": [0, STARTER_GUIDE_ID, STARTER_GUIDE_STEP]}
     ) is None
     recovered_area_tasks = state.task_info(RECOVERED_AREA_EVENT_TASK_TYPE)
-    assert len(recovered_area_tasks["tasks"]) == len(RECOVERED_AREA_EVENT_TASK_RECORDS) == 75
+    assert len(RECOVERED_AREA_EVENT_TASK_RECORDS) == 75
+    assert [task["Id"] for task in recovered_area_tasks["tasks"]] == [280101]
     assert recovered_area_tasks["tasks"][0] == RECOVERED_AREA_EVENT_TASK_RECORDS[
         0
     ].to_protocol()
@@ -3987,8 +3985,26 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert area_task_update["task_info"]["Id"] == 280101
     assert area_task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
     assert area_task_update["task_info"]["Cond"][0]["CompCount"] == 1
+    assert [task["Id"] for task in state.task_info()["tasks"][:4]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+        100602,
+    ]
     assert state.complete_area_event_stage(21111) is None
     assert RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID[21311].id == 280301
+    out_of_order_state = TaskState()
+    out_of_order_state.skip_starter_quest()
+    out_of_order_update = out_of_order_state.complete_area_event_stage(21111)
+    assert out_of_order_update is not None
+    assert 1010 in out_of_order_state.finished
+    assert 280101 in out_of_order_state.finished
+    assert [task["Id"] for task in out_of_order_state.task_info()["tasks"][:4]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+        100602,
+    ]
 
 
 def test_activity_state_returns_empty_compatibility_payloads() -> None:
@@ -6038,14 +6054,7 @@ async def _run_task_requests() -> None:
     decoder = FrameDecoder(RollingXor(0x66778899))
     [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
     assert registry.protocol_names[reply_id] == "c_task_info"
-    expected_type_one_tasks = [
-        STARTER_TASK.to_protocol(),
-        *[
-            task.to_protocol()
-            for task in RECOVERED_ACT_TASK_RECORDS
-            if task.type == STARTER_TASK.type
-        ],
-    ]
+    expected_type_one_tasks = [STARTER_TASK.to_protocol()]
     assert codec.decode_message("c_task_info", reply_body) == {
         "tasks": expected_type_one_tasks,
         "finishs": [],
@@ -6118,6 +6127,28 @@ async def _run_task_requests() -> None:
     submitted = codec.decode_message("c_task_info_update", reply_body)
     assert submitted["action_type"] == 2
     assert submitted["task_info"]["Status"] == TASK_STATUS_FINISHED
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x8A9BACBD)
+    unlocked_task_list = codec.encode_message(
+        "s_task_get_tasklist_bytype",
+        {"task_type": STARTER_TASK.type},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_get_tasklist_bytype"],
+        unlocked_task_list,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x8A9BACBD))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_task_info"
+    unlocked_tasks = codec.decode_message("c_task_info", reply_body)
+    assert [task["Id"] for task in unlocked_tasks["tasks"]] == [
+        STARTER_TASK.id,
+        1010,
+    ]
+    assert unlocked_tasks["finishs"] == [STARTER_TASK.id]
 
     writer.data.clear()
     session.outbound = RollingXor(0x99AABBCC)

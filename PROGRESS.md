@@ -609,6 +609,12 @@ environment details are intentionally omitted from Git.
   `previous_task_id` and `next_task_id` links. Runtime task records expose
   those links internally for the next progressive-task visibility pass without
   inventing any ordering outside the parsed packed constant sequence.
+- Task-list responses now use those parsed links for conservative progressive
+  visibility: the client sees the local starter task, completed recovered
+  tasks, and the next unlocked recovered quest-chain task instead of receiving
+  the entire 90-task chain at once. Completing an area-event stage can also
+  backfill unfinished parsed predecessor gates so out-of-order stage progress
+  does not strand the recovered chain.
 - The 75 recovered `task_cfg.lua` area-event task links are now bridged to the
   75 parsed `areaevent_cfg.lua` combat stage rows in recovered order. The
   server exposes them as type-28 task records, keeps both task/event/stage IDs
