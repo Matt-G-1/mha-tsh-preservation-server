@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from .characters import PlayableCharacter
 from .combat_action_hints import RECOVERED_HERO_ACTION_HINTS_BY_MODEL
 from .combat_internal_action_hints import RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL
+from .skill_video_paths import HERO_SKILL_VIDEO_PATHS_BY_MODEL
 
 
 COMBAT_CATALOG_SOURCE = (
@@ -43,10 +44,19 @@ class HeroSkillVideoEvidence:
     prefix: str
     count: int
     categories: tuple[str, ...]
+    videos: tuple[str, ...] = ()
 
     def categories_for_command(self, command: str) -> tuple[str, ...]:
         wanted = SKILL_VIDEO_CATEGORIES_BY_COMMAND.get(command, ())
         return tuple(category for category in wanted if category in self.categories)
+
+    def videos_for_command(self, command: str) -> tuple[str, ...]:
+        wanted = SKILL_VIDEO_CATEGORIES_BY_COMMAND.get(command, ())
+        return tuple(
+            video
+            for video in self.videos
+            if _skill_video_category(self.prefix, video) in wanted
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +98,7 @@ class MoveCombatResult:
     range_type: str
     role: str
     video_categories: tuple[str, ...] = ()
+    skill_video_paths: tuple[str, ...] = ()
     skill_info_terms: tuple[str, ...] = ()
     skill_slot_labels: tuple[str, ...] = ()
     action_hints: tuple[str, ...] = ()
@@ -108,6 +119,7 @@ class MoveCombatResult:
             "RangeType": self.range_type,
             "Role": self.role,
             "VideoCategories": list(self.video_categories),
+            "SkillVideoPaths": list(self.skill_video_paths),
             "SkillInfoTerms": list(self.skill_info_terms),
             "SkillSlotLabels": list(self.skill_slot_labels),
             "ActionHints": list(self.action_hints),
@@ -206,7 +218,13 @@ class FightStyle:
         return HERO_CFG_ACTION_MAP_BY_MODEL.get(self.model_asset_id, ())
 
     def recovered_skill_video_evidence(self) -> HeroSkillVideoEvidence | None:
-        return HERO_SKILL_VIDEO_EVIDENCE_BY_MODEL.get(self.model_asset_id)
+        evidence = HERO_SKILL_VIDEO_EVIDENCE_BY_MODEL.get(self.model_asset_id)
+        if evidence is None or evidence.videos:
+            return evidence
+        videos = HERO_SKILL_VIDEO_PATHS_BY_MODEL.get(self.model_asset_id, ())
+        if not videos:
+            return evidence
+        return replace(evidence, videos=videos)
 
     def recovered_skill_info_evidence(self) -> HeroSkillInfoEvidence | None:
         return HERO_SKILL_INFO_EVIDENCE_BY_MODEL.get(self.model_asset_id)
@@ -279,6 +297,11 @@ class FightStyle:
                 role=move.role,
                 video_categories=(
                     video_evidence.categories_for_command(move.command)
+                    if video_evidence is not None
+                    else ()
+                ),
+                skill_video_paths=(
+                    video_evidence.videos_for_command(move.command)
                     if video_evidence is not None
                     else ()
                 ),
@@ -386,6 +409,14 @@ DEFAULT_MOVES = (
     _move(6, "DODGE", "Perfect Dodge", "defensive counter", "utility", "self"),
     _move(7, "PASSIVE", "Core Passive", "passive mechanic", "utility", "self"),
 )
+
+
+def _skill_video_category(prefix: str, path: str) -> str:
+    filename = path.rsplit("/", 1)[-1].removesuffix(".flv")
+    expected_prefix = f"{prefix}_"
+    if not filename.startswith(expected_prefix):
+        return ""
+    return filename[len(expected_prefix) :].split("_", 1)[0].upper()
 
 
 HERO_ACTION_HINTS_BY_MODEL = {

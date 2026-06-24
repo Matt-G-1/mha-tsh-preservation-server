@@ -1678,6 +1678,12 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert deku_style.recovered_skill_video_evidence().prefix == "lvgu"
     assert deku_style.recovered_skill_video_evidence().count == 10
     assert "QTE" in deku_style.recovered_skill_video_evidence().categories
+    assert deku_style.recovered_skill_video_evidence().videos_for_command("Q") == (
+        "video/skill/lvgu_Q_1.flv",
+    )
+    assert deku_style.recovered_skill_video_evidence().videos_for_command(
+        "PASSIVE"
+    ) == ("video/skill/lvgu_abi_1.flv",)
     assert deku_style.recovered_skill_info_evidence() is not None
     assert "Detroit Smash" in (
         deku_style.recovered_skill_info_evidence().terms_for_command("Q")
@@ -1768,6 +1774,16 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "BREAK",
         "RUSH",
     )
+    assert deku_resolution.move_results[0].skill_video_paths == (
+        "video/skill/lvgu_atk_1.flv",
+        "video/skill/lvgu_break_1.flv",
+        "video/skill/lvgu_rush_1.flv",
+    )
+    assert deku_resolution.move_results[0].as_dict()["SkillVideoPaths"] == [
+        "video/skill/lvgu_atk_1.flv",
+        "video/skill/lvgu_break_1.flv",
+        "video/skill/lvgu_rush_1.flv",
+    ]
     assert deku_resolution.move_results[0].skill_slot_labels == (
         "BaseSkill",
         "ASkill",
@@ -1781,6 +1797,9 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "BATTLE/HERO/lvgu/commonATK/lvgu_pve_atk03",
     }.issubset(deku_resolution.move_results[0].action_hints)
     assert deku_resolution.move_results[1].video_categories == ("Q",)
+    assert deku_resolution.move_results[1].skill_video_paths == (
+        "video/skill/lvgu_Q_1.flv",
+    )
     assert deku_resolution.move_results[1].skill_info_terms == (
         "Smash",
         "Detroit Smash",
@@ -1790,6 +1809,10 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "Special Skill",
     )
     assert deku_resolution.move_results[4].video_categories == ("R", "QTE")
+    assert deku_resolution.move_results[4].skill_video_paths == (
+        "video/skill/lvgu_R_1.flv",
+        "video/skill/lvgu_qte_1.flv",
+    )
     assert deku_resolution.move_results[4].skill_info_terms == ("One For All",)
     assert deku_resolution.move_results[4].skill_slot_labels == ("FinalSkill",)
     assert deku_resolution.move_results[4].resource_delta == -3
@@ -1850,6 +1873,9 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "RUSH",
     )
     assert all_might_resolution.move_results[5].video_categories == ("DASH",)
+    assert all_might_resolution.move_results[5].skill_video_paths == (
+        "video/skill/ouermaite_dash_1.flv",
+    )
 
     bakugo_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1002"])
     assert bakugo_style.hero_cfg is not None
@@ -1865,6 +1891,13 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     )
     assert "BATTLE/HERO/baohao/skills/Qskill_EX" in bakugo_style.action_hints()
     bakugo_resolution = bakugo_style.resolve_usage((("1", 1),), hero_level=1)
+    assert bakugo_style.recovered_skill_video_evidence() is not None
+    assert bakugo_style.recovered_skill_video_evidence().videos_for_command(
+        "PASSIVE"
+    ) == (
+        "video/skill/baohao_abi_1.flv",
+        "video/skill/baohao_pre.flv",
+    )
     assert {
         "BATTLE/HERO/baohao/skills/Qskill_EX",
         "BATTLE/HERO/baohao/skills/Qskill_EX_start",

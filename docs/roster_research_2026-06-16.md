@@ -22,8 +22,9 @@ development.
 ## Playable Roster Verdict
 
 The public TSH-specific wiki lists 26 playable heroes. Its list matches the
-core playable set we currently expose through `PLAYABLE_CHARACTERS`, including
-Class 1-A characters, pro heroes, villains, WHM variants, and the Big Three.
+core public playable set we currently expose through `PUBLIC_PLAYABLE_MODEL_IDS`,
+including Class 1-A characters, pro heroes, villains, WHM variants, and the Big
+Three.
 
 The broader MHA wiki page for the game separately lists playable heroes,
 playable villains, and limited WHM events. It corroborates the same broad set,
@@ -51,7 +52,7 @@ Current local roster status:
 | h1015 | Shota Aizawa | Verified playable |
 | h1016 | Mashirao Ojiro | Verified playable |
 | h1017 | Mina Ashido | Verified playable |
-| h1018 | Kyoka Jiro | Verified playable |
+| h1018 | Kyoka Jiro | Local protocol/model row; not public playable |
 | h1019 | Tomura Shigaraki | Verified playable |
 | h1020 | Minoru Mineta | Verified playable |
 | h1021 | Endeavor | Verified playable |
@@ -102,4 +103,3 @@ For near-term restoration, that means the character work should be ordered as:
    proves a playable implementation path.
 6. Avoid spawning battle enemies or boss-sized NPCs in the starter city unless a
    quest/activity state explicitly requests them.
-
