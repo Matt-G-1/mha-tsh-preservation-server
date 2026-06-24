@@ -14,6 +14,7 @@ from .act_daily_stages import (
 )
 from .combat import CombatResolution, FightStyle
 from .herochip_stages import HEROCHIP_STAGE_SOURCE, HEROCHIP_STAGES
+from .relax_stages import RELAX_STAGE_BY_ID, RELAX_STAGE_SOURCE, RELAX_STAGES
 from .roguelike_stages import ROGUELIKE_STAGE_SOURCE, ROGUELIKE_STAGES
 from .usj_stages import USJ_POINT_BY_ID, USJ_POINTS, USJ_STAGE_SOURCE, USJ_STAGES
 
@@ -2091,7 +2092,11 @@ def _zx_numeric_stage_definitions() -> tuple[BattleStageDefinition, ...]:
 
 
 def _asset_numeric_drama_stage_definitions() -> tuple[BattleStageDefinition, ...]:
-    occupied_ids = EXPLICIT_RECOVERED_STAGE_IDS | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | {stage.stage_id for stage in RELAX_STAGES}
+    )
     return tuple(
         BattleStageDefinition(
             key=f"asset_drama_stage_{stage_id}",
@@ -2232,6 +2237,18 @@ def _roguelike_stage_definitions() -> tuple[BattleStageDefinition, ...]:
         )
         for stage in ROGUELIKE_STAGES
         if stage.stage_id not in occupied_ids
+    )
+
+
+def _relax_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    return tuple(
+        BattleStageDefinition(
+            key=f"relax_stage_{stage.stage_id}",
+            label=stage.label,
+            stage_id=stage.stage_id,
+            source=RELAX_STAGE_SOURCE,
+        )
+        for stage in RELAX_STAGES
     )
 
 
@@ -2480,6 +2497,7 @@ RECOVERED_BATTLE_STAGES = (
     *_herochip_stage_definitions(),
     *_roguelike_stage_definitions(),
     *_zx_numeric_stage_definitions(),
+    *_relax_stage_definitions(),
     BattleStageDefinition(
         key="battle_drama_zx_only",
         label="battle drama scripts without recovered numeric stage id",
@@ -2988,6 +3006,74 @@ class StageState:
             "StageId": int(stage_id),
             "FightTimes": completion.pass_count if completion else 0,
             "ResetTimes": 0,
+        }
+
+    def relax_stage_sync_times(self) -> dict[str, object]:
+        box_times = sum(
+            self.completions.get(stage.stage_id, StageCompletion(stage.stage_id)).pass_count
+            for stage in RELAX_STAGES
+        )
+        reward_times = len(
+            [
+                stage
+                for stage in RELAX_STAGES
+                if self.completions.get(stage.stage_id) is not None
+                and self.completions[stage.stage_id].status == 1
+            ]
+        )
+        return {
+            "DailyBoxTimes": min(1, box_times),
+            "TotalBoxTimes": box_times,
+            "DailyRewardTimes": min(1, reward_times),
+            "TotalRewardTimes": reward_times,
+        }
+
+    def relax_stage_sync_data(self) -> dict[str, object]:
+        times = self.relax_stage_sync_times()
+        round_data = [
+            stage.as_round_data(
+                status=(
+                    self.completions[stage.stage_id].status
+                    if stage.stage_id in self.completions
+                    else 0
+                ),
+                reward=(
+                    1
+                    if stage.stage_id in self.completions
+                    and self.completions[stage.stage_id].status == 1
+                    else 0
+                ),
+            )
+            for stage in RELAX_STAGES
+        ]
+        return {**times, "RoundData": round_data, "StepsData": []}
+
+    def relax_stage_sync_cond(self, cond_type: int, cond_id: int) -> dict[str, object]:
+        stage = RELAX_STAGE_BY_ID.get(int(cond_id))
+        completion = self.completions.get(int(cond_id))
+        status = completion.status if completion is not None else 0
+        reward = 1 if completion is not None and completion.status == 1 else 0
+        return {
+            "NewData": [
+                {
+                    "Type": int(cond_type),
+                    "Id": stage.stage_id if stage is not None else int(cond_id),
+                    "Status": status,
+                    "Reward": reward,
+                }
+            ]
+        }
+
+    def relax_stage_boxinfo(self, uid: int) -> dict[str, object]:
+        times = self.relax_stage_sync_times()
+        return {
+            "BoxInfo": [
+                {
+                    "Uid": int(uid),
+                    "BoxList": [],
+                    **times,
+                }
+            ]
         }
 
     def area_event_login_data(

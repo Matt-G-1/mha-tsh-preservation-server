@@ -1263,6 +1263,29 @@ class GameServer:
                 "c_stage_activity_info",
                 session.activities.stage_activity_info(),
             )
+            await self._send(
+                writer,
+                session,
+                "c_relax_stage_sync_data",
+                session.stage.relax_stage_sync_data(),
+            )
+        elif name == "s_relax_stage_get_box":
+            await self._send(
+                writer,
+                session,
+                "c_relax_stage_boxinfo",
+                session.stage.relax_stage_boxinfo(session.uid),
+            )
+        elif name == "s_relax_cond_get_reward":
+            await self._send(
+                writer,
+                session,
+                "c_relax_stage_sync_cond",
+                session.stage.relax_stage_sync_cond(
+                    int(values.get("Type") or 0),
+                    int(values.get("Id") or 0),
+                ),
+            )
         elif name == "s_activity_shop_info":
             await self._send(
                 writer,

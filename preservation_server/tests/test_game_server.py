@@ -94,6 +94,11 @@ from mhatsh_server.herochip_stages import (
     HEROCHIP_STAGE_SOURCE,
     HEROCHIP_STAGES,
 )
+from mhatsh_server.relax_stages import (
+    RELAX_STAGE_BY_ID,
+    RELAX_STAGE_SOURCE,
+    RELAX_STAGES,
+)
 from mhatsh_server.roguelike_stages import (
     ROGUELIKE_STAGE_BY_ID,
     ROGUELIKE_STAGE_SOURCE,
@@ -251,6 +256,18 @@ def _load_roguelike_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_roguelike_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_roguelike_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_relax_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_relax_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_relax_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -650,13 +667,14 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "zx_touqiu" in training_yard.scripts
     assert "video/zx/chapter2/touqiu.flv" in training_yard.video_assets
 
-    asset_drama = stage_candidate_by_id(400301)
-    assert asset_drama.key == "asset_drama_stage_400301"
-    assert asset_drama.scripts == ("400301_1", "400301_2", "400301_3")
-    assert asset_drama.source == "parsed from packed Lua drama chunk headers, 2026-06-23"
+    relax_stage = stage_candidate_by_id(400301)
+    assert relax_stage.key == "relax_stage_400301"
+    assert relax_stage.label == "01 Trial of the Strongest Easy"
+    assert relax_stage.source == RELAX_STAGE_SOURCE
+    assert stage_candidate_by_id(400318).label == "06 End of the Light Hard"
     assert stage_candidate_by_key("asset_drama_stage_520001").scripts == ("520001",)
     assert stage_candidate_by_id(901008).scripts == ("901008",)
-    assert [spawn.ai_profile_key for spawn in asset_drama.encounter_spawns] == [
+    assert [spawn.ai_profile_key for spawn in relax_stage.encounter_spawns] == [
         "melee_chaser",
         "training_enemy",
         "melee_chaser",
@@ -1139,6 +1157,34 @@ def test_roguelike_stage_hint_parser_tracks_random_and_endless_rows() -> None:
     assert generated_rows[400101]["constant_index"] == 1114
     assert generated_rows[400119]["mode"] == "endless"
     assert generated_rows[400119]["constant_index"] == 1227
+
+
+def test_relax_stage_hint_parser_tracks_joint_operations_rows() -> None:
+    module = _load_relax_stage_hint_script()
+    hints = module.collect_relax_stage_hints(ROOT / module.DEFAULT_RELAX_STAGE_ASSET)
+
+    assert hints["constant_count"] == 396
+    assert hints["stage_count"] == 18
+    assert RELAX_STAGE_SOURCE == f"{hints['source']}, parsed 2026-06-24"
+    assert len(RELAX_STAGES) == hints["stage_count"]
+    assert RELAX_STAGES[0].stage_id == 400301
+    assert RELAX_STAGES[0].group_name == "01 Trial of the Strongest"
+    assert RELAX_STAGES[0].fighting == (2640, 2940, 3080, 3240, 3520)
+    assert RELAX_STAGE_BY_ID[400310].group_name == "04 Explosive Crisis"
+    assert RELAX_STAGE_BY_ID[400316].open_level == 65
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[400301]["tips"].startswith(
+        "Challenge from the No.1 Hero"
+    )
+    assert generated_rows[400309]["tips"].endswith(
+        "to cancel out Creation Stance."
+    )
+    assert generated_rows[400318]["difficulty_name"] == "Hard"
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
@@ -6376,6 +6422,8 @@ async def _run_activity_and_side_task_requests() -> None:
 
     request_cases = [
         ("s_stage_activity_info", {}),
+        ("s_relax_stage_get_box", {}),
+        ("s_relax_cond_get_reward", {"Type": 1, "Id": 400301}),
         ("s_activity_shop_info", {"ActType": 17}),
         ("s_entrust_task_list", {}),
         ("s_secret_area_task", {}),
@@ -6397,6 +6445,9 @@ async def _run_activity_and_side_task_requests() -> None:
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_stage_activity_info",
+        "c_relax_stage_sync_data",
+        "c_relax_stage_boxinfo",
+        "c_relax_stage_sync_cond",
         "c_activity_shop_info",
         "c_entrust_task_list",
         "c_secret_area_task",
@@ -6408,21 +6459,41 @@ async def _run_activity_and_side_task_requests() -> None:
     assert codec.decode_message("c_stage_activity_info", replies[0][1]) == {
         "ProgressInfo": []
     }
-    assert codec.decode_message("c_activity_shop_info", replies[1][1]) == {
+    relax_sync = codec.decode_message("c_relax_stage_sync_data", replies[1][1])
+    assert len(relax_sync["RoundData"]) == len(RELAX_STAGES)
+    assert relax_sync["RoundData"][0] == {"Id": 400301, "Status": 0, "Reward": 0}
+    assert relax_sync["RoundData"][-1] == {"Id": 400318, "Status": 0, "Reward": 0}
+    assert relax_sync["DailyBoxTimes"] == 0
+    assert codec.decode_message("c_relax_stage_boxinfo", replies[2][1]) == {
+        "BoxInfo": [
+            {
+                "Uid": 10001,
+                "BoxList": [],
+                "DailyBoxTimes": 0,
+                "TotalBoxTimes": 0,
+                "DailyRewardTimes": 0,
+                "TotalRewardTimes": 0,
+            }
+        ]
+    }
+    assert codec.decode_message("c_relax_stage_sync_cond", replies[3][1]) == {
+        "NewData": [{"Type": 1, "Id": 400301, "Status": 0, "Reward": 0}]
+    }
+    assert codec.decode_message("c_activity_shop_info", replies[4][1]) == {
         "BuyInfo": []
     }
-    assert codec.decode_message("c_entrust_task_list", replies[2][1]) == {
+    assert codec.decode_message("c_entrust_task_list", replies[5][1]) == {
         "Version": 1,
         "EntrustTaskData": [],
     }
-    assert codec.decode_message("c_secret_area_task", replies[3][1]) == {
+    assert codec.decode_message("c_secret_area_task", replies[6][1]) == {
         "TaskList": []
     }
-    assert codec.decode_message("c_usj_task", replies[4][1]) == {"TaskList": []}
-    assert codec.decode_message("c_offlinepvp_task", replies[5][1]) == {
+    assert codec.decode_message("c_usj_task", replies[7][1]) == {"TaskList": []}
+    assert codec.decode_message("c_offlinepvp_task", replies[8][1]) == {
         "TaskList": []
     }
-    assert codec.decode_message("c_battlefield_task_info", replies[6][1]) == {
+    assert codec.decode_message("c_battlefield_task_info", replies[9][1]) == {
         "IsFightOver": 0,
         "IsGetDayReward": 0,
         "IsGetWeekReward": 0,
@@ -6430,7 +6501,7 @@ async def _run_activity_and_side_task_requests() -> None:
         "FreshenTime": 0,
         "Tasks": [],
     }
-    assert codec.decode_message("c_group_open_map", replies[7][1]) == {
+    assert codec.decode_message("c_group_open_map", replies[10][1]) == {
         "MapAttackArea": []
     }
     assert session.activities.requested_activity_types == [17]
