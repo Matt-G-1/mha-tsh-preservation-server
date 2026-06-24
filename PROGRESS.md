@@ -389,14 +389,15 @@ environment details are intentionally omitted from Git.
   `combat_enemy_ids` layer separately from raw `enemy_group_ids`, and
   encounter generation uses the filtered combat list first so helper rows do
   not become accidental battle targets.
-- Route-backed `stage_cfg_route_*` definitions now use their recovered raw
-  encounter groups as combat IDs only when the filtered combat cross-check has
-  no row yet. This turns route-only stages such as `201005`, `300502`, and
-  `561112` into stage-specific encounters instead of generic generated enemy
-  probes, while stages with filtered combat evidence such as `563903` still
-  keep NPC/object/helper rows out of battle. Global activity monster rosters,
-  such as `act_daily_stage` metadata, are intentionally not promoted this way
-  until a true per-stage mapping is recovered.
+- Route-backed `stage_cfg_route_*` definitions deliberately keep recovered raw
+  encounter groups as metadata unless the monster cross-check marks them as
+  combat rows. A follow-up audit of raw-only routes such as `201005`, `300502`,
+  and `561112` found NPC/object/helper names (`npc_idle3`, `Metal Plate`,
+  `Ochaco`, bystanders, and photograph props), so those stages continue to use
+  generated combat probes rather than placing noncombat rows into battle.
+  Global activity monster rosters, such as `act_daily_stage` metadata, are
+  intentionally not promoted this way until a true per-stage mapping is
+  recovered.
 - Those stage encounter IDs are now cross-checked against packed
   `monster_cfg` evidence through `scripts/derive_stage_monster_evidence.py`.
   The extractor recovers 137 target IDs, marks 75 as combat candidates, and
@@ -582,6 +583,15 @@ environment details are intentionally omitted from Git.
   quest/tutorial ordering work. A regression test also verifies that all 1,257
   indexed drama scripts from the intro/QTE asset index are represented by the
   recovered runtime stage catalog.
+- The recovered packed `task_cfg.lua` constants now have a repeatable quest
+  hint parser: `scripts/derive_task_cfg_hints.py`. It currently reads 2,856
+  constants, preserves 798 narrative task text hints, 75 area-event task
+  links, and 21 `act*` ordering markers in
+  `mhatsh_server.task_cfg_hints`. Early anchors include `act1001`, the
+  `280101`/`280102`/`280103` first-sortie area-event chain, and the
+  `280301`/`280302` training/practical exercise entries, with nearby
+  stage/NPC/drama references retained for later quest sequencing. This is
+  evidence-only for now and does not yet drive live quest state.
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.

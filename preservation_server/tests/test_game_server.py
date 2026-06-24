@@ -141,6 +141,13 @@ from mhatsh_server.usj_stages import (
 from mhatsh_server.skill_info_structured_terms import (
     STRUCTURED_SKILL_INFO_TERMS_BY_MODEL,
 )
+from mhatsh_server.task_cfg_hints import (
+    RECOVERED_ACT_MARKERS,
+    RECOVERED_AREA_EVENT_TASKS,
+    RECOVERED_TASK_TEXT_HINTS,
+    TASK_CFG_CONSTANT_COUNT,
+    TASK_CFG_HINT_SOURCE,
+)
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
 from mhatsh_server.schema import SchemaRegistry
 from mhatsh_server.stages import (
@@ -494,6 +501,16 @@ def _load_internal_combat_action_hint_script():
     spec = importlib.util.spec_from_file_location(
         "derive_internal_combat_action_hints", script_path
     )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_task_cfg_hint_script():
+    script_path = ROOT / "scripts" / "derive_task_cfg_hints.py"
+    spec = importlib.util.spec_from_file_location("derive_task_cfg_hints", script_path)
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -964,10 +981,11 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert stage_cfg_route.encounter_spawns[0].placement_source == "stage_cfg_authored"
     assert stage_cfg_route.source == "parsed from packed stage_cfg constant routes, 2026-06-23"
     generated_route_only = stage_candidate_by_id(201005)
-    assert generated_route_only.combat_enemy_ids == (20100502,)
-    assert [spawn.enemy_id for spawn in generated_route_only.encounter_spawns] == [
-        20100502,
-    ]
+    assert generated_route_only.enemy_group_ids == (20100502,)
+    assert generated_route_only.combat_enemy_ids == ()
+    assert tuple(spawn.enemy_id for spawn in generated_route_only.encounter_spawns) == tuple(
+        spawn.enemy_id for spawn in generated_stage_spawns(201005)
+    )
     assert len(STAGE_CFG_SCRIPT_ROUTE_GROUPS) == 71
     assert stage_candidate_by_id(310405).key == "stage_cfg_route_310405"
     assert stage_candidate_by_id(310405).scripts == ("zx_usj_003", "zx_usj_004")
@@ -1072,12 +1090,9 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         30050204,
         30050205,
     )
-    assert raw_only_training.combat_enemy_ids == raw_only_training.enemy_group_ids
-    assert tuple(spawn.enemy_id for spawn in raw_only_training.encounter_spawns) == (
-        30050201,
-        30050202,
-        30050204,
-        30050205,
+    assert raw_only_training.combat_enemy_ids == ()
+    assert tuple(spawn.enemy_id for spawn in raw_only_training.encounter_spawns) == tuple(
+        spawn.enemy_id for spawn in generated_stage_spawns(300502)
     )
     assert stage_candidate_by_id(160001).enemy_group_ids == (16000101,)
     assert tuple(spawn.enemy_id for spawn in stage_candidate_by_id(563903).encounter_spawns) == (
@@ -1537,6 +1552,57 @@ def test_area_event_stage_hint_parser_tracks_progression_rows() -> None:
         AREA_EVENT_STAGE_BY_ID[211461].description
     )
     assert generated_rows[211461]["scripts"] == AREA_EVENT_STAGE_BY_ID[211461].scripts
+
+
+def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
+    module = _load_task_cfg_hint_script()
+    hints = module.collect_task_cfg_hints(ROOT / module.DEFAULT_TASK_CFG_ASSET)
+
+    assert hints["source"] == TASK_CFG_HINT_SOURCE
+    assert hints["constant_count"] == TASK_CFG_CONSTANT_COUNT == 2856
+    assert hints["text_hint_count"] == len(RECOVERED_TASK_TEXT_HINTS) == 798
+    assert hints["area_event_count"] == len(RECOVERED_AREA_EVENT_TASKS) == 75
+    assert hints["act_marker_count"] == len(RECOVERED_ACT_MARKERS) == 21
+    assert hints["area_events"] == RECOVERED_AREA_EVENT_TASKS
+    assert hints["act_markers"] == RECOVERED_ACT_MARKERS
+
+    act_by_marker = {item["marker"]: item for item in RECOVERED_ACT_MARKERS}
+    assert act_by_marker["act1001"]["task_id"] == 1010
+    assert act_by_marker["act1001"]["next_text"] == (
+        "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f"
+    )
+    assert act_by_marker["act_event1-1"]["previous_text"] == "\u9996\u6b21\u51fa\u51fb"
+    assert act_by_marker["act_event3-1"]["previous_text"] == (
+        "\u96c4\u82f1\u7684\u9080\u8bf7"
+    )
+
+    area_by_id = {
+        int(item["event_id"]): item for item in RECOVERED_AREA_EVENT_TASKS
+    }
+    assert [item["event_id"] for item in RECOVERED_AREA_EVENT_TASKS[:10]] == [
+        280101,
+        280102,
+        280103,
+        280201,
+        280202,
+        280203,
+        280301,
+        280302,
+        280303,
+        280304,
+    ]
+    assert area_by_id[280101]["description"] == (
+        "\u9996\u6b21\u51fa\u51fb\uff01\u51fb\u8d25\u7ed1\u67b6\u4e8b\u4ef6\u7684\u654c\u4eba"
+    )
+    assert area_by_id[280101]["name"] == "\u9996\u6b21\u51fa\u51fb"
+    assert area_by_id[280301]["name"] == "\u6559\u5b66\u6f14\u4e60"
+    assert area_by_id[280302]["name"] == "\u5b9e\u6218\u6f14\u4e60"
+    assert 280301 in area_by_id[280301]["nearby_stage_ids"]
+
+    text_by_value = {item["text"]: item for item in RECOVERED_TASK_TEXT_HINTS}
+    assert text_by_value["\u901a\u8baf\u57fa\u7ad9"]["task_id"] == 201005
+    assert text_by_value["\u6f0f\u7f51\u4e4b\u9c7c"]["task_id"] == 101103
+    assert text_by_value["\u526f\u5361\u652f\u63f4"]["task_id"] == 102702
 
 
 def test_act_daily_stage_hint_parser_tracks_activity_stage_rows() -> None:

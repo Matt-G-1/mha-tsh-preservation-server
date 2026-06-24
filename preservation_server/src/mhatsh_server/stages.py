@@ -336,8 +336,6 @@ class BattleStageDefinition:
         )
         if filtered_combat_ids:
             return filtered_combat_ids
-        if self.key.startswith("stage_cfg_route_") and self.enemy_group_ids:
-            return self.enemy_group_ids
         return ()
 
     @property
