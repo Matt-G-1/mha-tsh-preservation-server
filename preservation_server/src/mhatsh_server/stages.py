@@ -16,6 +16,12 @@ from .combat import CombatResolution, FightStyle
 from .herochip_stages import HEROCHIP_STAGE_SOURCE, HEROCHIP_STAGES
 from .relax_stages import RELAX_STAGE_BY_ID, RELAX_STAGE_SOURCE, RELAX_STAGES
 from .roguelike_stages import ROGUELIKE_STAGE_SOURCE, ROGUELIKE_STAGES
+from .secret_area_stages import (
+    DEFAULT_SECRET_AREA_STAGE,
+    SECRET_AREA_STAGE_BY_ID,
+    SECRET_AREA_STAGE_SOURCE,
+    SECRET_AREA_STAGES,
+)
 from .usj_stages import USJ_POINT_BY_ID, USJ_POINTS, USJ_STAGE_SOURCE, USJ_STAGES
 
 
@@ -2252,6 +2258,31 @@ def _relax_stage_definitions() -> tuple[BattleStageDefinition, ...]:
     )
 
 
+def _secret_area_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | set(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+        | set(STAGE_CFG_SCRIPT_ROUTE_GROUPS)
+        | {stage.stage_id for stage in AREA_EVENT_STAGES}
+        | {stage.stage_id for stage in ACT_DAILY_STAGES}
+        | {stage.stage_id for stage in USJ_STAGES}
+        | {stage.stage_id for stage in HEROCHIP_STAGES}
+        | {stage.stage_id for stage in ROGUELIKE_STAGES}
+        | {stage.stage_id for stage in RELAX_STAGES}
+    )
+    return tuple(
+        BattleStageDefinition(
+            key=f"secret_area_stage_{stage.stage_id}",
+            label=stage.label,
+            stage_id=stage.stage_id,
+            source=SECRET_AREA_STAGE_SOURCE,
+        )
+        for stage in SECRET_AREA_STAGES
+        if stage.stage_id not in occupied_ids
+    )
+
+
 RECOVERED_BATTLE_STAGES = (
     BattleStageDefinition(
         key="starter_intro_299301",
@@ -2498,6 +2529,7 @@ RECOVERED_BATTLE_STAGES = (
     *_roguelike_stage_definitions(),
     *_zx_numeric_stage_definitions(),
     *_relax_stage_definitions(),
+    *_secret_area_stage_definitions(),
     BattleStageDefinition(
         key="battle_drama_zx_only",
         label="battle drama scripts without recovered numeric stage id",
@@ -3075,6 +3107,234 @@ class StageState:
                 }
             ]
         }
+
+    def secret_area_stage(self, stage_id: int | None = None):
+        resolved_stage_id = int(stage_id or self.current_stage_id or 0)
+        return SECRET_AREA_STAGE_BY_ID.get(resolved_stage_id, DEFAULT_SECRET_AREA_STAGE)
+
+    def secret_area_key(self, stage_id: int | None = None) -> dict[str, object]:
+        stage = self.secret_area_stage(stage_id)
+        return {
+            "Status": 1,
+            "KeyId": stage.key_id,
+            "StageId": stage.stage_id,
+            "LevelRangeId": stage.level_range_id,
+        }
+
+    def secret_area_cycle(self) -> dict[str, object]:
+        return {
+            "CycleTypeId": 1,
+            "SeasonId": 1,
+            "CycleId": 1,
+            "PersonalityGroupId": 1,
+            "EndTime": 4102444800,
+        }
+
+    def secret_area_times(self) -> dict[str, object]:
+        completed = [
+            stage_id
+            for stage_id, completion in self.completions.items()
+            if stage_id in SECRET_AREA_STAGE_BY_ID and completion.status == 1
+        ]
+        return {
+            "DayIncomeTimes": min(3, len(completed)),
+            "CycleIncomeTimes": len(completed),
+        }
+
+    def secret_area_history(self) -> dict[str, object]:
+        history = [
+            SECRET_AREA_STAGE_BY_ID[stage_id].as_history(
+                waste_time=completion.best_time,
+                reward_item_id=LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+            )
+            for stage_id, completion in sorted(self.completions.items())
+            if stage_id in SECRET_AREA_STAGE_BY_ID and completion.status == 1
+        ]
+        return {"HistoryList": history}
+
+    def secret_area_cycle_record(self, uid: int, hero_id: int) -> dict[str, object]:
+        records = []
+        for stage_id, completion in sorted(self.completions.items()):
+            stage = SECRET_AREA_STAGE_BY_ID.get(stage_id)
+            if stage is None or completion.status != 1:
+                continue
+            records.append(
+                {
+                    "WasteTime": completion.best_time,
+                    "KeyId": stage.key_id,
+                    "LevelRangeId": stage.level_range_id,
+                    "StageId": stage.stage_id,
+                    "StageLevel": stage.floor,
+                    "TeamMembers": [
+                        {
+                            "Uid": int(uid),
+                            "AvatarId": 0,
+                            "AvatarFrameId": 0,
+                            "HeroId": int(hero_id),
+                            "Level": 1,
+                            "Name": "Local Hero",
+                        }
+                    ],
+                }
+            )
+        return {"PreviousRecord": [], "HaveRecord": int(bool(records)), "CurrentRecord": records}
+
+    def secret_area_all_hero(self, hero_ids: list[int]) -> dict[str, object]:
+        return {
+            "AllHero": [
+                {
+                    "ClassId": int(hero_id),
+                    "Strength": 100,
+                    "ReturnTime": 0,
+                }
+                for hero_id in hero_ids
+            ]
+        }
+
+    def secret_area_players(
+        self,
+        *,
+        uid: int,
+        hero_id: int,
+        level: int,
+        fighting: int,
+    ) -> dict[str, object]:
+        return {
+            "PlayerList": [
+                {
+                    "UserUid": int(uid),
+                    "HeroId": int(hero_id),
+                    "Fighting": int(fighting),
+                    "Lv": int(level),
+                    "EquipRune": [],
+                }
+            ]
+        }
+
+    def secret_area_stage_finish(
+        self,
+        uid: int,
+        values: dict[str, object],
+    ) -> dict[str, object]:
+        stage = self.secret_area_stage()
+        members = []
+        for member in _dict_list(values.get("Members")):
+            hurt_sum = _as_int(member.get("HurtSum"))
+            members.append(
+                {
+                    "UserUid": _as_int(member.get("UserUid"), uid),
+                    "DrawItems": [
+                        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Num": 1}
+                    ],
+                    "FakeItems": [],
+                    "ExtraItems": [],
+                    "LeagueItems": [],
+                    "HurtSum": hurt_sum,
+                    "MaxCombo": 0,
+                    "Reborn": 0,
+                    "LeagueDraw": 0,
+                }
+            )
+        if not members:
+            members.append(
+                {
+                    "UserUid": int(uid),
+                    "DrawItems": [
+                        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Num": 1}
+                    ],
+                    "FakeItems": [],
+                    "ExtraItems": [],
+                    "LeagueItems": [],
+                    "HurtSum": 0,
+                    "MaxCombo": 0,
+                    "Reborn": 0,
+                    "LeagueDraw": 0,
+                }
+            )
+        completion = self.complete_stage(
+            StageCombatSummary(
+                stage_id=stage.stage_id,
+                result=1,
+                time=60,
+                max_combo=0,
+                combo_damage=0,
+                all_damage=sum(_as_int(member.get("HurtSum")) for member in members),
+                on_hit_num=0,
+                solo_boss_num=0,
+                monster_kills=(),
+                item_rewards=((LOCAL_STAGE_PASS_REWARD_ITEM_ID, len(members)),),
+                skill_levels=(),
+                button_counts=(),
+                move_total=0,
+                damage_members=(),
+                mvp_uid=_as_int(values.get("MvpUserUid"), uid),
+                reborn=0,
+                combat_resolution=None,
+                enemy_results=(),
+                stage_time_limit=STARTER_INTRO_STAGE_TIME,
+            )
+        )
+        return {
+            "Members": members,
+            "MvpUserUid": _as_int(values.get("MvpUserUid"), uid),
+            "ScoreLevel": 1,
+            "HierarchyUp": min(stage.floor + completion.pass_count, 40),
+            "WasteTime": completion.best_time or 60,
+            "KeyId": stage.key_id,
+            "StageLevel": stage.floor,
+        }
+
+    def secret_area_stage_fail(
+        self,
+        uid: int,
+        values: dict[str, object],
+    ) -> dict[str, object]:
+        stage = self.secret_area_stage()
+        members = [
+            {
+                "UserUid": _as_int(member.get("UserUid"), uid),
+                "HurtSum": _as_int(member.get("HurtSum")),
+                "Reborn": 0,
+            }
+            for member in _dict_list(values.get("Members"))
+        ] or [{"UserUid": int(uid), "HurtSum": 0, "Reborn": 0}]
+        return {"Members": members, "KeyId": stage.key_id}
+
+    def secret_area_history_add(self) -> dict[str, object]:
+        stage = self.secret_area_stage()
+        completion = self.completions.get(stage.stage_id)
+        return {
+            "History": stage.as_history(
+                waste_time=completion.best_time if completion else 0,
+                reward_item_id=LOCAL_STAGE_PASS_REWARD_ITEM_ID,
+            )
+        }
+
+    def secret_area_drop_card(self, uid: int, card_pos: int) -> dict[str, object]:
+        return {"UserUid": int(uid), "CardPos": int(card_pos)}
+
+    def act_secret_info(self, act_id: int = 0) -> dict[str, object]:
+        return {
+            "ActId": int(act_id),
+            "CurScore": len(self.secret_area_history()["HistoryList"]),
+            "RewardTakeList": [],
+            "LevelRangeId": self.secret_area_stage().level_range_id,
+        }
+
+    def act_secret_record_list(self, act_id: int = 0) -> dict[str, object]:
+        records = [
+            {
+                "NameList": ["Local Hero"],
+                "StageGroupId": SECRET_AREA_STAGE_BY_ID[stage_id].group_id,
+                "Floor": SECRET_AREA_STAGE_BY_ID[stage_id].floor,
+                "Score": len(completion.stars) or 1,
+                "Time": completion.best_time or 60,
+                "StageLevel": SECRET_AREA_STAGE_BY_ID[stage_id].floor,
+            }
+            for stage_id, completion in sorted(self.completions.items())
+            if stage_id in SECRET_AREA_STAGE_BY_ID and completion.status == 1
+        ]
+        return {"ActId": int(act_id), "RecordList": records}
 
     def area_event_login_data(
         self,

@@ -104,6 +104,12 @@ from mhatsh_server.roguelike_stages import (
     ROGUELIKE_STAGE_SOURCE,
     ROGUELIKE_STAGES,
 )
+from mhatsh_server.secret_area_stages import (
+    DEFAULT_SECRET_AREA_STAGE,
+    SECRET_AREA_STAGE_BY_ID,
+    SECRET_AREA_STAGE_SOURCE,
+    SECRET_AREA_STAGES,
+)
 from mhatsh_server.usj_stages import (
     USJ_POINT_BY_ID,
     USJ_POINTS,
@@ -268,6 +274,18 @@ def _load_relax_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_relax_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_relax_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_secret_area_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_secret_area_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_secret_area_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -515,8 +533,8 @@ def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> Non
 
 def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "battle_stage_candidate_catalog" in STAGE_CATALOG_SOURCE
-    assert len(RECOVERED_BATTLE_STAGES) >= 654
-    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 647
+    assert len(RECOVERED_BATTLE_STAGES) >= 740
+    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 733
     stage_ids = [
         stage.stage_id for stage in RECOVERED_BATTLE_STAGES if stage.stage_id is not None
     ]
@@ -679,6 +697,14 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         "training_enemy",
         "melee_chaser",
     ]
+
+    secret_area_stage = stage_candidate_by_id(100101)
+    assert secret_area_stage.key == "secret_area_stage_100101"
+    assert secret_area_stage.label == "Town Nightraid 1001 Floor 1"
+    assert secret_area_stage.source == SECRET_AREA_STAGE_SOURCE
+    assert stage_candidate_by_id(101608).key == "secret_area_stage_101608"
+    assert stage_candidate_by_id(101101).key == "zx_stage_101101"
+    assert stage_candidate_by_id(101201).key == "asset_drama_stage_101201"
 
     stage_cfg_route = stage_candidate_by_id(563903)
     assert stage_cfg_route.key == "stage_cfg_route_563903"
@@ -1185,6 +1211,40 @@ def test_relax_stage_hint_parser_tracks_joint_operations_rows() -> None:
         "to cancel out Creation Stance."
     )
     assert generated_rows[400318]["difficulty_name"] == "Hard"
+
+
+def test_secret_area_stage_hint_parser_tracks_stage_key_rows() -> None:
+    module = _load_secret_area_stage_hint_script()
+    hints = module.collect_secret_area_stage_hints(
+        ROOT / module.DEFAULT_SECRET_AREA_ASSET
+    )
+
+    assert hints["constant_count"] == 1407
+    assert hints["stage_count"] == 88
+    assert SECRET_AREA_STAGE_SOURCE == f"{hints['source']}, parsed 2026-06-24"
+    assert len(SECRET_AREA_STAGES) == hints["stage_count"]
+    assert SECRET_AREA_STAGES[0].stage_id == 100101
+    assert SECRET_AREA_STAGES[0].level_range_id == 1001
+    assert SECRET_AREA_STAGES[0].floor == 1
+    assert SECRET_AREA_STAGES[-1].stage_id == 101608
+    assert SECRET_AREA_STAGE_BY_ID[100608].floor == 8
+    assert DEFAULT_SECRET_AREA_STAGE.stage_id == 100101
+
+    groups = {
+        group["group_id"]: group["group_name"]
+        for group in hints["groups"]
+        if isinstance(group, dict)
+    }
+    assert groups[11001] == "Town Nightraid"
+    assert groups[11002] == "Abandoned Chemical Plant"
+    assert groups[11003] == "Forest Training"
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[100101]["label"] == "Secret Area 1001 Floor 1"
+    assert generated_rows[101608]["level_range_id"] == 1016
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
@@ -6405,6 +6465,140 @@ async def _run_world_map_task_requests() -> None:
 
 def test_activity_and_side_task_requests_receive_empty_state_replies() -> None:
     asyncio.run(_run_activity_and_side_task_requests())
+
+
+def test_secret_area_requests_receive_recovered_mode_state() -> None:
+    asyncio.run(_run_secret_area_requests())
+
+
+async def _run_secret_area_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x55667788),
+    )
+
+    active_key = codec.encode_message("s_secret_area_active_key", {})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_secret_area_active_key"],
+        active_key,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x55667788))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_secret_area_cycle",
+        "c_secret_area_times",
+        "c_secret_area_key",
+        "c_secret_area_all_hero",
+        "c_secret_area_players",
+        "c_secret_area_history",
+        "c_secret_area_cycle_record",
+    ]
+    assert codec.decode_message("c_secret_area_cycle", replies[0][1]) == {
+        "CycleTypeId": 1,
+        "SeasonId": 1,
+        "CycleId": 1,
+        "PersonalityGroupId": 1,
+        "EndTime": 4102444800,
+    }
+    assert codec.decode_message("c_secret_area_times", replies[1][1]) == {
+        "DayIncomeTimes": 0,
+        "CycleIncomeTimes": 0,
+    }
+    assert codec.decode_message("c_secret_area_key", replies[2][1]) == {
+        "Status": 1,
+        "KeyId": 100101,
+        "StageId": 100101,
+        "LevelRangeId": 1001,
+    }
+    all_hero = codec.decode_message("c_secret_area_all_hero", replies[3][1])
+    assert all_hero["AllHero"][0] == {
+        "ClassId": STARTER_HERO_ID,
+        "Strength": 100,
+        "ReturnTime": 0,
+    }
+    players = codec.decode_message("c_secret_area_players", replies[4][1])
+    assert players["PlayerList"][0]["HeroId"] == STARTER_HERO_ID
+    assert codec.decode_message("c_secret_area_history", replies[5][1]) == {
+        "HistoryList": []
+    }
+    assert codec.decode_message("c_secret_area_cycle_record", replies[6][1]) == {
+        "PreviousRecord": [],
+        "HaveRecord": 0,
+        "CurrentRecord": [],
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55667789)
+    target_stage = codec.encode_message("s_secret_target_stage", {"stageId": 100101})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_secret_target_stage"],
+        target_stage,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55667789))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 100101
+    assert session.stage.current_stage_key == "secret_area_stage_100101"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x5566778A)
+    finish_stage = codec.encode_message(
+        "s_secret_area_finish_stage",
+        {"Members": [{"UserUid": 10001, "HurtSum": 12345}], "MvpUserUid": 10001},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_secret_area_finish_stage"],
+        finish_stage,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5566778A))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_secret_area_stage_finish",
+        "c_secret_area_history_add",
+    ]
+    finish = codec.decode_message("c_secret_area_stage_finish", replies[0][1])
+    assert finish["Members"][0]["DrawItems"] == [
+        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Num": 1}
+    ]
+    assert finish["KeyId"] == 100101
+    assert finish["StageLevel"] == 1
+    assert codec.decode_message("c_secret_area_history_add", replies[1][1])[
+        "History"
+    ]["StageHierarchy"] == 1
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x5566778B)
+    record_list = codec.encode_message("s_act_secret_record_list", {"ActId": 9})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_secret_record_list"],
+        record_list,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5566778B))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_act_secret_record_list"
+    records = codec.decode_message("c_act_secret_record_list", reply_body)
+    assert records["ActId"] == 9
+    assert records["RecordList"][0]["StageGroupId"] == 11001
+    assert records["RecordList"][0]["Floor"] == 1
 
 
 async def _run_activity_and_side_task_requests() -> None:

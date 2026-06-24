@@ -1309,6 +1309,141 @@ class GameServer:
                 "c_secret_area_task",
                 session.activities.secret_area_task(),
             )
+        elif name == "s_secret_area_task_reward":
+            task_id = int(values.get("TaskId") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_task_update",
+                {"TaskList": [{"Id": task_id, "Status": 1, "CurValue": 1}]},
+            )
+        elif name == "s_secret_area_active_key":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_cycle",
+                session.stage.secret_area_cycle(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_times",
+                session.stage.secret_area_times(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_key",
+                session.stage.secret_area_key(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_all_hero",
+                session.stage.secret_area_all_hero(
+                    [card.hero_id for card in roster.cards.values()]
+                ),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_players",
+                session.stage.secret_area_players(
+                    uid=session.uid,
+                    hero_id=roster.active_hero_id,
+                    level=roster.hero_level,
+                    fighting=roster.hero_level * 1000 + roster.active_hero_id,
+                ),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_history",
+                session.stage.secret_area_history(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_cycle_record",
+                session.stage.secret_area_cycle_record(
+                    session.uid,
+                    roster.active_hero_id,
+                ),
+            )
+        elif name == "s_secret_area_history":
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_history",
+                session.stage.secret_area_history(),
+            )
+        elif name == "s_secret_area_finish_stage":
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_stage_finish",
+                session.stage.secret_area_stage_finish(session.uid, values),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_history_add",
+                session.stage.secret_area_history_add(),
+            )
+        elif name == "s_secret_area_drop_card":
+            await self._send(
+                writer,
+                session,
+                "c_secret_area_drop_card",
+                session.stage.secret_area_drop_card(
+                    session.uid,
+                    int(values.get("CardPos") or 0),
+                ),
+            )
+        elif name == "s_secret_insert_key":
+            await self._send(
+                writer,
+                session,
+                "c_secret_insert_key",
+                {
+                    "KeyOwerUid": int(values.get("KeyOwerUid") or session.uid),
+                    "KeyId": int(values.get("KeyId") or 0),
+                },
+            )
+        elif name == "s_secret_apply_insert_key":
+            await self._send(
+                writer,
+                session,
+                "c_secret_apply_insert_key",
+                {
+                    "KeyOwerUid": session.uid,
+                    "KeyId": int(values.get("KeyId") or 0),
+                    "OwnerName": "Local Hero",
+                },
+            )
+        elif name == "s_secret_refuse_key":
+            await self._send(
+                writer,
+                session,
+                "c_secret_refuse_key",
+                {"UserUid": int(values.get("UserUid") or session.uid)},
+            )
+        elif name == "s_secret_out_key":
+            await self._send(writer, session, "c_secret_out_key", {})
+        elif name == "s_secret_area_jump_key":
+            await self._send(writer, session, "c_secret_area_jump_key", {})
+        elif name == "s_secret_area_cycle_reward":
+            await self._send(writer, session, "c_secret_area_clear_cycle_record", {})
+        elif name == "s_act_secret_record_list":
+            await self._send(
+                writer,
+                session,
+                "c_act_secret_record_list",
+                session.stage.act_secret_record_list(
+                    int(values.get("ActId") or 0),
+                ),
+            )
         elif name == "s_usj_task":
             await self._send(
                 writer,
