@@ -4927,10 +4927,18 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
             "c_area_event_stage_pass",
             "c_area_event_info",
             "c_task_info_update",
+            "c_task_info",
         ]
         task_update = codec.decode_message("c_task_info_update", replies[2][1])
         assert task_update["task_info"]["Id"] == 280101
         assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+        refreshed_tasks = codec.decode_message("c_task_info", replies[3][1])
+        assert [task["Id"] for task in refreshed_tasks["tasks"][:4]] == [
+            STARTER_TASK.id,
+            1010,
+            280101,
+            100602,
+        ]
 
         second_game = GameServer(registry)
         second_session = Session(
@@ -5656,6 +5664,7 @@ async def _run_guide_finish() -> None:
         "c_guide_finish",
         "c_scene_npc_create",
         "c_task_info_update",
+        "c_task_info",
         "c_city_level_add_exp",
         "c_city_level_up",
         "c_city_level_info",
@@ -5676,17 +5685,23 @@ async def _run_guide_finish() -> None:
     task_update = codec.decode_message("c_task_info_update", reply_body)
     assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
     assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
-    assert codec.decode_message("c_city_level_add_exp", replies[3][1]) == {
+    refreshed_tasks = codec.decode_message("c_task_info", replies[3][1])
+    assert [task["Id"] for task in refreshed_tasks["tasks"]] == [
+        STARTER_TASK.id,
+        1010,
+    ]
+    assert refreshed_tasks["finishs"] == [STARTER_TASK.id]
+    assert codec.decode_message("c_city_level_add_exp", replies[4][1]) == {
         "Exp": BEGINNER_QUEST_CITY_EXP
     }
-    assert codec.decode_message("c_city_level_up", replies[4][1]) == {
+    assert codec.decode_message("c_city_level_up", replies[5][1]) == {
         "Level": BEGINNER_QUEST_CITY_LEVEL
     }
-    assert codec.decode_message("c_city_level_info", replies[5][1]) == {
+    assert codec.decode_message("c_city_level_info", replies[6][1]) == {
         "Level": BEGINNER_QUEST_CITY_LEVEL,
         "ClickList": [],
     }
-    assert codec.decode_message("c_world_task_info", replies[6][1])["FinishList"] == [
+    assert codec.decode_message("c_world_task_info", replies[7][1])["FinishList"] == [
         {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": STARTER_GUIDE_ID}
     ]
 
@@ -5827,6 +5842,7 @@ async def _run_client_stat() -> None:
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_scene_npc_create",
         "c_task_info_update",
+        "c_task_info",
         "c_city_level_add_exp",
         "c_city_level_up",
         "c_city_level_info",
@@ -5842,10 +5858,16 @@ async def _run_client_stat() -> None:
     task_update = codec.decode_message("c_task_info_update", reply_body)
     assert task_update["task_info"]["Id"] == STARTER_GUIDE_ID
     assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
-    assert codec.decode_message("c_city_level_add_exp", replies[2][1]) == {
+    refreshed_tasks = codec.decode_message("c_task_info", replies[2][1])
+    assert [task["Id"] for task in refreshed_tasks["tasks"]] == [
+        STARTER_TASK.id,
+        1010,
+    ]
+    assert refreshed_tasks["finishs"] == [STARTER_TASK.id]
+    assert codec.decode_message("c_city_level_add_exp", replies[3][1]) == {
         "Exp": BEGINNER_QUEST_CITY_EXP
     }
-    assert codec.decode_message("c_city_level_up", replies[3][1]) == {
+    assert codec.decode_message("c_city_level_up", replies[4][1]) == {
         "Level": BEGINNER_QUEST_CITY_LEVEL
     }
     assert session.tutorial.client_stats == [
@@ -6117,6 +6139,7 @@ async def _run_task_requests() -> None:
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_task_info_update",
+        "c_task_info",
         "c_city_level_add_exp",
         "c_city_level_up",
         "c_city_level_info",
@@ -6127,6 +6150,12 @@ async def _run_task_requests() -> None:
     submitted = codec.decode_message("c_task_info_update", reply_body)
     assert submitted["action_type"] == 2
     assert submitted["task_info"]["Status"] == TASK_STATUS_FINISHED
+    refreshed_tasks = codec.decode_message("c_task_info", replies[1][1])
+    assert [task["Id"] for task in refreshed_tasks["tasks"]] == [
+        STARTER_TASK.id,
+        1010,
+    ]
+    assert refreshed_tasks["finishs"] == [STARTER_TASK.id]
 
     writer.data.clear()
     session.outbound = RollingXor(0x8A9BACBD)
@@ -7163,6 +7192,7 @@ async def _run_requested_stage_enter_packets() -> None:
         "c_area_event_stage_pass",
         "c_area_event_info",
         "c_task_info_update",
+        "c_task_info",
     ]
     stage_pass = codec.decode_message("c_area_event_stage_pass", replies[0][1])
     assert stage_pass == {
@@ -7185,6 +7215,13 @@ async def _run_requested_stage_enter_packets() -> None:
         21111,
         280101,
         290101,
+    ]
+    refreshed_tasks = codec.decode_message("c_task_info", replies[3][1])
+    assert [task["Id"] for task in refreshed_tasks["tasks"][:4]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+        100602,
     ]
     assert session.stage.completions[21111].pass_count == 1
 
@@ -7683,6 +7720,7 @@ async def _run_starter_guide_intro_stage_probe() -> None:
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_scene_npc_create",
         "c_task_info_update",
+        "c_task_info",
         "c_city_level_add_exp",
         "c_city_level_up",
         "c_city_level_info",

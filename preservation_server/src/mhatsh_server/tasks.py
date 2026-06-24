@@ -213,6 +213,12 @@ class TaskState:
             "RewardRate": 0,
         }
 
+    def should_refresh_progression_list(self, task_id: int) -> bool:
+        task = self.tasks.get(int(task_id))
+        return task is not None and (
+            task.id == STARTER_TASK.id or task.quest_order > 0
+        )
+
     def _task(self, task_id: int) -> TaskRecord:
         task = self.tasks.get(task_id)
         if task is None:

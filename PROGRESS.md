@@ -615,6 +615,10 @@ environment details are intentionally omitted from Git.
   the entire 90-task chain at once. Completing an area-event stage can also
   backfill unfinished parsed predecessor gates so out-of-order stage progress
   does not strand the recovered chain.
+- Known starter/recovered quest completions now follow their
+  `c_task_info_update` finish packet with a refreshed `c_task_info` snapshot of
+  the currently visible parsed task chain, so the client does not need a second
+  manual task-list request to learn about the next recovered quest step.
 - The 75 recovered `task_cfg.lua` area-event task links are now bridged to the
   75 parsed `areaevent_cfg.lua` combat stage rows in recovered order. The
   server exposes them as type-28 task records, keeps both task/event/stage IDs

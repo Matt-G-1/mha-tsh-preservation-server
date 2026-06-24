@@ -2261,6 +2261,15 @@ class GameServer:
             self.profile_store.remember_finished_tasks(
                 session.urs, session.tasks.finished
             )
+            if session.tasks.should_refresh_progression_list(
+                int(task_info.get("Id") or 0)
+            ):
+                await self._send(
+                    writer,
+                    session,
+                    "c_task_info",
+                    session.tasks.task_info(),
+                )
         if int(task_info.get("Id") or 0) != STARTER_TASK_ID:
             return
         if int(task_info.get("Status") or 0) != 3:
