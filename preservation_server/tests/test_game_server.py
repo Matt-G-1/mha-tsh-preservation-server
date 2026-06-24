@@ -1585,6 +1585,8 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "label": "\u7b49\u7ea7",
             "objective": "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f",
             "order": 1,
+            "previous_task_id": 0,
+            "next_task_id": 280101,
         },
         {
             "constant_index": 422,
@@ -1596,6 +1598,8 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "label": "\u9996\u6b21\u51fa\u51fb",
             "objective": "\u9996\u6b21\u51fa\u51fb\uff01\u51fb\u8d25\u7ed1\u67b6\u4e8b\u4ef6\u7684\u654c\u4eba",
             "order": 2,
+            "previous_task_id": 1010,
+            "next_task_id": 100602,
         },
         {
             "constant_index": 436,
@@ -1607,6 +1611,8 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "label": "\u62ef\u6551\u5e02\u6c11",
             "objective": "\u62ef\u6551\u51fa\u88ab\u7ed1\u67b6\u7684\u5e02\u6c11\u4eec",
             "order": 3,
+            "previous_task_id": 280101,
+            "next_task_id": 100701,
         },
         {
             "constant_index": 448,
@@ -1618,6 +1624,8 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "label": "\u843d\u5e55",
             "objective": "\u6293\u6355\u7ed1\u67b6\u4e8b\u4ef6\u7684\u5e55\u540e\u654c\u4eba",
             "order": 4,
+            "previous_task_id": 100602,
+            "next_task_id": 100902,
         },
         {
             "constant_index": 460,
@@ -1628,6 +1636,8 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "label": "\u8c03\u67e5\u7ed3\u679c",
             "objective": "\u524d\u5f80\u65b0\u5174\u533a\u57fa\u7ad9\u8fdb\u884c\u8ba4\u8bc1",
             "order": 5,
+            "previous_task_id": 100701,
+            "next_task_id": 280201,
         },
     ]
 
@@ -3915,6 +3925,8 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert RECOVERED_ACT_TASK_RECORDS[0].source_marker == "act1001"
     assert RECOVERED_ACT_TASK_RECORDS[0].source_kind == "act"
     assert RECOVERED_ACT_TASK_RECORDS[0].quest_order == 1
+    assert RECOVERED_ACT_TASK_RECORDS[0].previous_task_id == 0
+    assert RECOVERED_ACT_TASK_RECORDS[0].next_task_id == 280101
     accept = state.accept(STARTER_TASK.id)
     assert accept["action_type"] == 1
     assert accept["task_info"]["Status"] == TASK_STATUS_ACCEPTED
@@ -3968,6 +3980,8 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_relate_stage_id == 290101
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_kind == "area_event"
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].quest_order == 2
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].previous_task_id == 1010
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].next_task_id == 100602
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
     assert area_task_update["task_info"]["Id"] == 280101

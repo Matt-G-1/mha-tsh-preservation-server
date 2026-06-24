@@ -308,6 +308,15 @@ def collect_task_cfg_hints(
     quest_chain.sort(key=lambda item: int(item["constant_index"]))
     for order, item in enumerate(quest_chain, start=1):
         item["order"] = order
+    for index, item in enumerate(quest_chain):
+        previous_item = quest_chain[index - 1] if index > 0 else None
+        next_item = quest_chain[index + 1] if index + 1 < len(quest_chain) else None
+        item["previous_task_id"] = (
+            int(previous_item["task_id"]) if previous_item is not None else 0
+        )
+        item["next_task_id"] = (
+            int(next_item["task_id"]) if next_item is not None else 0
+        )
 
     return {
         "source": TASK_CFG_SOURCE,

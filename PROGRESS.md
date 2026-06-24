@@ -605,6 +605,10 @@ environment details are intentionally omitted from Git.
   all-task listings preserve the recovered sequence (`act1001`, first-sortie
   area tasks, `act1111`, and onward) while still keeping the local starter task
   first for compatibility.
+- The recovered 90-entry quest chain now also stores explicit
+  `previous_task_id` and `next_task_id` links. Runtime task records expose
+  those links internally for the next progressive-task visibility pass without
+  inventing any ordering outside the parsed packed constant sequence.
 - The 75 recovered `task_cfg.lua` area-event task links are now bridged to the
   75 parsed `areaevent_cfg.lua` combat stage rows in recovered order. The
   server exposes them as type-28 task records, keeps both task/event/stage IDs

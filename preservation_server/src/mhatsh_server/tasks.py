@@ -59,6 +59,8 @@ class TaskRecord:
     source_marker: str = ""
     source_kind: str = ""
     quest_order: int = 0
+    previous_task_id: int = 0
+    next_task_id: int = 0
 
     def to_protocol(self) -> dict[str, object]:
         return {
@@ -84,6 +86,8 @@ class TaskRecord:
             source_marker=self.source_marker,
             source_kind=self.source_kind,
             quest_order=self.quest_order,
+            previous_task_id=self.previous_task_id,
+            next_task_id=self.next_task_id,
         )
 
 
@@ -245,6 +249,16 @@ QUEST_CHAIN_ORDER_BY_AREA_EVENT_ID = {
     for item in RECOVERED_QUEST_CHAIN
     if item.get("kind") == "area_event"
 }
+QUEST_CHAIN_BY_ACT_MARKER = {
+    str(item["marker"]): item
+    for item in RECOVERED_QUEST_CHAIN
+    if item.get("kind") == "act"
+}
+QUEST_CHAIN_BY_AREA_EVENT_ID = {
+    int(item["event_id"]): item
+    for item in RECOVERED_QUEST_CHAIN
+    if item.get("kind") == "area_event"
+}
 
 
 def _recovered_area_event_task_records() -> tuple[TaskRecord, ...]:
@@ -253,6 +267,7 @@ def _recovered_area_event_task_records() -> tuple[TaskRecord, ...]:
         task_id = int(task_hint["task_id"] or task_hint["event_id"])
         event_id = int(task_hint["event_id"])
         relate_stage = int(stage.relate_stage)
+        chain_item = QUEST_CHAIN_BY_AREA_EVENT_ID.get(event_id, {})
         params = tuple(
             value
             for value in (int(stage.stage_id), event_id, relate_stage)
@@ -276,7 +291,9 @@ def _recovered_area_event_task_records() -> tuple[TaskRecord, ...]:
                 source_stage_id=int(stage.stage_id),
                 source_relate_stage_id=relate_stage,
                 source_kind="area_event",
-                quest_order=QUEST_CHAIN_ORDER_BY_AREA_EVENT_ID.get(event_id, 0),
+                quest_order=int(chain_item.get("order") or 0),
+                previous_task_id=int(chain_item.get("previous_task_id") or 0),
+                next_task_id=int(chain_item.get("next_task_id") or 0),
             )
         )
     return tuple(records)
@@ -303,6 +320,8 @@ RECOVERED_AREA_EVENT_TASK_ORDER = {
 def _recovered_act_task_records() -> tuple[TaskRecord, ...]:
     records: list[TaskRecord] = []
     for task_hint in RECOVERED_ACT_TASKS:
+        marker = str(task_hint["marker"])
+        chain_item = QUEST_CHAIN_BY_ACT_MARKER.get(marker, {})
         records.append(
             TaskRecord(
                 id=int(task_hint["task_id"]),
@@ -311,11 +330,11 @@ def _recovered_act_task_records() -> tuple[TaskRecord, ...]:
                 conditions=(),
                 label=str(task_hint["label"]),
                 objective=str(task_hint["objective"]),
-                source_marker=str(task_hint["marker"]),
+                source_marker=marker,
                 source_kind="act",
-                quest_order=QUEST_CHAIN_ORDER_BY_ACT_MARKER.get(
-                    str(task_hint["marker"]), 0
-                ),
+                quest_order=int(chain_item.get("order") or 0),
+                previous_task_id=int(chain_item.get("previous_task_id") or 0),
+                next_task_id=int(chain_item.get("next_task_id") or 0),
             )
         )
     return tuple(records)
