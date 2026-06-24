@@ -2602,7 +2602,13 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     asui_evidence = fight_style_for_character(
         PLAYABLE_CHARACTERS["h1014"]
     ).evidence_sources_by_command()
-    assert asui_evidence["PASSIVE"] == ("skill_video",)
+    assert asui_evidence["PASSIVE"] == ("skill_video", "skill_info")
+    assert len(STRUCTURED_SKILL_INFO_TERMS_BY_MODEL) == 24
+    assert sum(
+        len(terms)
+        for command_terms in STRUCTURED_SKILL_INFO_TERMS_BY_MODEL.values()
+        for terms in command_terms.values()
+    ) == 1267
 
     deku_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1001"])
     assert deku_style.style_name == "One For All Rookie"
@@ -2725,6 +2731,7 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert deku_resolution.move_results[0].evidence_sources == (
         "action_hints",
         "skill_video",
+        "skill_info",
     )
     assert deku_resolution.move_results[0].as_dict()["SkillVideoPaths"] == [
         "video/skill/lvgu_atk_1.flv",
@@ -2734,6 +2741,7 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert deku_resolution.move_results[0].as_dict()["EvidenceSources"] == [
         "action_hints",
         "skill_video",
+        "skill_info",
     ]
     assert deku_resolution.move_results[0].skill_slot_labels == (
         "BaseSkill",
@@ -3352,6 +3360,10 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert hints["h1024"]["terms"]["Smash!"]["count"] == 1
     assert hints["h1026"]["terms"]["Hawks Q open"]["count"] == 1
     assert hints["h1026"]["terms"]["Hawks ult"]["count"] == 3
+    assert "Dodge" in hints["h1001"]["structured_terms"]["DODGE"]
+    assert "SecondSkill" in hints["h1001"]["structured_terms"]["W"]
+    assert "Dodge 2" in hints["h1020"]["structured_terms"]["DODGE"]
+    assert "Hawks passive 1" in hints["h1026"]["structured_terms"]["PASSIVE"]
     assert hints["h1027"]["terms"]["Midoriya Q"]["count"] >= 1
     assert hints["h1027"]["terms"]["whm绿谷R"]["count"] == 2
     assert "Midoriya Q" in hints["h1027"]["structured_terms"]["Q"]
@@ -3384,6 +3396,12 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert "通行百万R" in hints["h1032"]["structured_terms"]["R"]
     assert hints["h1110"]["terms"]["Dagger Throw"]["count"] == 1
     assert hints["h1110"]["terms"]["Permeate Uppercut"]["count"] == 1
+    assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1001"]["Q"] == tuple(
+        hints["h1001"]["structured_terms"]["Q"]
+    )
+    assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1020"]["R"] == tuple(
+        hints["h1020"]["structured_terms"]["R"]
+    )
     assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1028"]["W"] == tuple(
         hints["h1028"]["structured_terms"]["W"]
     )

@@ -284,16 +284,14 @@ environment details are intentionally omitted from Git.
   Stain's `Aura of Fear`, `Permeate Uppercut`, `Shadowy Surprise`, and
   `Vigor` evidence. These are parser-backed annotations for combat telemetry,
   not a claim that every packet-side skill slot is fully proven yet.
-- A third conservative `skill_info` pass now uses the cleaner late-roster
-  skill-ID neighborhoods to annotate WHM Midoriya, WHM Bakugo, WHM Todoroki,
-  Nejire, Tamaki, and Mirio. WHM Midoriya, WHM Bakugo, Nejire, Tamaki, and
-  Mirio now have original ATK/Q/W/E/R text evidence attached to combat
-  telemetry; WHM Todoroki has Q/W/E/R evidence and only ATK remains unlabeled
-  at this layer. The public-roster original-text gap count dropped from 25 to
-  20 characters with at least one missing ATK/Q/W/E/R label. The extractor now
-  also parses structured skill-ID neighborhoods for `h1027` through `h1032`,
-  classifies human-readable labels into command buckets, and verifies that the
-  promoted late-roster terms are present in the original packed constants.
+- A third conservative `skill_info` pass now uses skill-ID neighborhoods to
+  annotate 24 recovered hero models instead of only the late roster. The
+  structured parser classifies 1,267 human-readable terms into command buckets,
+  adding move/variant evidence for older heroes such as Midoriya, Bakugo,
+  Asui, Mina, Mineta, and Hawks as well as WHM Midoriya, WHM Bakugo, WHM
+  Todoroki, Nejire, Tamaki, and Mirio. Runtime combat telemetry exposes those
+  labels as `SkillInfoVariants`, improving ATK/Q/W/E/R/Dodge/Passive evidence
+  without overwriting curated primary move names.
 - The `skill_info` extractor now reads both recovered localized skill-info
   assets (`language/en/skill_info.lua` and the sibling base
   `skill_info.lua`) by default, merging structured command neighborhoods across

@@ -31,15 +31,6 @@ DEFAULT_SKILL_INFO_ASSETS = (
     DEFAULT_SKILL_INFO_LOCALIZED_ASSET,
 )
 
-STRUCTURED_SKILL_INFO_MODEL_PREFIXES = {
-    "h1027": 1027,
-    "h1028": 1028,
-    "h1029": 1029,
-    "h1030": 1030,
-    "h1031": 1031,
-    "h1032": 1032,
-}
-
 SKILL_INFO_TERMS_BY_MODEL = {
     "h1001": ("Smash", "One For All", "Detroit Smash"),
     "h1002": ("Extra Explosion", "Bakugo"),
@@ -189,6 +180,13 @@ SKILL_INFO_TERMS_BY_MODEL = {
         "Vigor",
         "Stain",
     ),
+}
+
+
+STRUCTURED_SKILL_INFO_MODEL_PREFIXES = {
+    model_id: int(model_id[1:])
+    for model_id in SKILL_INFO_TERMS_BY_MODEL
+    if model_id.startswith("h") and model_id[1:].isdigit()
 }
 
 
