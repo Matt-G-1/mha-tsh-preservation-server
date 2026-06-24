@@ -187,6 +187,14 @@ from mhatsh_server.world_tasks import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
+LEGACY_STARTER_ENV = {
+    "MHATSH_PLAYER_LEVEL": "1",
+    "MHATSH_HERO_LEVEL": "1",
+    "MHATSH_CITY_LEVEL": "1",
+    "MHATSH_SKIP_STARTER_QUEST": "0",
+    "MHATSH_UNLOCK_ALL_FUNCTIONS": "0",
+    "MHATSH_ROSTER_MODE": "starter",
+}
 
 
 def _load_stage_cfg_hint_script():
@@ -3448,7 +3456,8 @@ async def _run_player_responses() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     writer = BufferWriter()
     session = Session(
         seed=1,
@@ -3624,7 +3633,16 @@ async def _run_demo_cast_scene_sends_verified_map_character_rows() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    legacy_environment = {
+        "MHATSH_PLAYER_LEVEL": "1",
+        "MHATSH_HERO_LEVEL": "1",
+        "MHATSH_CITY_LEVEL": "1",
+        "MHATSH_SKIP_STARTER_QUEST": "0",
+        "MHATSH_UNLOCK_ALL_FUNCTIONS": "0",
+        "MHATSH_ROSTER_MODE": "starter",
+    }
+    with patch.dict(os.environ, legacy_environment, clear=False):
+        game = GameServer(registry)
     game.map_spawns = DEMO_CAST_MAP_SPAWNS
     writer = BufferWriter()
     session = Session(
@@ -3681,6 +3699,7 @@ async def _run_expanded_roster_cards() -> None:
             character,
             STARTER_CARD_UID + index,
             fighting=int(index == 0),
+            level=PLAYER_LEVEL_CAP,
         )
         for index, character in enumerate(VERIFIED_PLAYABLE_ROSTER)
     ]
@@ -3703,15 +3722,7 @@ async def _run_unlocked_profile() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    environment = {
-        "MHATSH_PLAYER_LEVEL": str(PLAYER_LEVEL_CAP),
-        "MHATSH_HERO_LEVEL": str(PLAYER_LEVEL_CAP),
-        "MHATSH_CITY_LEVEL": str(CITY_LEVEL_CAP),
-        "MHATSH_SKIP_STARTER_QUEST": "1",
-        "MHATSH_UNLOCK_ALL_FUNCTIONS": "1",
-        "MHATSH_ROSTER_MODE": "verified",
-    }
-    with patch.dict(os.environ, environment):
+    with patch.dict(os.environ, {}, clear=True):
         game = GameServer(registry)
 
     writer = BufferWriter()
@@ -3884,7 +3895,8 @@ async def _run_character_roster_requests() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     writer = BufferWriter()
     session = Session(
         seed=1,
@@ -4324,7 +4336,7 @@ async def _run_character_menu_requests() -> None:
                 "HeroUid": STARTER_CARD_UID,
                 "SkillLevelInfo": fight_style_for_character(
                     STARTER_CHARACTER
-                ).protocol_skill_levels(1),
+                ).protocol_skill_levels(PLAYER_LEVEL_CAP),
             }
         ]
     }
@@ -4360,7 +4372,7 @@ async def _run_character_menu_requests() -> None:
                     "HeroUid": STARTER_CARD_UID + 2,
                     "SkillLevelInfo": fight_style_for_character(
                         INITIAL_PLAYABLE_ROSTER[2]
-                    ).protocol_skill_levels(1),
+                    ).protocol_skill_levels(PLAYER_LEVEL_CAP),
                 }
             },
         ),
@@ -4443,7 +4455,7 @@ async def _run_character_menu_requests() -> None:
     assert rank_info["TotalStar"] == 0
     assert rank_info["HeroStar"] == [
         {"Cid": character.hero_id, "Star": 0}
-        for character in INITIAL_PLAYABLE_ROSTER
+        for character in VERIFIED_PLAYABLE_ROSTER
     ]
     assert rank_info["TaskList"] == []
 
@@ -4566,7 +4578,7 @@ async def _run_character_menu_requests() -> None:
     assert codec.decode_message("c_attached_card_info", reply_body) == {
         "AttachedCardInfo": [
             {"HeroId": character.hero_id, "SlotInfo": []}
-            for character in INITIAL_PLAYABLE_ROSTER
+            for character in VERIFIED_PLAYABLE_ROSTER
         ]
     }
 
@@ -4679,7 +4691,7 @@ async def _run_character_menu_requests() -> None:
     assert codec.decode_message("c_training_info", reply_body) == {
         "HeroData": [
             {"HeroCId": character.hero_id, "FinishList": [], "GetList": []}
-            for character in INITIAL_PLAYABLE_ROSTER
+            for character in VERIFIED_PLAYABLE_ROSTER
         ]
     }
 
@@ -4703,7 +4715,7 @@ async def _run_character_menu_requests() -> None:
             "HeroUid": STARTER_CARD_UID,
             "SkillLevel": fight_style_for_character(
                 STARTER_CHARACTER
-            ).protocol_skill_levels(1),
+            ).protocol_skill_levels(PLAYER_LEVEL_CAP),
         }
     ]
     assert training_info["TrainingData"]["SupportSkill"] == [
@@ -4754,7 +4766,7 @@ async def _run_character_menu_requests() -> None:
                 "BuffLayer": 0,
                 "CdTime": 0,
             }
-            for character in INITIAL_PLAYABLE_ROSTER
+            for character in VERIFIED_PLAYABLE_ROSTER
         ]
     }
 
@@ -4805,7 +4817,8 @@ async def _run_guide_finish() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     writer = BufferWriter()
     session = Session(
         seed=1,
@@ -4976,7 +4989,8 @@ async def _run_client_stat() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     writer = BufferWriter()
     session = Session(
         seed=1,
@@ -5201,7 +5215,8 @@ async def _run_task_requests() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     writer = BufferWriter()
     session = Session(
         seed=1,
@@ -5339,7 +5354,8 @@ async def _run_starter_intro_stage_probe() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     game.intro_stage_enabled = True
     writer = BufferWriter()
     session = Session(
@@ -6440,7 +6456,8 @@ async def _run_starter_guide_intro_stage_probe() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     game.intro_stage_enabled = True
     game.intro_stage_trigger = "starter_guide"
     game.intro_stage_delay = 0.0
@@ -6625,7 +6642,8 @@ async def _run_base_station_info() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(os.environ, LEGACY_STARTER_ENV, clear=False):
+        game = GameServer(registry)
     writer = BufferWriter()
     session = Session(
         seed=1,

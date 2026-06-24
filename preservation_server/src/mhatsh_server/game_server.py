@@ -124,20 +124,28 @@ class GameServer:
         )
         self.player_level = min(
             PLAYER_LEVEL_CAP,
-            max(1, int(os.environ.get("MHATSH_PLAYER_LEVEL", "1"))),
+            max(
+                1,
+                int(os.environ.get("MHATSH_PLAYER_LEVEL", str(PLAYER_LEVEL_CAP))),
+            ),
         )
-        self.hero_level = max(1, int(os.environ.get("MHATSH_HERO_LEVEL", "1")))
+        self.hero_level = max(
+            1, int(os.environ.get("MHATSH_HERO_LEVEL", str(PLAYER_LEVEL_CAP)))
+        )
         self.city_level = min(
             CITY_LEVEL_CAP,
-            max(1, int(os.environ.get("MHATSH_CITY_LEVEL", "1"))),
+            max(
+                1,
+                int(os.environ.get("MHATSH_CITY_LEVEL", str(CITY_LEVEL_CAP))),
+            ),
         )
         self.skip_starter_quest = _env_enabled(
-            "MHATSH_SKIP_STARTER_QUEST", "0"
+            "MHATSH_SKIP_STARTER_QUEST", "1"
         )
         self.unlock_all_functions = _env_enabled(
-            "MHATSH_UNLOCK_ALL_FUNCTIONS", "0"
+            "MHATSH_UNLOCK_ALL_FUNCTIONS", "1"
         )
-        self.roster_mode = os.environ.get("MHATSH_ROSTER_MODE", "starter")
+        self.roster_mode = os.environ.get("MHATSH_ROSTER_MODE", "verified")
         self.map_spawn_mode = os.environ.get("MHATSH_MAP_SPAWN_MODE", "starter")
         self.playable_roster = playable_roster(self.roster_mode)
         self.map_spawns = map_spawns(self.map_spawn_mode)
