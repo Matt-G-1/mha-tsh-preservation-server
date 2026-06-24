@@ -267,6 +267,30 @@ class TaskState:
         self._finish(task)
         return self.task_update(task, action_type=2)
 
+    def complete_active_quest_contact_from_sync(
+        self, task_id: int, params: Iterable[object]
+    ) -> dict[str, object] | None:
+        update = self.complete_active_quest_contact(task_id)
+        if update is not None:
+            return update
+        npc_ids = _safe_int_set(params)
+        if not npc_ids:
+            return None
+        for candidate in self.active_quest_contact_candidates():
+            candidate_ids = (
+                set(candidate.raw_npc_ids)
+                | set(candidate.resolved_npc_ids)
+                | set(candidate.scene_npc_ids)
+            )
+            if not (candidate_ids & npc_ids):
+                continue
+            task = self.tasks.get(candidate.task_id)
+            if task is None or task.id in self.finished:
+                continue
+            self._finish(task)
+            return self.task_update(task, action_type=2)
+        return None
+
     def area_event_stage_id_for_task(self, task_id: int) -> int:
         task = self.tasks.get(int(task_id))
         if task is None or task.source_kind != "area_event":
@@ -439,6 +463,16 @@ class TaskState:
 
 def _int_tuple(value: object) -> tuple[int, ...]:
     return tuple(int(item) for item in list(value or []))
+
+
+def _safe_int_set(value: Iterable[object]) -> set[int]:
+    result: set[int] = set()
+    for item in value:
+        try:
+            result.add(int(item))
+        except (TypeError, ValueError):
+            continue
+    return result
 
 
 def _str_tuple(value: object) -> tuple[str, ...]:

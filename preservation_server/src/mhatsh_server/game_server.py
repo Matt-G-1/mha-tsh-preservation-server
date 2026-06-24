@@ -858,6 +858,7 @@ class GameServer:
             )
         elif name == "s_task_sync_info":
             task_id = int(values.get("TaskId") or 0)
+            params = list(values.get("ParamList") or [])
             await self._send(
                 writer,
                 session,
@@ -865,13 +866,21 @@ class GameServer:
                 session.tasks.sync_info(
                     task_id,
                     str(values.get("Type") or ""),
-                    list(values.get("ParamList") or []),
+                    params,
                 ),
             )
-            task_update = session.tasks.complete_active_quest_contact(task_id)
+            task_update = session.tasks.complete_active_quest_contact_from_sync(
+                task_id,
+                params,
+            )
             if task_update is not None:
                 await self._send_task_progression(writer, session, task_update)
-                area_stage_id = session.tasks.area_event_stage_id_for_task(task_id)
+                completed_task_id = int(
+                    dict(task_update.get("task_info") or {}).get("Id") or task_id
+                )
+                area_stage_id = session.tasks.area_event_stage_id_for_task(
+                    completed_task_id
+                )
                 if area_stage_id:
                     stage_pass = session.stage.ensure_area_event_stage_passed(
                         area_stage_id

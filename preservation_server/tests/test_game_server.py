@@ -4315,6 +4315,25 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         100602,
         100701,
     ]
+    raw_param_state = TaskState()
+    raw_param_state.skip_starter_quest()
+    raw_param_state.complete_area_event_stage(21111)
+    raw_param_update = raw_param_state.complete_active_quest_contact_from_sync(
+        0,
+        ["6669", "ignored"],
+    )
+    assert raw_param_update is not None
+    assert raw_param_update["task_info"]["Id"] == 100602
+    assert 100602 in raw_param_state.finished
+    resolved_param_state = TaskState()
+    resolved_param_state.skip_starter_quest()
+    resolved_param_state.complete_area_event_stage(21311)
+    resolved_param_update = (
+        resolved_param_state.complete_active_quest_contact_from_sync(0, ["5009"])
+    )
+    assert resolved_param_update is not None
+    assert resolved_param_update["task_info"]["Id"] == 102203
+    assert 102203 in resolved_param_state.finished
     assert state.complete_area_event_stage(21111) is None
     assert RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID[21311].id == 280301
     out_of_order_state = TaskState()
@@ -6999,6 +7018,45 @@ async def _run_task_requests() -> None:
         "Star": 3,
     }
     assert session.stage.completions[21121].pass_count == 1
+    assert session.tasks.complete_area_event_stage(21311) is not None
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xA9B8C7D6)
+    resolved_contact_sync = codec.encode_message(
+        "s_task_sync_info",
+        {
+            "TaskId": 0,
+            "Type": "DialogSub",
+            "ParamList": ["5009"],
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_sync_info"],
+        resolved_contact_sync,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xA9B8C7D6))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_sync_info",
+        "c_task_info_update",
+        "c_task_info",
+        "c_area_event_stage_pass",
+        "c_area_event_info",
+    ]
+    assert codec.decode_message("c_task_sync_info", replies[0][1]) == {
+        "TaskId": 0,
+        "Type": "DialogSub",
+        "ParamList": ["5009"],
+    }
+    resolved_contact_update = codec.decode_message("c_task_info_update", replies[1][1])
+    assert resolved_contact_update["task_info"]["Id"] == 102203
+    resolved_stage_pass = codec.decode_message("c_area_event_stage_pass", replies[3][1])
+    assert resolved_stage_pass["FirstPass"] == 1
+    resolved_area_event_info = codec.decode_message("c_area_event_info", replies[4][1])
+    assert resolved_area_event_info["StageData"]["StageId"] == 21321
+    assert session.stage.completions[21321].pass_count == 1
 
     writer.data.clear()
     session.outbound = RollingXor(0xAABBCCDD)
