@@ -1126,7 +1126,9 @@ class GameServer:
             )
         elif name == "s_area_event_enter_stage":
             hero_uids = [int(item) for item in list(values.get("HerosUId") or [])]
-            stage_id = int(values.get("StageId") or 0)
+            stage_id = session.tasks.canonical_area_event_stage_id(
+                int(values.get("StageId") or 0)
+            )
             await self._send(
                 writer,
                 session,
@@ -1291,7 +1293,9 @@ class GameServer:
                 self._rogue_endless_stage_id(rogue_index),
             )
         elif name == "s_area_event_fight_over":
-            stage_id = int(values.get("StageId") or session.stage.current_stage_id or 0)
+            stage_id = session.tasks.canonical_area_event_stage_id(
+                int(values.get("StageId") or session.stage.current_stage_id or 0)
+            )
             is_win = int(values.get("IsWin") or 0)
             stage_pass = session.stage.record_area_event_fight_over(
                 stage_id=stage_id,

@@ -203,7 +203,7 @@ class TaskState:
         return self.complete_guide(guide_id)
 
     def complete_area_event_stage(self, stage_id: int) -> dict[str, object] | None:
-        task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID.get(int(stage_id))
+        task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_TOKEN.get(int(stage_id))
         if task is None:
             return None
         live_task = self._task(task.id)
@@ -218,7 +218,7 @@ class TaskState:
         self, stage_ids: Iterable[int]
     ) -> None:
         for stage_id in stage_ids:
-            task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID.get(int(stage_id))
+            task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_TOKEN.get(int(stage_id))
             if task is None:
                 continue
             live_task = self._task(task.id)
@@ -297,8 +297,14 @@ class TaskState:
             return 0
         return int(task.source_stage_id)
 
+    def canonical_area_event_stage_id(self, stage_id: int) -> int:
+        task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_TOKEN.get(int(stage_id))
+        if task is None:
+            return int(stage_id)
+        return int(task.source_stage_id)
+
     def area_event_id_for_stage(self, stage_id: int) -> int:
-        task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID.get(int(stage_id))
+        task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_TOKEN.get(int(stage_id))
         if task is None:
             return 0
         return int(task.source_event_id)
@@ -712,6 +718,12 @@ RECOVERED_AREA_EVENT_TASKS_BY_ID = {
 RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID = {
     stage.stage_id: task
     for task, stage in zip(RECOVERED_AREA_EVENT_TASK_RECORDS, AREA_EVENT_STAGES)
+}
+RECOVERED_AREA_EVENT_TASK_BY_STAGE_TOKEN = {
+    token: task
+    for task in RECOVERED_AREA_EVENT_TASK_RECORDS
+    for condition in task.conditions
+    for token in condition.params
 }
 RECOVERED_AREA_EVENT_TASK_ORDER = {
     task.id: index for index, task in enumerate(RECOVERED_AREA_EVENT_TASK_RECORDS)

@@ -4328,6 +4328,9 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert state.area_event_stage_id_for_task(100602) == 21121
     assert state.area_event_stage_id_for_task(102203) == 21321
     assert state.area_event_stage_id_for_task(424242) == 0
+    assert state.canonical_area_event_stage_id(280101) == 21111
+    assert state.canonical_area_event_stage_id(290101) == 21111
+    assert state.area_event_id_for_stage(290101) == 280101
     assert 100602 in state.finished
     assert state.active_quest_contact_candidates() == ()
     assert [task["Id"] for task in state.task_info()["tasks"][:5]] == [
@@ -4386,6 +4389,16 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         280101,
         100602,
     ]
+    alias_state = TaskState()
+    alias_state.skip_starter_quest()
+    alias_update = alias_state.complete_area_event_stage(280101)
+    assert alias_update is not None
+    assert alias_update["task_info"]["Id"] == 280101
+    related_alias_state = TaskState()
+    related_alias_state.skip_starter_quest()
+    related_alias_update = related_alias_state.complete_area_event_stage(290101)
+    assert related_alias_update is not None
+    assert related_alias_update["task_info"]["Id"] == 280101
     base_state = TaskState()
     base_state.skip_starter_quest()
     assert base_state.complete_active_base_station_task() is None
@@ -5708,6 +5721,42 @@ async def _run_area_event_auto_gate_progression() -> None:
     area_sync = codec.decode_message("c_area_event_sync_status", replies[6][1])
     assert area_sync["StageId"] == 21451
     assert area_sync["EventRound"] == 280405
+
+    alias_session = Session(
+        seed=2,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x47415446),
+        urs="gate-user-2",
+        uid=4243,
+    )
+    game._configure_session(alias_session)
+    writer.data.clear()
+    alias_area_over = codec.encode_message(
+        "s_area_event_fight_over",
+        {"StageId": 280101, "IsWin": 1, "UseTime": 9},
+    )
+    await game._dispatch(
+        alias_session,
+        registry.protocol_ids["s_area_event_fight_over"],
+        alias_area_over,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x47415446))
+    alias_replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in alias_replies] == [
+        "c_area_event_stage_pass",
+        "c_area_event_info",
+        "c_task_info_update",
+        "c_task_info",
+        "c_area_event_sync_status",
+    ]
+    alias_info = codec.decode_message("c_area_event_info", alias_replies[1][1])
+    assert alias_info["StageData"]["StageId"] == 21111
+    alias_update = codec.decode_message("c_task_info_update", alias_replies[2][1])
+    assert alias_update["task_info"]["Id"] == 280101
+    alias_sync = codec.decode_message("c_area_event_sync_status", alias_replies[4][1])
+    assert alias_sync["StageId"] == 21111
+    assert alias_sync["EventRound"] == 280101
 
 
 async def _run_area_event_contact_npc_spawn() -> None:
