@@ -301,6 +301,7 @@ class GameServer:
             if self.send_initial_user:
                 await self._send_initial_user(writer, session)
                 await self._send_initial_cards(writer, session)
+                await self._send_area_event_login_data(writer, session)
                 if self.unlock_all_functions:
                     await self._send_initial_function_unlocks(writer, session)
             if self.send_initial_scene:
@@ -829,6 +830,74 @@ class GameServer:
                 int(values.get("Id") or 0),
                 hero_id=int(values.get("HeroId") or 0),
             )
+        elif name == "s_area_event_enter_stage":
+            hero_uids = [int(item) for item in list(values.get("HerosUId") or [])]
+            stage_id = int(values.get("StageId") or 0)
+            await self._enter_requested_stage(
+                writer,
+                session,
+                stage_id,
+                card_uid=hero_uids[0] if hero_uids else 0,
+            )
+            await self._send(
+                writer,
+                session,
+                "c_area_event_info",
+                session.stage.area_event_info(stage_id),
+            )
+        elif name == "s_area_event_fight_over":
+            stage_id = int(values.get("StageId") or session.stage.current_stage_id or 0)
+            stage_pass = session.stage.record_area_event_fight_over(
+                stage_id=stage_id,
+                is_win=int(values.get("IsWin") or 0),
+                use_time=int(values.get("UseTime") or 0),
+            )
+            self.profile_store.remember_stage_progress(
+                session.urs,
+                session.stage.export_completions(),
+            )
+            await self._send(writer, session, "c_area_event_stage_pass", stage_pass)
+            await self._send(
+                writer,
+                session,
+                "c_area_event_info",
+                session.stage.area_event_info(stage_id),
+            )
+        elif name == "s_area_event_reset_stage_times":
+            await self._send(
+                writer,
+                session,
+                "c_area_event_fight_times_status",
+                {
+                    "StageFightTimes": session.stage.area_event_stage_times_for(
+                        int(values.get("StageId") or 0)
+                    )
+                },
+            )
+        elif name == "s_area_event_trigger_on":
+            await self._send(
+                writer,
+                session,
+                "c_area_event_trigger_change",
+                {
+                    "EventRound": int(values.get("AreaId") or 0),
+                    "TriggerOnMap": [int(values.get("AreaId") or 0)],
+                },
+            )
+        elif name == "s_area_event_wipe":
+            await self._send(
+                writer,
+                session,
+                "c_area_event_wipe",
+                {"AreaEventId": int(values.get("AreaEventId") or 0)},
+            )
+        elif name == "s_area_event_leave_stage":
+            await self._send(
+                writer,
+                session,
+                "c_area_event_leave_stage",
+                {"LeaveType": int(values.get("LeaveType") or 0)},
+            )
         elif name == "s_resource_stage_info":
             roster = self._ensure_roster(session)
             await self._send(
@@ -1220,6 +1289,19 @@ class GameServer:
             session,
             "c_card_hero_bio_info",
             session.character_menu.card_hero_bio_info(roster),
+        )
+
+    async def _send_area_event_login_data(
+        self, writer: asyncio.StreamWriter, session: Session
+    ) -> None:
+        roster = self._ensure_roster(session)
+        await self._send(
+            writer,
+            session,
+            "c_area_event_login_data",
+            session.stage.area_event_login_data(
+                normal_lineup=[roster.active_card_uid],
+            ),
         )
 
     async def _send_initial_function_unlocks(

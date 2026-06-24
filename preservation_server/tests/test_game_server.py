@@ -9,6 +9,11 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from mhatsh_server.activity_state import ActivityState
+from mhatsh_server.area_event_stages import (
+    AREA_EVENT_STAGE_BY_ID,
+    AREA_EVENT_STAGES,
+    AREA_EVENT_STAGE_SOURCE,
+)
 from mhatsh_server.beginner_quest import (
     BEGINNER_QUEST_DEATH_ARMS_UID,
     STARTER_MAP_GUIDE_ID,
@@ -159,6 +164,18 @@ def _load_stage_cfg_route_hint_script():
     script_path = ROOT / "scripts" / "derive_stage_cfg_route_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_stage_cfg_route_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_area_event_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_area_event_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_area_event_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -842,6 +859,38 @@ def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
         "constant_index": 7472,
         "route_label": "yhc-训练场信号塔5支线战斗1",
     }
+
+
+def test_area_event_stage_hint_parser_tracks_progression_rows() -> None:
+    module = _load_area_event_stage_hint_script()
+    hints = module.collect_area_event_stage_hints(
+        ROOT / module.DEFAULT_AREA_EVENT_ASSET
+    )
+
+    assert hints["constant_count"] == 2577
+    assert hints["stage_count"] == 75
+    assert AREA_EVENT_STAGE_SOURCE == hints["source"]
+    assert len(AREA_EVENT_STAGES) == hints["stage_count"]
+    assert AREA_EVENT_STAGES[0].stage_id == 21111
+    assert AREA_EVENT_STAGES[0].name == "1-1首次出击"
+    assert AREA_EVENT_STAGES[0].area_name == "旧城区"
+    assert AREA_EVENT_STAGES[0].open_drama == "area1_1"
+    assert AREA_EVENT_STAGES[0].next_stage_id == 21121
+    assert AREA_EVENT_STAGE_BY_ID[21121].previous_stage_id == 21111
+    assert AREA_EVENT_STAGE_BY_ID[21761].name == "7-6车站治安"
+    assert AREA_EVENT_STAGE_BY_ID[21761].reward_tips_item_id == 1013204
+    assert AREA_EVENT_STAGES[-1].stage_id == 211461
+    assert AREA_EVENT_STAGES[-1].next_stage_id == 0
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[21111]["name"] == AREA_EVENT_STAGE_BY_ID[21111].name
+    assert generated_rows[211461]["description"] == (
+        AREA_EVENT_STAGE_BY_ID[211461].description
+    )
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
@@ -2948,6 +2997,7 @@ async def _run_player_responses() -> None:
         "c_card_seeinfo",
         "c_card_show_info",
         "c_card_hero_bio_info",
+        "c_area_event_login_data",
         "c_scene_player_info",
         "c_scene_enter",
         "c_scene_npc_create",
@@ -3009,6 +3059,17 @@ async def _run_player_responses() -> None:
         ]
     }
     reply_id, reply_body = replies[5]
+    area_event_login = codec.decode_message("c_area_event_login_data", reply_body)
+    assert len(area_event_login["StageData"]) == len(AREA_EVENT_STAGES)
+    assert area_event_login["StageData"][0] == {
+        "StageId": 21111,
+        "PassedTimes": 0,
+        "DropCountTimes": 0,
+        "Star": 0,
+    }
+    assert area_event_login["NormalLineup"] == [STARTER_CARD_UID]
+    assert area_event_login["CacheStageId"] == 21111
+    reply_id, reply_body = replies[6]
     assert codec.decode_message("c_scene_player_info", reply_body) == {
         "Uid": 4242,
         "Camp": 0,
@@ -3022,7 +3083,7 @@ async def _run_player_responses() -> None:
         "MoodId": 0,
         "Version": 1,
     }
-    reply_id, reply_body = replies[6]
+    reply_id, reply_body = replies[7]
     assert codec.decode_message("c_scene_enter", reply_body) == {
         "SceneUid": STARTER_SCENE_ID,
         "X": STARTER_SCENE_X,
@@ -3038,11 +3099,11 @@ async def _run_player_responses() -> None:
         },
         "Extra": [],
     }
-    reply_id, reply_body = replies[7]
+    reply_id, reply_body = replies[8]
     assert codec.decode_message("c_scene_npc_create", reply_body) == {
         "NpcList": [scene_npc_from_spawn(spawn) for spawn in INITIAL_MAP_SPAWNS]
     }
-    reply_id, reply_body = replies[8]
+    reply_id, reply_body = replies[9]
     assert codec.decode_message("c_data_merge_to", reply_body) == {
         "str": "c_login_ok"
     }
@@ -3180,6 +3241,7 @@ async def _run_unlocked_profile() -> None:
         "c_card_seeinfo",
         "c_card_show_info",
         "c_card_hero_bio_info",
+        "c_area_event_login_data",
         "c_funcopen_list",
         "c_scene_player_info",
         "c_scene_enter",
@@ -3191,10 +3253,13 @@ async def _run_unlocked_profile() -> None:
     cards = codec.decode_message("c_card_seeinfo", replies[2][1])["CardInfo"]
     assert len(cards) == len(VERIFIED_PLAYABLE_ROSTER) == 26
     assert {card["Lv"] for card in cards} == {PLAYER_LEVEL_CAP}
-    assert codec.decode_message("c_funcopen_list", replies[5][1]) == {
+    area_event_login = codec.decode_message("c_area_event_login_data", replies[5][1])
+    assert len(area_event_login["StageData"]) == len(AREA_EVENT_STAGES)
+    assert area_event_login["NormalLineup"] == [STARTER_CARD_UID]
+    assert codec.decode_message("c_funcopen_list", replies[6][1]) == {
         "idlist": list(FUNCTION_OPEN_IDS)
     }
-    scene_player = codec.decode_message("c_scene_player_info", replies[6][1])
+    scene_player = codec.decode_message("c_scene_player_info", replies[7][1])
     assert scene_player["Level"] == PLAYER_LEVEL_CAP
     task_info = session.tasks.task_info()
     assert task_info["finishs"] == [STARTER_TASK.id]
@@ -5001,6 +5066,73 @@ async def _run_requested_stage_enter_packets() -> None:
         "nomu_charge",
     ]
     assert game._current_stage_definition(session).key == "generated_stage_777777"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112235)
+    area_enter = codec.encode_message(
+        "s_area_event_enter_stage",
+        {"StageId": 21111, "HerosUId": [STARTER_CARD_UID + 1]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_area_event_enter_stage"],
+        area_enter,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x55112235))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_area_event_info",
+    ]
+    area_stage_enter = codec.decode_message("c_stage_enter", replies[0][1])
+    assert area_stage_enter["StageId"] == 21111
+    assert area_stage_enter["StageUid"] == 211110001
+    area_info = codec.decode_message("c_area_event_info", replies[1][1])
+    assert area_info["StageData"] == {
+        "StageId": 21111,
+        "PassedTimes": 0,
+        "DropCountTimes": 0,
+        "Star": 0,
+    }
+    assert session.roster is not None
+    assert session.roster.active_card_uid == STARTER_CARD_UID + 1
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112236)
+    area_over = codec.encode_message(
+        "s_area_event_fight_over",
+        {"StageId": 21111, "IsWin": 1, "UseTime": 12},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_area_event_fight_over"],
+        area_over,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x55112236))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_area_event_stage_pass",
+        "c_area_event_info",
+    ]
+    stage_pass = codec.decode_message("c_area_event_stage_pass", replies[0][1])
+    assert stage_pass == {
+        "Star": [1, 2, 3],
+        "FirstPass": 1,
+        "FirstPassPrize": [],
+        "ImportantPrize": [],
+    }
+    area_info = codec.decode_message("c_area_event_info", replies[1][1])
+    assert area_info["StageData"] == {
+        "StageId": 21111,
+        "PassedTimes": 1,
+        "DropCountTimes": 0,
+        "Star": 3,
+    }
+    assert session.stage.completions[21111].pass_count == 1
 
 
 async def _run_stage_family_info_packets() -> None:

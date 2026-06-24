@@ -22,6 +22,7 @@ DEFAULT_STAGE_CFG_ASSET = (
 )
 
 LUA_HEADER = b"\x1bLua"
+NUMBER_TAGS = {3, 0x42}
 STRING_TAGS = {4, 0x37}
 STAGE_REF_RE = re.compile(r"^stage(\d{3,6})(?:[a-z]|_\d+|_[a-z]+)?$")
 CONTROL_LABELS = {
@@ -90,7 +91,7 @@ class _RootConstantReader:
                 constants.append(None)
             elif tag == 1:
                 constants.append(bool(self.u8()))
-            elif tag == 3:
+            elif tag in NUMBER_TAGS:
                 constants.append(struct.unpack("<d", self.read(8))[0])
             elif tag in STRING_TAGS:
                 constants.append(self.lua_string())

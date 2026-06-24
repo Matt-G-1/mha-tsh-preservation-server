@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .area_event_stages import (
+    AREA_EVENT_STAGE_BY_ID,
+    AREA_EVENT_STAGES,
+)
 from .combat import CombatResolution, FightStyle
 
 
@@ -2836,6 +2840,102 @@ class StageState:
                 for resource_type in range(1, 4)
             ],
         }
+
+    def area_event_stage_data(self, stage_id: int) -> dict[str, object]:
+        numeric_stage_id = int(stage_id)
+        completion = self.completions.get(numeric_stage_id)
+        return {
+            "StageId": numeric_stage_id,
+            "PassedTimes": completion.pass_count if completion else 0,
+            "DropCountTimes": 0,
+            "Star": len(completion.stars) if completion else 0,
+        }
+
+    def area_event_info(self, stage_id: int) -> dict[str, object]:
+        return {"StageData": self.area_event_stage_data(stage_id)}
+
+    def area_event_stage_times(self) -> list[dict[str, object]]:
+        return [
+            self.area_event_stage_times_for(stage.stage_id)
+            for stage in AREA_EVENT_STAGES
+        ]
+
+    def area_event_stage_times_for(self, stage_id: int) -> dict[str, object]:
+        completion = self.completions.get(int(stage_id))
+        return {
+            "StageId": int(stage_id),
+            "FightTimes": completion.pass_count if completion else 0,
+            "ResetTimes": 0,
+        }
+
+    def area_event_login_data(
+        self,
+        *,
+        normal_lineup: list[int],
+        act_lineup: list[int] | None = None,
+        diff_lineup: list[int] | None = None,
+    ) -> dict[str, object]:
+        stage_data = [
+            self.area_event_stage_data(stage.stage_id)
+            for stage in AREA_EVENT_STAGES
+        ]
+        stage_times = self.area_event_stage_times()
+        return {
+            "StageData": stage_data,
+            "DiffStageData": [],
+            "CacheStageId": AREA_EVENT_STAGES[0].stage_id if AREA_EVENT_STAGES else 0,
+            "DifficultCacheStageId": 0,
+            "NormalLineup": list(normal_lineup),
+            "ActLineup": list(act_lineup or []),
+            "DiffLineup": list(diff_lineup or []),
+            "StageFightTimes": stage_times,
+            "DiffStageFightTimes": [],
+        }
+
+    def area_event_stage_pass(self, stage_id: int) -> dict[str, object]:
+        completion = self.completions.get(int(stage_id))
+        stars = list(completion.stars) if completion is not None else []
+        return {
+            "Star": stars,
+            "FirstPass": int(completion.pass_count == 1) if completion else 0,
+            "FirstPassPrize": [],
+            "ImportantPrize": [],
+        }
+
+    def area_event_stage_metadata(self, stage_id: int) -> dict[str, object]:
+        stage = AREA_EVENT_STAGE_BY_ID.get(int(stage_id))
+        return stage.as_dict() if stage is not None else {}
+
+    def record_area_event_fight_over(
+        self,
+        *,
+        stage_id: int,
+        is_win: int,
+        use_time: int,
+    ) -> dict[str, object]:
+        summary = StageCombatSummary(
+            stage_id=int(stage_id),
+            result=1 if int(is_win) else 0,
+            time=max(0, int(use_time)),
+            max_combo=0,
+            combo_damage=0,
+            all_damage=0,
+            on_hit_num=0,
+            solo_boss_num=0,
+        )
+        if summary.passed:
+            self.complete_stage(summary)
+        else:
+            existing = self.completions.get(summary.stage_id)
+            self.completions[summary.stage_id] = StageCompletion(
+                stage_id=summary.stage_id,
+                status=0,
+                stars=existing.stars if existing else (),
+                full_star_time=existing.full_star_time if existing else 0,
+                best_time=existing.best_time if existing else 0,
+                pass_count=existing.pass_count if existing else 0,
+            )
+        return self.area_event_stage_pass(summary.stage_id)
 
     def pressure_stage_detail(
         self,
