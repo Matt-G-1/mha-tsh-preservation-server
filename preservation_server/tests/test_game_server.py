@@ -86,6 +86,13 @@ from mhatsh_server.combat_action_hints import RECOVERED_HERO_ACTION_HINTS_BY_MOD
 from mhatsh_server.combat_internal_action_hints import (
     RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL,
 )
+from mhatsh_server.usj_stages import (
+    USJ_POINT_BY_ID,
+    USJ_POINTS,
+    USJ_STAGE_BY_ID,
+    USJ_STAGE_SOURCE,
+    USJ_STAGES,
+)
 from mhatsh_server.skill_info_structured_terms import (
     STRUCTURED_SKILL_INFO_TERMS_BY_MODEL,
 )
@@ -195,6 +202,18 @@ def _load_act_daily_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_act_daily_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_act_daily_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_usj_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_usj_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_usj_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -436,8 +455,8 @@ def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> Non
 
 def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "battle_stage_candidate_catalog" in STAGE_CATALOG_SOURCE
-    assert len(RECOVERED_BATTLE_STAGES) >= 300
-    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 295
+    assert len(RECOVERED_BATTLE_STAGES) >= 625
+    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 618
     stage_ids = [
         stage.stage_id for stage in RECOVERED_BATTLE_STAGES if stage.stage_id is not None
     ]
@@ -480,6 +499,17 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         3007,
     ]
     assert stage_candidate_by_id(882008).label == "snowman_daily_challenge 882008"
+
+    usj_stage = stage_candidate_by_id(700101)
+    assert usj_stage.key == "usj_stage_700101"
+    assert usj_stage.label == "USJ point 100101 stage 700101"
+    assert usj_stage.source == USJ_STAGE_SOURCE
+    assert [spawn.enemy_id for spawn in usj_stage.encounter_spawns] == [
+        2202,
+        2472,
+        3007,
+    ]
+    assert stage_candidate_by_id(723706).label == "USJ point 100304 stage 723706"
 
     starter = stage_candidate_by_id(STARTER_INTRO_STAGE_ID)
     assert starter.key == "starter_intro_299301"
@@ -964,6 +994,33 @@ def test_act_daily_stage_hint_parser_tracks_activity_stage_rows() -> None:
     assert generated_rows[880004]["name"] == ACT_DAILY_STAGE_BY_ID[880004].name
     assert generated_rows[882008]["sub_id"] == 0
     assert hints["monsters"][0]["monster_id"] == 2005
+
+
+def test_usj_stage_hint_parser_tracks_point_stage_matrix() -> None:
+    module = _load_usj_stage_hint_script()
+    hints = module.collect_usj_stage_hints(ROOT / module.DEFAULT_USJ_STAGE_ASSET)
+
+    assert hints["constant_count"] == 1952
+    assert hints["point_count"] == 12
+    assert hints["stage_count"] == 323
+    assert USJ_STAGE_SOURCE == hints["source"]
+    assert len(USJ_POINTS) == hints["point_count"]
+    assert len(USJ_STAGES) == hints["stage_count"]
+    assert USJ_POINTS[0].point_id == 100101
+    assert USJ_POINTS[0].stage_ids[:3] == (700101, 700201, 700202)
+    assert len(USJ_POINT_BY_ID[100101].stage_ids) == 27
+    assert len(USJ_POINT_BY_ID[100303].stage_ids) == 26
+    assert USJ_STAGE_BY_ID[700101].point_id == 100101
+    assert USJ_STAGE_BY_ID[723706].point_id == 100304
+    assert USJ_STAGES[-1].stage_id == 723706
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[700101]["point_id"] == 100101
+    assert generated_rows[723706]["stage_order"] == 27
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:

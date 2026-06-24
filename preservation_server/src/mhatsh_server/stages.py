@@ -13,6 +13,7 @@ from .act_daily_stages import (
     ACT_DAILY_STAGES,
 )
 from .combat import CombatResolution, FightStyle
+from .usj_stages import USJ_STAGE_SOURCE, USJ_STAGES
 
 
 STARTER_INTRO_STAGE_ID = 299301
@@ -2166,6 +2167,27 @@ def _act_daily_stage_definitions() -> tuple[BattleStageDefinition, ...]:
     )
 
 
+def _usj_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | set(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+        | set(STAGE_CFG_SCRIPT_ROUTE_GROUPS)
+        | {stage.stage_id for stage in AREA_EVENT_STAGES}
+        | {stage.stage_id for stage in ACT_DAILY_STAGES}
+    )
+    return tuple(
+        BattleStageDefinition(
+            key=f"usj_stage_{stage.stage_id}",
+            label=stage.label,
+            stage_id=stage.stage_id,
+            source=USJ_STAGE_SOURCE,
+        )
+        for stage in USJ_STAGES
+        if stage.stage_id not in occupied_ids
+    )
+
+
 RECOVERED_BATTLE_STAGES = (
     BattleStageDefinition(
         key="starter_intro_299301",
@@ -2407,6 +2429,7 @@ RECOVERED_BATTLE_STAGES = (
     *_stage_cfg_script_route_definitions(),
     *_area_event_stage_definitions(),
     *_act_daily_stage_definitions(),
+    *_usj_stage_definitions(),
     *_zx_numeric_stage_definitions(),
     BattleStageDefinition(
         key="battle_drama_zx_only",
