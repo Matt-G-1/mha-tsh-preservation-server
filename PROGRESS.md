@@ -586,13 +586,19 @@ environment details are intentionally omitted from Git.
 - The recovered packed `task_cfg.lua` constants now have a repeatable quest
   hint parser: `scripts/derive_task_cfg_hints.py`. It currently reads 2,856
   constants, preserves 798 narrative task text hints, 75 area-event task
-  links, and 21 `act*` ordering markers in
-  `mhatsh_server.task_cfg_hints`. Early anchors include `act1001`, the
+  links, 21 `act*` ordering markers, and 15 non-area-event act task records
+  in `mhatsh_server.task_cfg_hints`. Early anchors include `act1001`, the
   `280101`/`280102`/`280103` first-sortie area-event chain, and the
   `280301`/`280302` training/practical exercise entries, with nearby
   stage/NPC/drama references retained for later quest sequencing. The parser
   now also emits task type and condition ID from the recovered
   `区域事件|event|step` marker instead of relying on literal server constants.
+- Non-area-event `act*` task markers are now promoted into task state as
+  recovered records with derived task type, label, objective, and source
+  marker metadata. The starter task remains first for the archived client path,
+  followed by recovered type-1 story gates such as `act1001`, `act1111`, and
+  `act1120`; no conditions are invented when the packed task config does not
+  expose one.
 - The 75 recovered `task_cfg.lua` area-event task links are now bridged to the
   75 parsed `areaevent_cfg.lua` combat stage rows in recovered order. The
   server exposes them as type-28 task records, keeps both task/event/stage IDs

@@ -143,6 +143,7 @@ from mhatsh_server.skill_info_structured_terms import (
 )
 from mhatsh_server.task_cfg_hints import (
     RECOVERED_ACT_MARKERS,
+    RECOVERED_ACT_TASKS,
     RECOVERED_AREA_EVENT_TASKS,
     RECOVERED_TASK_TEXT_HINTS,
     TASK_CFG_CONSTANT_COUNT,
@@ -183,6 +184,7 @@ from mhatsh_server.stages import (
     stage_candidate_by_key,
 )
 from mhatsh_server.tasks import (
+    RECOVERED_ACT_TASK_RECORDS,
     RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID,
     RECOVERED_AREA_EVENT_TASK_RECORDS,
     RECOVERED_AREA_EVENT_TASK_TYPE,
@@ -1566,11 +1568,14 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
     assert hints["text_hint_count"] == len(RECOVERED_TASK_TEXT_HINTS) == 798
     assert hints["area_event_count"] == len(RECOVERED_AREA_EVENT_TASKS) == 75
     assert hints["act_marker_count"] == len(RECOVERED_ACT_MARKERS) == 21
+    assert hints["act_task_count"] == len(RECOVERED_ACT_TASKS) == 15
     assert hints["area_events"] == RECOVERED_AREA_EVENT_TASKS
     assert hints["act_markers"] == RECOVERED_ACT_MARKERS
+    assert hints["act_tasks"] == RECOVERED_ACT_TASKS
 
     act_by_marker = {item["marker"]: item for item in RECOVERED_ACT_MARKERS}
     assert act_by_marker["act1001"]["task_id"] == 1010
+    assert act_by_marker["act1001"]["task_type"] == 1
     assert act_by_marker["act1001"]["next_text"] == (
         "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f"
     )
@@ -1578,6 +1583,17 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
     assert act_by_marker["act_event3-1"]["previous_text"] == (
         "\u96c4\u82f1\u7684\u9080\u8bf7"
     )
+    act_tasks_by_marker = {item["marker"]: item for item in RECOVERED_ACT_TASKS}
+    assert act_tasks_by_marker["act1001"] == {
+        "constant_index": 258,
+        "marker": "act1001",
+        "task_id": 1010,
+        "task_type": 1,
+        "label": "\u7b49\u7ea7",
+        "objective": "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f",
+    }
+    assert act_tasks_by_marker["act_mission2-1"]["task_type"] == 2
+    assert "act_event1-1" not in act_tasks_by_marker
 
     area_by_id = {
         int(item["event_id"]): item for item in RECOVERED_AREA_EVENT_TASKS
@@ -3808,14 +3824,28 @@ def test_tutorial_state_accumulates_guides_teach_and_base_station() -> None:
 
 def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     state = TaskState()
+    expected_type_one_tasks = [
+        STARTER_TASK.to_protocol(),
+        *[
+            task.to_protocol()
+            for task in RECOVERED_ACT_TASK_RECORDS
+            if task.type == STARTER_TASK.type
+        ],
+    ]
 
     task_info = state.task_info(STARTER_TASK.type)
     assert task_info == {
-        "tasks": [STARTER_TASK.to_protocol()],
+        "tasks": expected_type_one_tasks,
         "finishs": [],
         "IsStart": 1,
         "IsEnd": 1,
     }
+    assert expected_type_one_tasks[1]["Id"] == 1010
+    assert RECOVERED_ACT_TASK_RECORDS[0].label == "\u7b49\u7ea7"
+    assert RECOVERED_ACT_TASK_RECORDS[0].objective == (
+        "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f"
+    )
+    assert RECOVERED_ACT_TASK_RECORDS[0].source_marker == "act1001"
     accept = state.accept(STARTER_TASK.id)
     assert accept["action_type"] == 1
     assert accept["task_info"]["Status"] == TASK_STATUS_ACCEPTED
@@ -5923,8 +5953,16 @@ async def _run_task_requests() -> None:
     decoder = FrameDecoder(RollingXor(0x66778899))
     [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
     assert registry.protocol_names[reply_id] == "c_task_info"
+    expected_type_one_tasks = [
+        STARTER_TASK.to_protocol(),
+        *[
+            task.to_protocol()
+            for task in RECOVERED_ACT_TASK_RECORDS
+            if task.type == STARTER_TASK.type
+        ],
+    ]
     assert codec.decode_message("c_task_info", reply_body) == {
-        "tasks": [STARTER_TASK.to_protocol()],
+        "tasks": expected_type_one_tasks,
         "finishs": [],
         "IsStart": 1,
         "IsEnd": 1,

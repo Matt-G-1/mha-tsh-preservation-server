@@ -10,7 +10,7 @@ from .beginner_quest import (
     STARTER_TASK_TYPE,
 )
 from .area_event_stages import AREA_EVENT_STAGES
-from .task_cfg_hints import RECOVERED_AREA_EVENT_TASKS
+from .task_cfg_hints import RECOVERED_ACT_TASKS, RECOVERED_AREA_EVENT_TASKS
 
 
 TASK_STATUS_AVAILABLE = 1
@@ -52,6 +52,7 @@ class TaskRecord:
     source_event_id: int = 0
     source_stage_id: int = 0
     source_relate_stage_id: int = 0
+    source_marker: str = ""
 
     def to_protocol(self) -> dict[str, object]:
         return {
@@ -74,6 +75,7 @@ class TaskRecord:
             source_event_id=self.source_event_id,
             source_stage_id=self.source_stage_id,
             source_relate_stage_id=self.source_relate_stage_id,
+            source_marker=self.source_marker,
         )
 
 
@@ -85,6 +87,7 @@ class TaskState:
                 task.id: task.clone()
                 for task in RECOVERED_AREA_EVENT_TASKS_BY_ID.values()
             },
+            **{task.id: task.clone() for task in RECOVERED_ACT_TASKS_BY_ID.values()},
         }
         self.finished: set[int] = set()
         self.spawned_task_npcs: set[int] = set()
@@ -275,10 +278,37 @@ RECOVERED_AREA_EVENT_TASK_ORDER = {
 }
 
 
+def _recovered_act_task_records() -> tuple[TaskRecord, ...]:
+    records: list[TaskRecord] = []
+    for task_hint in RECOVERED_ACT_TASKS:
+        records.append(
+            TaskRecord(
+                id=int(task_hint["task_id"]),
+                type=int(task_hint["task_type"]),
+                status=TASK_STATUS_AVAILABLE,
+                conditions=(),
+                label=str(task_hint["label"]),
+                objective=str(task_hint["objective"]),
+                source_marker=str(task_hint["marker"]),
+            )
+        )
+    return tuple(records)
+
+
+RECOVERED_ACT_TASK_RECORDS = _recovered_act_task_records()
+RECOVERED_ACT_TASKS_BY_ID = {task.id: task for task in RECOVERED_ACT_TASK_RECORDS}
+RECOVERED_ACT_TASK_ORDER = {
+    task.id: index for index, task in enumerate(RECOVERED_ACT_TASK_RECORDS)
+}
+
+
 def _task_sort_key(task: TaskRecord) -> tuple[int, int]:
     if task.id == STARTER_TASK.id:
         return (0, task.id)
+    act_task_order = RECOVERED_ACT_TASK_ORDER.get(task.id)
+    if act_task_order is not None:
+        return (1, act_task_order)
     area_event_order = RECOVERED_AREA_EVENT_TASK_ORDER.get(task.id)
     if area_event_order is not None:
-        return (1, area_event_order)
-    return (2, task.id)
+        return (2, area_event_order)
+    return (3, task.id)

@@ -192,6 +192,14 @@ def _text_after(constants: list[object], index: int) -> str:
     return ""
 
 
+def _task_type_from_task_id(task_id: int) -> int:
+    if task_id >= 100000:
+        return task_id // 100000
+    if task_id >= 1000:
+        return task_id // 1000
+    return 0
+
+
 def collect_task_cfg_hints(
     task_cfg_asset: Path = DEFAULT_TASK_CFG_ASSET,
 ) -> dict[str, object]:
@@ -238,15 +246,38 @@ def collect_task_cfg_hints(
     act_markers: list[dict[str, object]] = []
     for index, value in enumerate(constants):
         if isinstance(value, str) and value.startswith("act"):
+            task_id = _nearest_task_id(constants, index)
             act_markers.append(
                 {
                     "constant_index": index,
                     "marker": value,
-                    "task_id": _nearest_task_id(constants, index),
+                    "task_id": task_id,
+                    "task_type": _task_type_from_task_id(task_id),
                     "previous_text": _text_before(constants, index),
                     "next_text": _text_after(constants, index),
                 }
             )
+
+    act_tasks: list[dict[str, object]] = []
+    seen_act_task_ids: set[int] = set()
+    for item in act_markers:
+        task_id = int(item["task_id"])
+        marker = str(item["marker"])
+        if task_id <= 0 or marker.startswith("act_event"):
+            continue
+        if task_id in seen_act_task_ids:
+            continue
+        seen_act_task_ids.add(task_id)
+        act_tasks.append(
+            {
+                "constant_index": int(item["constant_index"]),
+                "marker": marker,
+                "task_id": task_id,
+                "task_type": int(item["task_type"]),
+                "label": str(item["previous_text"]),
+                "objective": str(item["next_text"]),
+            }
+        )
 
     return {
         "source": TASK_CFG_SOURCE,
@@ -254,9 +285,11 @@ def collect_task_cfg_hints(
         "text_hint_count": len(text_hints),
         "area_event_count": len(area_events),
         "act_marker_count": len(act_markers),
+        "act_task_count": len(act_tasks),
         "text_hints": text_hints,
         "area_events": area_events,
         "act_markers": act_markers,
+        "act_tasks": act_tasks,
     }
 
 
@@ -264,6 +297,7 @@ def _emit_python_module(payload: dict[str, object]) -> str:
     text_hints = payload["text_hints"]
     area_events = payload["area_events"]
     act_markers = payload["act_markers"]
+    act_tasks = payload["act_tasks"]
     return (
         "from __future__ import annotations\n\n"
         "TASK_CFG_HINT_SOURCE = "
@@ -280,6 +314,9 @@ def _emit_python_module(payload: dict[str, object]) -> str:
         + "\n\n"
         "RECOVERED_ACT_MARKERS = "
         + pformat(act_markers, width=96, sort_dicts=False)
+        + "\n\n"
+        "RECOVERED_ACT_TASKS = "
+        + pformat(act_tasks, width=96, sort_dicts=False)
         + "\n"
     )
 
