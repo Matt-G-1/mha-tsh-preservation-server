@@ -4337,6 +4337,22 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         100602,
         100701,
     ]
+    act_auto_state = TaskState()
+    act_auto_state.skip_starter_quest()
+    assert act_auto_state.complete_active_act_task(100902) is None
+    act_auto_update = act_auto_state.complete_active_act_task(1010)
+    assert act_auto_update is not None
+    assert act_auto_update["task_info"]["Id"] == 1010
+    assert act_auto_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert 1010 in act_auto_state.finished
+    assert act_auto_state.complete_active_act_task(1010) is None
+    late_act_state = TaskState()
+    late_act_state.skip_starter_quest()
+    late_act_state.seed_finished_tasks([281203])
+    late_act_update = late_act_state.complete_active_act_task(201103)
+    assert late_act_update is not None
+    assert late_act_update["task_info"]["Id"] == 201103
+    assert 201103 in late_act_state.finished
     raw_param_state = TaskState()
     raw_param_state.skip_starter_quest()
     raw_param_state.complete_area_event_stage(21111)
@@ -8935,6 +8951,32 @@ async def _run_world_map_task_requests() -> None:
         "RandomReward": [],
         "RandomItem": 0,
     }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x11335578)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_world_task_auto_finish"],
+        codec.encode_message("s_world_task_auto_finish", {"TaskId": 1010}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x11335578))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_world_task_auto_finish",
+        "c_task_info_update",
+        "c_task_info",
+    ]
+    assert codec.decode_message("c_world_task_auto_finish", replies[0][1]) == {
+        "IsSuccess": 1
+    }
+    auto_finished = codec.decode_message("c_task_info_update", replies[1][1])
+    assert auto_finished["task_info"]["Id"] == 1010
+    assert auto_finished["task_info"]["Status"] == TASK_STATUS_FINISHED
+    refreshed_tasks = codec.decode_message("c_task_info", replies[2][1])
+    assert 1010 in refreshed_tasks["finishs"]
+    assert refreshed_tasks["tasks"][1]["Id"] == 1010
+    assert refreshed_tasks["tasks"][2]["Id"] == 280101
 
 
 def test_activity_and_side_task_requests_receive_empty_state_replies() -> None:

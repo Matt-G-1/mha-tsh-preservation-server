@@ -526,14 +526,16 @@ class GameServer:
                 ),
             )
         elif name == "s_world_task_auto_finish":
+            task_id = int(values.get("TaskId") or 0)
             await self._send(
                 writer,
                 session,
                 "c_world_task_auto_finish",
-                session.world_tasks.auto_finish_response(
-                    int(values.get("TaskId") or 0)
-                ),
+                session.world_tasks.auto_finish_response(task_id),
             )
+            task_update = session.tasks.complete_active_act_task(task_id)
+            if task_update is not None:
+                await self._send_task_progression(writer, session, task_update)
         elif name == "s_world_task_pick_prestige":
             await self._send(
                 writer,

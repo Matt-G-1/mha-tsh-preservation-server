@@ -310,6 +310,17 @@ class TaskState:
         self._finish(task)
         return self.task_update(task, action_type=2)
 
+    def complete_active_act_task(self, task_id: int) -> dict[str, object] | None:
+        task = self.tasks.get(int(task_id))
+        if task is None or task.id in self.finished:
+            return None
+        if task.source_kind != "act" or task.quest_order <= 0:
+            return None
+        if not self._is_visible(task):
+            return None
+        self._finish(task)
+        return self.task_update(task, action_type=2)
+
     def complete_auto_act_gates(self) -> list[dict[str, object]]:
         updates: list[dict[str, object]] = []
         while True:
