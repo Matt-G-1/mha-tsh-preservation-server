@@ -27,6 +27,7 @@ from .characters import (
 from .combat import fight_style_for_character
 from .profile_store import ProfileStore
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
+from .roguelike_stages import ROGUELIKE_STAGES
 from .roster import RosterState
 from .schema import SchemaRegistry
 from .stages import (
@@ -927,6 +928,61 @@ class GameServer:
                 "c_area_event_info",
                 session.stage.area_event_info(stage_id),
             )
+        elif name in {
+            "s_campaign_fight",
+            "s_new_hero_fight",
+            "s_secret_target_stage",
+            "s_relax_stage_choose",
+        }:
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("StageId") or values.get("stageId") or 0),
+                card_uid=int(values.get("HeroUid") or 0),
+            )
+        elif name == "s_pressure_hero_fight":
+            hero_uid = int(values.get("HeroUid") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_pressure_hero_fight",
+                {"HeroUid": hero_uid},
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("StageId") or 0),
+                card_uid=hero_uid,
+            )
+        elif name == "s_night_fight_enter_stage":
+            stage_id = int(values.get("StageId") or 0)
+            lineup = [int(item) for item in list(values.get("Lineup") or [])]
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_cache_stage_id",
+                {"CacheStageId": stage_id},
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                stage_id,
+                card_uid=lineup[0] if lineup else 0,
+            )
+        elif name == "s_rogue_endless_fight":
+            hero_index = int(values.get("HeroIndex") or 0)
+            rogue_index = int(values.get("Index") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_rogue_endless_fight",
+                {"HeroIndex": hero_index, "Index": rogue_index},
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                self._rogue_endless_stage_id(rogue_index),
+            )
         elif name == "s_area_event_fight_over":
             stage_id = int(values.get("StageId") or session.stage.current_stage_id or 0)
             stage_pass = session.stage.record_area_event_fight_over(
@@ -1736,6 +1792,16 @@ class GameServer:
             time_limit=self.intro_stage_time,
             drama=self.intro_stage_drama,
         )
+
+    @staticmethod
+    def _rogue_endless_stage_id(index: int) -> int:
+        stages = tuple(sorted(ROGUELIKE_STAGES, key=lambda stage: stage.display_order))
+        if index > 0:
+            for stage in stages:
+                if stage.display_order == index or stage.constant_index == index:
+                    return stage.stage_id
+        endless = tuple(stage for stage in stages if stage.mode == "endless")
+        return (endless or stages)[0].stage_id
 
     async def _maybe_send_starter_intro_stage(
         self, writer: asyncio.StreamWriter, session: Session, trigger: str

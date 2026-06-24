@@ -5487,6 +5487,166 @@ async def _run_requested_stage_enter_packets() -> None:
     assert session.roster.active_card_uid == STARTER_CARD_UID + 1
 
     writer.data.clear()
+    session.outbound = RollingXor(0x55112237)
+    campaign = codec.encode_message(
+        "s_campaign_fight",
+        {"StageId": 160001, "HeroUid": STARTER_CARD_UID, "Field": 0, "AreaId": 0},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_campaign_fight"],
+        campaign,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112237))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 160001
+    assert codec.decode_message("c_frame_fighter_data", replies[1][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID
+    assert session.stage.current_stage_key == "main_stage_160001"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112238)
+    secret = codec.encode_message("s_secret_target_stage", {"stageId": 299301})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_secret_target_stage"],
+        secret,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112238))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 299301
+    assert session.stage.current_stage_key == "starter_intro_299301"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x5511223C)
+    new_hero = codec.encode_message(
+        "s_new_hero_fight",
+        {"StageId": 400101, "ActId": 0},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_new_hero_fight"],
+        new_hero,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5511223C))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 400101
+    assert session.stage.current_stage_key == "roguelike_stage_400101"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x5511223D)
+    relax = codec.encode_message("s_relax_stage_choose", {"StageId": 502601})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_relax_stage_choose"],
+        relax,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5511223D))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 502601
+    assert session.stage.current_stage_key == "all_might_stage_502601"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112239)
+    pressure_hero = codec.encode_message(
+        "s_pressure_hero_fight",
+        {"StageId": 777778, "HeroUid": STARTER_CARD_UID},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_pressure_hero_fight"],
+        pressure_hero,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112239))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_pressure_hero_fight",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_pressure_hero_fight", replies[0][1]) == {
+        "HeroUid": STARTER_CARD_UID
+    }
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 777778
+    assert codec.decode_message("c_frame_fighter_data", replies[2][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x5511223A)
+    night = codec.encode_message(
+        "s_night_fight_enter_stage",
+        {"StageId": 160001, "Lineup": [STARTER_CARD_UID + 2]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_night_fight_enter_stage"],
+        night,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5511223A))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_night_fight_cache_stage_id",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_night_fight_cache_stage_id", replies[0][1]) == {
+        "CacheStageId": 160001
+    }
+    assert codec.decode_message("c_frame_fighter_data", replies[2][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID + 2
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x5511223B)
+    rogue = codec.encode_message(
+        "s_rogue_endless_fight",
+        {"HeroIndex": 1, "Index": 24},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_rogue_endless_fight"],
+        rogue,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x5511223B))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_rogue_endless_fight",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_rogue_endless_fight", replies[0][1]) == {
+        "HeroIndex": 1,
+        "Index": 24,
+    }
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 400119
+    assert session.stage.current_stage_key == "roguelike_stage_400119"
+
+    writer.data.clear()
     session.outbound = RollingXor(0x55112236)
     area_over = codec.encode_message(
         "s_area_event_fight_over",
