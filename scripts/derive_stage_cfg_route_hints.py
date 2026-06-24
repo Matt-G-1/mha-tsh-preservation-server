@@ -22,8 +22,8 @@ DEFAULT_STAGE_CFG_ASSET = (
 )
 
 LUA_HEADER = b"\x1bLua"
-NUMBER_TAGS = {3, 0x42}
-STRING_TAGS = {4, 0x37}
+NUMBER_TAGS = {3, 0x42, 0x63}
+STRING_TAGS = {4, 0x37, 0x52}
 STAGE_REF_RE = re.compile(r"^stage(\d{3,6})(?:[a-z]|_\d+|_[a-z]+)?$")
 CONTROL_LABELS = {
     "EndDrama",

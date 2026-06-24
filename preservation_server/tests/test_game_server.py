@@ -14,6 +14,13 @@ from mhatsh_server.area_event_stages import (
     AREA_EVENT_STAGES,
     AREA_EVENT_STAGE_SOURCE,
 )
+from mhatsh_server.act_daily_stages import (
+    ACT_DAILY_MONSTER_IDS,
+    ACT_DAILY_STAGE_BY_ID,
+    ACT_DAILY_STAGE_SOURCE,
+    ACT_DAILY_STAGES,
+    ACT_DAILY_TOTAL_LIMIT,
+)
 from mhatsh_server.beginner_quest import (
     BEGINNER_QUEST_DEATH_ARMS_UID,
     STARTER_MAP_GUIDE_ID,
@@ -176,6 +183,18 @@ def _load_area_event_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_area_event_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_area_event_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_act_daily_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_act_daily_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_act_daily_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -417,8 +436,8 @@ def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> Non
 
 def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "battle_stage_candidate_catalog" in STAGE_CATALOG_SOURCE
-    assert len(RECOVERED_BATTLE_STAGES) >= 260
-    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 145
+    assert len(RECOVERED_BATTLE_STAGES) >= 300
+    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 295
     stage_ids = [
         stage.stage_id for stage in RECOVERED_BATTLE_STAGES if stage.stage_id is not None
     ]
@@ -449,6 +468,18 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         "generated_fallback"
     )
     assert stage_candidate_by_id(211461).label == "14-6林中小路"
+
+    act_daily_stage = stage_candidate_by_id(880004)
+    assert act_daily_stage.key == "act_daily_stage_880004"
+    assert act_daily_stage.label == "爆豪胜己"
+    assert act_daily_stage.source == ACT_DAILY_STAGE_SOURCE
+    assert act_daily_stage.enemy_group_ids == ACT_DAILY_MONSTER_IDS
+    assert [spawn.enemy_id for spawn in act_daily_stage.encounter_spawns] == [
+        2202,
+        2472,
+        3007,
+    ]
+    assert stage_candidate_by_id(882008).label == "snowman_daily_challenge 882008"
 
     starter = stage_candidate_by_id(STARTER_INTRO_STAGE_ID)
     assert starter.key == "starter_intro_299301"
@@ -902,6 +933,37 @@ def test_area_event_stage_hint_parser_tracks_progression_rows() -> None:
     assert generated_rows[211461]["description"] == (
         AREA_EVENT_STAGE_BY_ID[211461].description
     )
+
+
+def test_act_daily_stage_hint_parser_tracks_activity_stage_rows() -> None:
+    module = _load_act_daily_stage_hint_script()
+    hints = module.collect_act_daily_stage_hints(
+        ROOT / module.DEFAULT_ACT_DAILY_STAGE_ASSET
+    )
+
+    assert hints["constant_count"] == 191
+    assert hints["stage_count"] == 34
+    assert hints["total_limit"] == 65
+    assert ACT_DAILY_STAGE_SOURCE == hints["source"]
+    assert ACT_DAILY_TOTAL_LIMIT == hints["total_limit"]
+    assert len(ACT_DAILY_STAGES) == hints["stage_count"]
+    assert ACT_DAILY_STAGES[0].stage_id == 860001
+    assert ACT_DAILY_STAGES[0].section == "daily_stage"
+    assert ACT_DAILY_STAGE_BY_ID[880004].name == "爆豪胜己"
+    assert ACT_DAILY_STAGE_BY_ID[880004].member_ids == (1046,)
+    assert ACT_DAILY_STAGE_BY_ID[890001].member_shape_ids == (37002,)
+    assert ACT_DAILY_STAGES[-1].stage_id == 882008
+    assert ACT_DAILY_STAGES[-1].sub_id == 0
+    assert ACT_DAILY_MONSTER_IDS[:6] == (2005, 2051, 3003, 2206, 2044, 3007)
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[880004]["name"] == ACT_DAILY_STAGE_BY_ID[880004].name
+    assert generated_rows[882008]["sub_id"] == 0
+    assert hints["monsters"][0]["monster_id"] == 2005
 
 
 def test_stage_cfg_encounter_hint_parser_tracks_stage_enemy_groups() -> None:
