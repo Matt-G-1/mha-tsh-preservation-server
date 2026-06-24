@@ -149,6 +149,7 @@ from mhatsh_server.stages import (
     LOCAL_STAGE_PASS_REWARD_ITEM_ID,
     LOCAL_STAGE_STYLE_REWARD_ITEM_ID,
     MONSTER_CFG_EVIDENCE_BY_ID,
+    PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS,
     STARTER_INTRO_STAGE_DRAMA,
     STARTER_INTRO_STAGE_ID,
     STARTER_INTRO_STAGE_LEVEL,
@@ -226,6 +227,18 @@ def _load_index_numeric_drama_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_index_numeric_drama_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_index_numeric_drama_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_prefixed_numeric_drama_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_prefixed_numeric_drama_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_prefixed_numeric_drama_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -622,13 +635,30 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     area_event_stage = stage_candidate_by_id(21111)
     assert area_event_stage.key == "area_event_stage_21111"
     assert area_event_stage.label == "1-1首次出击"
-    assert area_event_stage.scripts == ("area1_1",)
+    assert area_event_stage.scripts == (
+        "area1_1",
+        "area1_1_1start",
+        "area1_1_2boss",
+        "area1_1_1end",
+    )
     assert area_event_stage.source == AREA_EVENT_STAGE_SOURCE
     assert [spawn.enemy_id for spawn in area_event_stage.encounter_spawns] == [2005]
     assert area_event_stage.encounter_spawns[0].placement_source == (
         "generated_fallback"
     )
     assert stage_candidate_by_id(211461).label == "14-6林中小路"
+    assert stage_candidate_by_id(211461).scripts == ("area14_6",)
+    assert stage_candidate_by_id(21511).scripts == (
+        "area5_1",
+        "area5_1_1",
+        "area5_1_3",
+        "area5_1_6",
+    )
+    assert stage_candidate_by_id(21921).scripts == (
+        "area9_2_start",
+        "area9_2_boss",
+        "area9_2_end",
+    )
 
     act_daily_stage = stage_candidate_by_id(880004)
     assert act_daily_stage.key == "act_daily_stage_880004"
@@ -779,6 +809,29 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
         "nomu_brute",
     ]
     assert stage_candidate_by_id(36050101).scripts == ("36050101", "36050101b")
+    assert stage_candidate_by_id(350010).key == "asset_drama_stage_350010"
+    assert stage_candidate_by_id(350010).scripts == ("350010", "350010_end")
+    assert stage_candidate_by_id(562502).key == "index_numeric_drama_stage_562502"
+    assert "562502_boss_dead" in stage_candidate_by_id(562502).scripts
+    assert "562502_nil_end" in stage_candidate_by_id(562502).scripts
+    assert len(stage_candidate_by_id(562502).scripts) == 42
+    prefixed_stage = stage_candidate_by_id(401001)
+    assert prefixed_stage.key == "prefixed_numeric_drama_stage_401001"
+    assert prefixed_stage.scripts == (
+        "fzx_401001_01",
+        "fzx_401001_02",
+        "fzx_401001_03",
+        "fzx_401001_04",
+        "fzx_401001_05",
+    )
+    assert stage_candidate_by_id(801203).scripts == (
+        "tc_801203_1",
+        "tc_801203_2",
+        "tc_801203_3",
+    )
+    assert stage_candidate_by_id(603301).key == "prefixed_numeric_drama_stage_603301"
+    assert stage_candidate_by_id(301202).key == "zx_stage_301202"
+    assert stage_candidate_by_id(702301).key == "usj_stage_702301"
     assert [spawn.ai_profile_key for spawn in relax_stage.encounter_spawns] == [
         "melee_chaser",
         "training_enemy",
@@ -1133,7 +1186,7 @@ def test_index_numeric_drama_stage_parser_tracks_additional_stage_groups() -> No
         for stage in hints["stages"]
         if isinstance(stage, dict)
     }
-    assert hints["stage_count"] == 139
+    assert hints["stage_count"] == 141
     assert generated_rows[1015023]["scripts"] == [
         "1015023",
         "1015023-1",
@@ -1142,6 +1195,16 @@ def test_index_numeric_drama_stage_parser_tracks_additional_stage_groups() -> No
         "1015023-4",
     ]
     assert generated_rows[36050101]["scripts"] == ["36050101", "36050101b"]
+    assert generated_rows[350010]["scripts"] == [
+        "350010",
+        "350010_1_fail",
+        "350010_1_retry",
+        "350010_1_suc",
+        "350010_end",
+    ]
+    assert "562502_boss_dead" in generated_rows[562502]["scripts"]
+    assert "562502_nil_end" in generated_rows[562502]["scripts"]
+    assert len(generated_rows[562502]["scripts"]) == 42
     assert generated_rows[90100703]["scripts"] == ["90100703"]
     assert INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS[1015023] == (
         "1015023",
@@ -1150,6 +1213,46 @@ def test_index_numeric_drama_stage_parser_tracks_additional_stage_groups() -> No
         "1015023-3",
         "1015023-4",
     )
+    assert INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS[350010] == (
+        "350010",
+        "350010_1_fail",
+        "350010_1_retry",
+        "350010_1_suc",
+        "350010_end",
+    )
+    assert len(INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS[562502]) == 42
+
+
+def test_prefixed_numeric_drama_stage_parser_tracks_prefixed_stage_groups() -> None:
+    module = _load_prefixed_numeric_drama_stage_hint_script()
+    hints = module.collect_prefixed_numeric_drama_stage_hints(
+        ROOT / module.DEFAULT_DRAMA_INDEX
+    )
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert hints["stage_count"] == 28
+    assert generated_rows[401001]["scripts"] == [
+        "fzx_401001_01",
+        "fzx_401001_02",
+        "fzx_401001_03",
+        "fzx_401001_04",
+        "fzx_401001_05",
+    ]
+    assert generated_rows[801203]["scripts"] == [
+        "tc_801203_1",
+        "tc_801203_2",
+        "tc_801203_3",
+    ]
+    assert generated_rows[603301]["scripts"] == ["xht_603301_1"]
+    assert PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS[1001101] == (
+        "tc_1001101_1",
+    )
+    assert 301202 not in PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS
+    assert 702301 not in PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS
 
 
 def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
@@ -1196,11 +1299,25 @@ def test_area_event_stage_hint_parser_tracks_progression_rows() -> None:
     assert AREA_EVENT_STAGES[0].name == "1-1首次出击"
     assert AREA_EVENT_STAGES[0].area_name == "旧城区"
     assert AREA_EVENT_STAGES[0].open_drama == "area1_1"
+    assert AREA_EVENT_STAGES[0].scripts == (
+        "area1_1",
+        "area1_1_1start",
+        "area1_1_2boss",
+        "area1_1_1end",
+    )
     assert AREA_EVENT_STAGES[0].next_stage_id == 21121
     assert AREA_EVENT_STAGE_BY_ID[21121].previous_stage_id == 21111
     assert AREA_EVENT_STAGE_BY_ID[21761].name == "7-6车站治安"
+    assert AREA_EVENT_STAGE_BY_ID[21431].open_drama == ""
+    assert AREA_EVENT_STAGE_BY_ID[21431].scripts == ("area4_3",)
+    assert AREA_EVENT_STAGE_BY_ID[21921].scripts == (
+        "area9_2_start",
+        "area9_2_boss",
+        "area9_2_end",
+    )
     assert AREA_EVENT_STAGE_BY_ID[21761].reward_tips_item_id == 1013204
     assert AREA_EVENT_STAGES[-1].stage_id == 211461
+    assert AREA_EVENT_STAGES[-1].scripts == ("area14_6",)
     assert AREA_EVENT_STAGES[-1].next_stage_id == 0
 
     generated_rows = {
@@ -1209,9 +1326,11 @@ def test_area_event_stage_hint_parser_tracks_progression_rows() -> None:
         if isinstance(stage, dict)
     }
     assert generated_rows[21111]["name"] == AREA_EVENT_STAGE_BY_ID[21111].name
+    assert generated_rows[21111]["scripts"] == AREA_EVENT_STAGE_BY_ID[21111].scripts
     assert generated_rows[211461]["description"] == (
         AREA_EVENT_STAGE_BY_ID[211461].description
     )
+    assert generated_rows[211461]["scripts"] == AREA_EVENT_STAGE_BY_ID[211461].scripts
 
 
 def test_act_daily_stage_hint_parser_tracks_activity_stage_rows() -> None:

@@ -542,6 +542,16 @@ environment details are intentionally omitted from Git.
   `1015023`, `36050101`, `56110901`, and `90100703`, keeping the recovered
   local script names while using generated encounters until enemy placement
   data is recovered.
+- Area-event stage recovery now cross-links the 75 parsed `areaevent_cfg.lua`
+  progression rows with the extracted drama-script index. The runtime stage
+  catalog now preserves chapter/step local hooks such as `area1_1_1start`,
+  boss/end scripts, blank-open stages like `21431`, and late chapter hooks such
+  as `area14_6` instead of exposing only the first `OpenDrama`.
+- Prefixed numeric drama-stage recovery now promotes 23 additional unowned
+  `xht_*`, `tc_*`, and `fzx_*` stage groups, including `401001`, `603301`,
+  `801203`, and `1001101`, while preserving stronger `zx`, asset-header,
+  stage-cfg, and USJ ownership for conflicting IDs. The numeric index parser
+  also now captures the 42-script `562502` stage branch.
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.

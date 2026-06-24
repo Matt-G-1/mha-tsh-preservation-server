@@ -890,6 +890,13 @@ INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS: dict[int, tuple[str, ...]] = {
     1015023: ("1015023", "1015023-1", "1015023-2", "1015023-3", "1015023-4"),
     1015024: ("1015024",),
     9010031: ("9010031",),
+    350010: (
+        "350010",
+        "350010_1_fail",
+        "350010_1_retry",
+        "350010_1_suc",
+        "350010_end",
+    ),
     36020104: ("36020104",),
     36020204: ("36020204",),
     36020303: ("36020303",),
@@ -916,6 +923,50 @@ INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS: dict[int, tuple[str, ...]] = {
     56110701: ("56110701",),
     56110801: ("56110801",),
     56110901: ("56110901", "56110901_2"),
+    562502: (
+        "562502_01a",
+        "562502_01b",
+        "562502_0a",
+        "562502_0b",
+        "562502_1a",
+        "562502_1b",
+        "562502_2a",
+        "562502_2b",
+        "562502_3a",
+        "562502_3b",
+        "562502_4a",
+        "562502_4b",
+        "562502_5a",
+        "562502_5b",
+        "562502_6a",
+        "562502_6b",
+        "562502_7a",
+        "562502_7b",
+        "562502_8a",
+        "562502_8b",
+        "562502_boss_dead",
+        "562502_nil_10a",
+        "562502_nil_10b",
+        "562502_nil_1a",
+        "562502_nil_1b",
+        "562502_nil_2a",
+        "562502_nil_2b",
+        "562502_nil_3a",
+        "562502_nil_3b",
+        "562502_nil_4a",
+        "562502_nil_4b",
+        "562502_nil_5a",
+        "562502_nil_5b",
+        "562502_nil_6a",
+        "562502_nil_6b",
+        "562502_nil_7a",
+        "562502_nil_7b",
+        "562502_nil_8a",
+        "562502_nil_8b",
+        "562502_nil_9a",
+        "562502_nil_9b",
+        "562502_nil_end",
+    ),
     90100501: ("90100501",),
     90100502: ("90100502",),
     90100601: ("90100601",),
@@ -923,6 +974,39 @@ INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS: dict[int, tuple[str, ...]] = {
     90100701: ("90100701",),
     90100702: ("90100702",),
     90100703: ("90100703",),
+}
+
+
+PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS: dict[int, tuple[str, ...]] = {
+    102301: ("xht_102301_1",),
+    103301: ("xht_103301_1",),
+    202101: ("tc_202101_1",),
+    202301: ("xht_202301_1",),
+    203301: ("xht_203301_1",),
+    302301: ("xht_302301_1",),
+    303301: ("xht_303301_1",),
+    401001: (
+        "fzx_401001_01",
+        "fzx_401001_02",
+        "fzx_401001_03",
+        "fzx_401001_04",
+        "fzx_401001_05",
+    ),
+    401003: ("fzx_401003_01",),
+    402103: ("fzx_402103_01",),
+    402301: ("xht_402301_1",),
+    502301: ("xht_502301_1",),
+    503301: ("xht_503301_1",),
+    601004: ("fzx_601004_01",),
+    602301: ("xht_602301_1",),
+    603103: ("fzx_603103_01",),
+    603301: ("xht_603301_1",),
+    801203: ("tc_801203_1", "tc_801203_2", "tc_801203_3"),
+    802301: ("xht_802301_1",),
+    803301: ("xht_803301_1",),
+    902301: ("xht_902301_1",),
+    903301: ("xht_903301_1",),
+    1001101: ("tc_1001101_1",),
 }
 
 
@@ -2227,6 +2311,32 @@ def _stage_cfg_script_route_definitions() -> tuple[BattleStageDefinition, ...]:
     )
 
 
+def _prefixed_numeric_drama_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | set(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+        | set(INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+        | set(STAGE_CFG_SCRIPT_ROUTE_GROUPS)
+    )
+    return tuple(
+        BattleStageDefinition(
+            key=f"prefixed_numeric_drama_stage_{stage_id}",
+            label=f"prefixed numeric drama stage {stage_id}",
+            stage_id=stage_id,
+            scripts=scripts,
+            source=(
+                "parsed from prefixed drama script names in "
+                "analysis/intro_qte_asset_index.txt, 2026-06-24"
+            ),
+        )
+        for stage_id, scripts in sorted(
+            PREFIXED_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS.items()
+        )
+        if stage_id not in occupied_ids
+    )
+
+
 def _area_event_stage_definitions() -> tuple[BattleStageDefinition, ...]:
     occupied_ids = (
         EXPLICIT_RECOVERED_STAGE_IDS
@@ -2239,7 +2349,7 @@ def _area_event_stage_definitions() -> tuple[BattleStageDefinition, ...]:
             key=f"area_event_stage_{stage.stage_id}",
             label=stage.name,
             stage_id=stage.stage_id,
-            scripts=(stage.open_drama,) if stage.open_drama else (),
+            scripts=stage.scripts,
             source=AREA_EVENT_STAGE_SOURCE,
         )
         for stage in AREA_EVENT_STAGES
@@ -2678,6 +2788,7 @@ RECOVERED_BATTLE_STAGES = (
     *_asset_numeric_drama_stage_definitions(),
     *_index_numeric_drama_stage_definitions(),
     *_stage_cfg_script_route_definitions(),
+    *_prefixed_numeric_drama_stage_definitions(),
     *_area_event_stage_definitions(),
     *_act_daily_stage_definitions(),
     *_usj_stage_definitions(),

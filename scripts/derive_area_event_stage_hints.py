@@ -19,6 +19,7 @@ DEFAULT_AREA_EVENT_ASSET = (
     / "0QIU"
     / "7b71e951b327b200"
 )
+DEFAULT_DRAMA_INDEX = Path("analysis") / "intro_qte_asset_index.txt"
 AREA_EVENT_SOURCE = (
     "analysis/mediafire_20260620/apk_extract/assets/0QIU/7b71e951b327b200, "
     "./script/setting/stage/areaevent_cfg.lua, parsed 2026-06-23"
@@ -26,6 +27,8 @@ AREA_EVENT_SOURCE = (
 
 AREA_STAGE_NAME_RE = re.compile(r"^(?P<chapter>\d+)-(?P<step>\d+)")
 AREA_SCRIPT_RE = re.compile(r"^area[\w-]+(?:_start)?$")
+DRAMA_INDEX_SCRIPT_RE = re.compile(r"\./script/setting/dramas/([^\s'\"\]]+)\.lua")
+AREA_INDEX_SCRIPT_RE = re.compile(r"^area[`_-]?(?P<chapter>\d+)[_-](?P<step>\d+)")
 
 
 def _as_int(value: object) -> int | None:
@@ -87,10 +90,74 @@ def _area_name_before_stage(values: list[object], area_image: str) -> str:
     return ""
 
 
+def _natural_script_key(value: str) -> tuple[object, ...]:
+    return tuple(
+        int(part) if part.isdigit() else part for part in re.split(r"(\d+)", value)
+    )
+
+
+def _area_script_flow_key(value: str) -> tuple[object, ...]:
+    lower = value.lower()
+    if "start" in lower:
+        phase = 1
+    elif "boss" in lower:
+        phase = 3
+    elif "end" in lower:
+        phase = 4
+    else:
+        phase = 2
+    return (phase, *_natural_script_key(value))
+
+
+def _sorted_area_scripts(
+    key: tuple[int, int],
+    scripts: list[str],
+) -> tuple[str, ...]:
+    chapter, step = key
+    base_names = {
+        f"area{chapter}_{step}",
+        f"area{chapter}-{step}",
+        f"area_{chapter}_{step}",
+        f"area`_{chapter}_{step}",
+    }
+
+    def sort_key(value: str) -> tuple[object, ...]:
+        if value in base_names:
+            return (0, *_natural_script_key(value))
+        return (1, *_area_script_flow_key(value))
+
+    return tuple(sorted(scripts, key=sort_key))
+
+
+def _area_event_scripts_by_chapter_step(
+    drama_index: Path = DEFAULT_DRAMA_INDEX,
+) -> dict[tuple[int, int], tuple[str, ...]]:
+    if not drama_index.exists():
+        return {}
+    text = drama_index.read_text(encoding="utf-8", errors="ignore")
+    groups: dict[tuple[int, int], list[str]] = {}
+    for match in DRAMA_INDEX_SCRIPT_RE.finditer(text):
+        script = match.group(1)
+        area_match = AREA_INDEX_SCRIPT_RE.match(script)
+        if area_match is None:
+            continue
+        chapter = int(area_match.group("chapter"))
+        step = int(area_match.group("step"))
+        group = groups.setdefault((chapter, step), [])
+        if script not in group:
+            group.append(script)
+    return {
+        key: _sorted_area_scripts(key, scripts)
+        for key, scripts in sorted(groups.items())
+    }
+
+
 def collect_area_event_stage_hints(
     area_event_asset: Path = DEFAULT_AREA_EVENT_ASSET,
+    drama_index: Path = DEFAULT_DRAMA_INDEX,
 ) -> dict[str, object]:
     constants = _RootConstantReader(area_event_asset.read_bytes()).root_constants()
+    script_groups = _area_event_scripts_by_chapter_step(drama_index)
     name_positions: list[tuple[int, str, int, int]] = []
     for index, value in enumerate(constants):
         if not isinstance(value, str):
@@ -124,6 +191,9 @@ def collect_area_event_stage_hints(
             window, lambda value: value.startswith("区域事件H_区域图片_area")
         )
         open_drama = _last_string(window, lambda value: AREA_SCRIPT_RE.match(value))
+        scripts = script_groups.get((chapter, step), ())
+        if open_drama and open_drama not in scripts:
+            scripts = (open_drama, *scripts)
         stages.append(
             {
                 "stage_id": stage_id,
@@ -136,6 +206,7 @@ def collect_area_event_stage_hints(
                 "area_image": area_image,
                 "area_name": _area_name_before_stage(window, area_image),
                 "open_drama": open_drama,
+                "scripts": scripts,
                 "relate_stage": _last_int(
                     window, lambda value: 290000 <= value <= 299999
                 )
@@ -183,6 +254,7 @@ def _emit_python_module(payload: dict[str, object]) -> str:
                 "area_image",
                 "area_name",
                 "open_drama",
+                "scripts",
                 "relate_stage",
                 "reward_show_id",
                 "reward_tips_item_id",
@@ -212,6 +284,7 @@ def _emit_python_module(payload: dict[str, object]) -> str:
         "    area_image: str\n"
         "    area_name: str\n"
         "    open_drama: str\n"
+        "    scripts: tuple[str, ...]\n"
         "    relate_stage: int\n"
         "    reward_show_id: int\n"
         "    reward_tips_item_id: int\n"
@@ -230,6 +303,7 @@ def _emit_python_module(payload: dict[str, object]) -> str:
         "            'AreaImage': self.area_image,\n"
         "            'AreaName': self.area_name,\n"
         "            'OpenDrama': self.open_drama,\n"
+        "            'Scripts': self.scripts,\n"
         "            'RelateStage': self.relate_stage,\n"
         "            'RewardShowId': self.reward_show_id,\n"
         "            'RewardTipsItemId': self.reward_tips_item_id,\n"
@@ -248,14 +322,17 @@ def _emit_python_module(payload: dict[str, object]) -> str:
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description="Recover area-event stage progression from areaevent_cfg."
     )
     parser.add_argument("--area-event", type=Path, default=DEFAULT_AREA_EVENT_ASSET)
+    parser.add_argument("--drama-index", type=Path, default=DEFAULT_DRAMA_INDEX)
     parser.add_argument("--python-module", action="store_true")
     args = parser.parse_args()
 
-    payload = collect_area_event_stage_hints(args.area_event)
+    payload = collect_area_event_stage_hints(args.area_event, args.drama_index)
     if args.python_module:
         print(_emit_python_module(payload))
     else:
