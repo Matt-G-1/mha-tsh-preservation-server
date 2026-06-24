@@ -59,7 +59,7 @@ class MapSpawn:
     is_authored_placement: bool = False
 
 
-PLAYABLE_CHARACTERS = {
+RECOVERED_HERO_CHARACTERS = {
     model_id: PlayableCharacter(name, model_id)
     for model_id, name in {
         "h1001": "Deku",
@@ -130,6 +130,7 @@ NON_PUBLIC_PLAYABLE_MODEL_REASONS = {
     "h1004": "small-form All Might variant, not a normal roster card",
     "h1018": "Kyoka Jiro has local protocol/model rows but was not public playable",
     "h1024": "alternate Deku row, not a separate public roster card",
+    "h1039": "All For One has asset rows but no verified public playable card",
     "h1998": "All Might art-test variant, not a normal roster card",
 }
 
@@ -167,18 +168,13 @@ for model_id, name, hero_id, shape_id in (
     ("h1110", "Stain", 1111, 1011),
     ("h1998", "All Might (Art Test Variant)", 1981, 9051),
 ):
-    PLAYABLE_CHARACTERS[model_id] = PlayableCharacter(
+    RECOVERED_HERO_CHARACTERS[model_id] = PlayableCharacter(
         name=name,
         model_asset_id=model_id,
         hero_id=hero_id,
         shape_id=shape_id,
     )
 
-STARTER_CHARACTER = PLAYABLE_CHARACTERS["h1001"]
-INITIAL_PLAYABLE_ROSTER = tuple(
-    PLAYABLE_CHARACTERS[model_id]
-    for model_id in ("h1001", "h1002", "h1006", "h1007", "h1008", "h1009", "h1010")
-)
 PUBLIC_PLAYABLE_MODEL_IDS = (
     "h1001",
     "h1002",
@@ -206,6 +202,15 @@ PUBLIC_PLAYABLE_MODEL_IDS = (
     "h1031",
     "h1032",
     "h1110",
+)
+PLAYABLE_CHARACTERS = {
+    model_id: RECOVERED_HERO_CHARACTERS[model_id]
+    for model_id in PUBLIC_PLAYABLE_MODEL_IDS
+}
+STARTER_CHARACTER = PLAYABLE_CHARACTERS["h1001"]
+INITIAL_PLAYABLE_ROSTER = tuple(
+    PLAYABLE_CHARACTERS[model_id]
+    for model_id in ("h1001", "h1002", "h1006", "h1007", "h1008", "h1009", "h1010")
 )
 VERIFIED_PLAYABLE_ROSTER = tuple(
     PLAYABLE_CHARACTERS[model_id]

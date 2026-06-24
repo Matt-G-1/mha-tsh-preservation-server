@@ -66,6 +66,7 @@ from mhatsh_server.characters import (
     NON_PUBLIC_PLAYABLE_MODEL_REASONS,
     PLAYABLE_CHARACTERS,
     PUBLIC_PLAYABLE_MODEL_IDS,
+    RECOVERED_HERO_CHARACTERS,
     SUPPORT_CARD_ITEM_IDS,
     STARTER_CHARACTER,
     SUPPORT_CHARACTERS,
@@ -449,7 +450,8 @@ def test_starter_identity_matches_archived_midoriya_config() -> None:
 def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert "AXMD raw-rip" in CATALOG_SOURCE
     assert "en_hero_cfg" in CATALOG_SOURCE
-    assert len(PLAYABLE_CHARACTERS) == 31
+    assert len(RECOVERED_HERO_CHARACTERS) == 31
+    assert len(PLAYABLE_CHARACTERS) == 26
     assert len(SUPPORT_CHARACTERS) == 12
     assert len(MAP_CHARACTERS) == 40
     assert len(CHIBI_MODEL_ASSETS) == 3
@@ -465,15 +467,18 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert STARTER_CHARACTER.shape_id == 1001
     assert sum(
         character.is_protocol_verified
-        for character in PLAYABLE_CHARACTERS.values()
+        for character in RECOVERED_HERO_CHARACTERS.values()
     ) == 30
     assert len(PUBLIC_PLAYABLE_MODEL_IDS) == 26
+    assert set(PLAYABLE_CHARACTERS) == set(PUBLIC_PLAYABLE_MODEL_IDS)
     assert "h1018" not in PUBLIC_PLAYABLE_MODEL_IDS
+    assert "h1018" not in PLAYABLE_CHARACTERS
     assert "h1927" not in PUBLIC_PLAYABLE_MODEL_IDS
     assert set(NON_PUBLIC_PLAYABLE_MODEL_REASONS) == {
         "h1004",
         "h1018",
         "h1024",
+        "h1039",
         "h1998",
     }
     assert "not public playable" in NON_PUBLIC_PLAYABLE_MODEL_REASONS["h1018"]
@@ -487,8 +492,8 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert PLAYABLE_CHARACTERS["h1032"].name == "Mirio Togata"
     assert PLAYABLE_CHARACTERS["h1032"].hero_id == 1321
     assert PLAYABLE_CHARACTERS["h1110"].shape_id == 1011
-    assert PLAYABLE_CHARACTERS["h1998"].name == "All Might (Art Test Variant)"
-    assert PLAYABLE_CHARACTERS["h1998"].shape_id == 9051
+    assert RECOVERED_HERO_CHARACTERS["h1998"].name == "All Might (Art Test Variant)"
+    assert RECOVERED_HERO_CHARACTERS["h1998"].shape_id == 9051
     assert [
         (character.hero_id, character.shape_id)
         for character in INITIAL_PLAYABLE_ROSTER
@@ -2076,7 +2081,7 @@ def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
     }
     assert {
         model_id
-        for model_id, character in PLAYABLE_CHARACTERS.items()
+        for model_id, character in RECOVERED_HERO_CHARACTERS.items()
         if character.is_protocol_verified
     } - {character.model_asset_id for character in VERIFIED_PLAYABLE_ROSTER} == {
         "h1004",
@@ -2553,21 +2558,27 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         ].action_hints
     )
 
-    alternate_deku_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1024"])
+    alternate_deku_style = fight_style_for_character(
+        RECOVERED_HERO_CHARACTERS["h1024"]
+    )
     assert "BATTLE/HERO/lvgu/commonATK/lvgu_pve_atk01" in (
         alternate_deku_style.resolve_usage((("ATK", 1),), hero_level=1).move_results[
             0
         ].action_hints
     )
 
-    small_might_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1004"])
+    small_might_style = fight_style_for_character(
+        RECOVERED_HERO_CHARACTERS["h1004"]
+    )
     assert "BATTLE/HERO/allmight/skills/Rskill" in (
         small_might_style.resolve_usage((("4", 1),), hero_level=1).move_results[
             4
         ].action_hints
     )
 
-    art_test_all_might_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1998"])
+    art_test_all_might_style = fight_style_for_character(
+        RECOVERED_HERO_CHARACTERS["h1998"]
+    )
     assert "BATTLE/HERO/allmight/skills/Rskill" in (
         art_test_all_might_style.resolve_usage(
             (("4", 1),), hero_level=1
@@ -2656,7 +2667,9 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "Abyssal Talons",
     )
 
-    deku_alt_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1024"])
+    deku_alt_style = fight_style_for_character(
+        RECOVERED_HERO_CHARACTERS["h1024"]
+    )
     assert deku_alt_style.recovered_skill_info_evidence() is not None
     assert deku_alt_style.recovered_skill_info_evidence().terms_for_command("Q") == (
         "Smash!",
@@ -2844,7 +2857,7 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
     assert "通行百万E" in mirio_resolution.move_results[3].skill_info_variants
 
     try:
-        fight_style_for_character(PLAYABLE_CHARACTERS["h1018"])
+        fight_style_for_character(RECOVERED_HERO_CHARACTERS["h1018"])
     except ValueError as exc:
         assert "not public playable" in str(exc)
     else:
