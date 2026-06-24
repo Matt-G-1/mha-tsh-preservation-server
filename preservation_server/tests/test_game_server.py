@@ -162,6 +162,7 @@ from mhatsh_server.npc_cfg_hints import (
     RECOVERED_NPC_NAME_HINTS,
 )
 from mhatsh_server.protocol import FrameDecoder, ProtocolCodec, RollingXor, encode_frame
+from mhatsh_server.roster import RosterState
 from mhatsh_server.schema import SchemaRegistry
 from mhatsh_server.stages import (
     ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS,
@@ -217,6 +218,7 @@ from mhatsh_server.tasks import (
     TaskState,
 )
 from mhatsh_server.tutorial import TutorialState
+from mhatsh_server.userinfo import UserInfoState
 from mhatsh_server.world import ScenePosition, WorldState
 from mhatsh_server.world_tasks import (
     BEGINNER_QUEST_CITY_EXP,
@@ -4537,6 +4539,32 @@ def test_world_state_records_movement_frames_and_errors() -> None:
     ]
 
 
+def test_userinfo_state_builds_profile_payloads() -> None:
+    roster = RosterState(INITIAL_PLAYABLE_ROSTER, first_card_uid=STARTER_CARD_UID)
+    state = UserInfoState()
+    assert state.set_sign("Plus Ultra") == {"Sign": "Plus Ultra"}
+    assert state.set_location("Honei") == {
+        "HideLocation": 0,
+        "Location": "Honei",
+    }
+    assert state.set_sex(1) == {"Sex": 1, "HideSex": 0}
+    birthday = state.set_birthday(2006, 7, 15)
+    assert birthday["Year"] == 2006
+    assert birthday["Month"] == 7
+    assert birthday["Day"] == 15
+    info = state.info(10001, roster)
+    assert info["Info"]["Uid"] == 10001
+    assert info["Info"]["Location"] == "Honei"
+    assert STARTER_HERO_ID in info["Info"]["Heros"]
+    other = state.other_info(10001, roster, name="Local Hero", level=70)
+    assert other["Info"]["Sign"] == "Plus Ultra"
+    assert other["Info"]["Heros"][0] == {
+        "Cid": STARTER_HERO_ID,
+        "Quality": 1,
+        "Level": 1,
+    }
+
+
 def test_version_and_account_login_exchange() -> None:
     asyncio.run(_run_login_exchange())
 
@@ -5132,6 +5160,117 @@ def test_stage_family_progress_persists_across_server_instances(
 
 def test_character_menu_requests_return_roster_backed_empty_state() -> None:
     asyncio.run(_run_character_menu_requests())
+
+
+def test_userinfo_requests_return_profile_payloads() -> None:
+    asyncio.run(_run_userinfo_requests())
+
+
+async def _run_userinfo_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x5566AA00),
+        uid=4242,
+    )
+
+    request_cases = [
+        ("s_userinfo_sign", {"Str": "Plus Ultra"}),
+        ("s_userinfo_location", {"Location": "Honei"}),
+        ("s_userinfo_location_hide", {"Hide": 1}),
+        ("s_userinfo_sex", {"Sex": 1}),
+        ("s_userinfo_sex_hide", {"Hide": 1}),
+        ("s_userinfo_birthday", {"Year": 2006, "Month": 7, "Day": 15}),
+        ("s_userinfo_birthday_hide", {"Hide": 1}),
+        ("s_userinfo_info", {}),
+        ("s_userinfo_base", {"Uid": [4242, 7777]}),
+        ("s_userinfo_brief", {"Uid": [4242]}),
+        ("s_userinfo_other", {"Uid": 4242}),
+    ]
+    for request_name, request_values in request_cases:
+        await game._dispatch(
+            session,
+            registry.protocol_ids[request_name],
+            codec.encode_message(request_name, request_values),
+            writer,
+        )
+
+    decoder = FrameDecoder(RollingXor(0x5566AA00))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_userinfo_sign",
+        "c_userinfo_location_set",
+        "c_userinfo_location_set",
+        "c_userinfo_sex_set",
+        "c_userinfo_sex_set",
+        "c_userinfo_birthday_set",
+        "c_userinfo_birthday_set",
+        "c_userinfo_info",
+        "c_userinfo_base",
+        "c_userinfo_brief",
+        "c_userinfo_other",
+    ]
+    assert codec.decode_message("c_userinfo_sign", replies[0][1]) == {
+        "Sign": "Plus Ultra"
+    }
+    assert codec.decode_message("c_userinfo_location_set", replies[1][1]) == {
+        "HideLocation": 0,
+        "Location": "Honei",
+    }
+    assert codec.decode_message("c_userinfo_location_set", replies[2][1]) == {
+        "HideLocation": 1,
+        "Location": "Honei",
+    }
+    assert codec.decode_message("c_userinfo_sex_set", replies[3][1]) == {
+        "Sex": 1,
+        "HideSex": 0,
+    }
+    assert codec.decode_message("c_userinfo_sex_set", replies[4][1]) == {
+        "Sex": 1,
+        "HideSex": 1,
+    }
+    birthday = codec.decode_message("c_userinfo_birthday_set", replies[5][1])
+    assert birthday["HideBirthday"] == 0
+    assert birthday["Year"] == 2006
+    assert birthday["Month"] == 7
+    assert birthday["Day"] == 15
+    hidden_birthday = codec.decode_message("c_userinfo_birthday_set", replies[6][1])
+    assert hidden_birthday["HideBirthday"] == 1
+    info = codec.decode_message("c_userinfo_info", replies[7][1])
+    assert info["Info"]["Uid"] == 4242
+    assert info["Info"]["HideLocation"] == 1
+    assert info["Info"]["HideSex"] == 1
+    assert STARTER_HERO_ID in info["Info"]["Heros"]
+    base = codec.decode_message("c_userinfo_base", replies[8][1])
+    assert base["BaseInfo"][0] == {
+        "Uid": 4242,
+        "Name": "Local Hero",
+        "Level": PLAYER_LEVEL_CAP,
+        "TopLevel": 0,
+        "AvatarId": 0,
+        "AvatarFrameId": 0,
+        "Online": 1,
+        "Fighting": STARTER_HERO_ID,
+    }
+    assert base["BaseInfo"][1]["Uid"] == 7777
+    brief = codec.decode_message("c_userinfo_brief", replies[9][1])
+    assert brief == {
+        "List": [
+            {"Uid": 4242, "Avatar": 0, "AvatarFrame": 0, "TeamUid": 0, "SvrId": 1}
+        ]
+    }
+    other = codec.decode_message("c_userinfo_other", replies[10][1])
+    assert other["Info"]["Uid"] == 4242
+    assert other["Info"]["Sign"] == "Plus Ultra"
+    assert other["Info"]["Location"] == ""
+    assert other["Info"]["Sex"] == 0
+    assert other["Info"]["Heros"][0]["Cid"] == STARTER_HERO_ID
 
 
 async def _run_character_roster_requests() -> None:

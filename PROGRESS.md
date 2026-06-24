@@ -145,6 +145,11 @@ environment details are intentionally omitted from Git.
   `s_userinfo_heros`, `s_card_go_to_fight`, `s_card_go_to_bridge_fight`,
   `s_team_change_hero`, `s_team_change_play`, and
   `s_area_event_switch_hero`.
+- Basic player profile/userinfo packets now have schema-backed responses:
+  `s_userinfo_info`, `s_userinfo_base`, `s_userinfo_brief`,
+  `s_userinfo_other`, plus mutable sign, location, sex, and birthday setters.
+  The payloads use the active local roster and current server level cap rather
+  than hard-coded menu-only hero lists.
 - Card, bridge-card, team-hero, team-play, and area-event switch requests are
   packet-tested against the recovered schemas. Team hero changes also emit a
   matching `c_scene_hero_change` for the active visible avatar.

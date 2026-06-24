@@ -47,6 +47,7 @@ from .stages import (
 )
 from .tasks import TaskState
 from .tutorial import TutorialState
+from .userinfo import UserInfoState
 from .world import WorldState
 from .world_tasks import WorldTaskState
 from .world_config_hints import (
@@ -79,6 +80,7 @@ class Session:
     uid: int = 10001
     account_info_urs: str | None = None
     tutorial: TutorialState = field(default_factory=TutorialState)
+    userinfo: UserInfoState = field(default_factory=UserInfoState)
     tasks: TaskState = field(default_factory=TaskState)
     world: WorldState = field(default_factory=WorldState)
     world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
@@ -343,6 +345,104 @@ class GameServer:
                     "OpenId": int(values.get("OpenId") or 0),
                     "Result": int(self.unlock_all_functions),
                 },
+            )
+        elif name == "s_userinfo_info":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_info",
+                session.userinfo.info(session.uid, roster),
+            )
+        elif name == "s_userinfo_base":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_base",
+                session.userinfo.base_info(
+                    [int(item) for item in list(values.get("Uid") or [])],
+                    uid=session.uid,
+                    name="Local Hero",
+                    level=self.player_level,
+                    fighting=roster.active_hero_id,
+                ),
+            )
+        elif name == "s_userinfo_brief":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_brief",
+                session.userinfo.brief_info(
+                    [int(item) for item in list(values.get("Uid") or [])],
+                    uid=session.uid,
+                ),
+            )
+        elif name == "s_userinfo_other":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_other",
+                session.userinfo.other_info(
+                    int(values.get("Uid") or session.uid),
+                    roster,
+                    name="Local Hero",
+                    level=self.player_level,
+                ),
+            )
+        elif name == "s_userinfo_sign":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_sign",
+                session.userinfo.set_sign(str(values.get("Str") or "")),
+            )
+        elif name == "s_userinfo_location":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_location_set",
+                session.userinfo.set_location(str(values.get("Location") or "")),
+            )
+        elif name == "s_userinfo_location_hide":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_location_set",
+                session.userinfo.set_location_hidden(int(values.get("Hide") or 0)),
+            )
+        elif name == "s_userinfo_sex":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_sex_set",
+                session.userinfo.set_sex(int(values.get("Sex") or 0)),
+            )
+        elif name == "s_userinfo_sex_hide":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_sex_set",
+                session.userinfo.set_sex_hidden(int(values.get("Hide") or 0)),
+            )
+        elif name == "s_userinfo_birthday":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_birthday_set",
+                session.userinfo.set_birthday(
+                    int(values.get("Year") or 0),
+                    int(values.get("Month") or 0),
+                    int(values.get("Day") or 0),
+                ),
+            )
+        elif name == "s_userinfo_birthday_hide":
+            await self._send(
+                writer,
+                session,
+                "c_userinfo_birthday_set",
+                session.userinfo.set_birthday_hidden(int(values.get("Hide") or 0)),
             )
         elif name == "s_guide_finish":
             set_ids = [int(item) for item in list(values.get("setIdList") or [])]
