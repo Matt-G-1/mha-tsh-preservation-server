@@ -1257,6 +1257,16 @@ class GameServer:
         elif name == "s_pressure_stage_finish":
             session.stage.record_pressure_stage_finish(values)
             self._remember_stage_family_progress(session)
+        elif name == "s_hero_rank_stage_end":
+            update = session.stage.hero_rank_stage_update(
+                int(values.get("Id") or session.stage.current_stage_id or 0),
+                [int(item) for item in list(values.get("Star") or [])],
+            )
+            await self._send(writer, session, "c_hero_rank_stage_update", update)
+            self.profile_store.remember_stage_progress(
+                session.urs,
+                session.stage.export_completions(),
+            )
         elif name == "s_usj_get_stage_record":
             roster = self._ensure_roster(session)
             await self._send(
@@ -1401,6 +1411,31 @@ class GameServer:
                 "c_theater_finish",
                 session.stage.theater_finish(values),
             )
+        elif name == "s_stage_bonus":
+            bonus = session.stage.stage_bonus(values)
+            self._grant_stage_reward_list(
+                session,
+                [item for item in list(bonus.get("RewardList") or []) if isinstance(item, dict)],
+            )
+            self.profile_store.remember_stage_progress(
+                session.urs,
+                session.stage.export_completions(),
+            )
+            await self._send(writer, session, "c_stage_show_reward", bonus)
+        elif name == "s_stage_extra_reward":
+            extra_reward = session.stage.stage_extra_reward(session.uid)
+            self.profile_store.grant_items(
+                session.urs,
+                [
+                    (
+                        int(item.get("ItemId") or 0),
+                        int(item.get("Num") or 0),
+                    )
+                    for item in list(extra_reward.get("DrawItems") or [])
+                    if isinstance(item, dict)
+                ],
+            )
+            await self._send(writer, session, "c_stage_extra_reward", extra_reward)
         elif name == "s_stage_quick_reborn":
             session.stage.record_quick_reborn(int(values.get("RebornCount") or 0))
         elif name == "s_stage_activity_info":

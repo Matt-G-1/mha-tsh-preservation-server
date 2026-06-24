@@ -3194,6 +3194,81 @@ class StageState:
         )
         return {"FixedReward": rewards, "ExtraReward": [], "SpecialReward": []}
 
+    def hero_rank_stage_info(self) -> dict[str, object]:
+        return {
+            "StageList": [
+                {"Id": stage_id, "Star": list(completion.stars)}
+                for stage_id, completion in sorted(self.completions.items())
+                if completion.status == 1
+            ]
+        }
+
+    def hero_rank_stage_update(
+        self, stage_id: int, stars: list[int]
+    ) -> dict[str, object]:
+        resolved_stage_id = int(stage_id or self.current_stage_id or 0)
+        normalized_stars = tuple(sorted({_as_int(star) for star in stars if _as_int(star) > 0}))
+        existing = self.completions.get(resolved_stage_id)
+        self.completions[resolved_stage_id] = StageCompletion(
+            stage_id=resolved_stage_id,
+            status=1,
+            stars=(
+                tuple(sorted(set(existing.stars).union(normalized_stars)))
+                if existing is not None
+                else normalized_stars
+            ),
+            full_star_time=existing.full_star_time if existing is not None else 0,
+            best_time=existing.best_time if existing is not None else 0,
+            pass_count=(existing.pass_count if existing is not None else 0) + 1,
+        )
+        return {
+            "Id": resolved_stage_id,
+            "Star": list(self.completions[resolved_stage_id].stars),
+        }
+
+    def stage_bonus(self, values: dict[str, object]) -> dict[str, object]:
+        stage_id = _as_int(values.get("StageId"), self.current_stage_id)
+        result = _as_int(values.get("Result"), 1)
+        stars = tuple(
+            sorted({_as_int(star) for star in list(values.get("StarList") or []) if _as_int(star) > 0})
+        )
+        existing = self.completions.get(stage_id)
+        if result == 1:
+            self.completions[stage_id] = StageCompletion(
+                stage_id=stage_id,
+                status=1,
+                stars=(
+                    tuple(sorted(set(existing.stars).union(stars)))
+                    if existing is not None
+                    else stars
+                ),
+                full_star_time=_as_int(values.get("TotalTime"))
+                if len(stars) >= 3
+                else (existing.full_star_time if existing is not None else 0),
+                best_time=existing.best_time if existing is not None else 0,
+                pass_count=(existing.pass_count if existing is not None else 0) + 1,
+            )
+        rewards = [
+            {
+                "ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID,
+                "count": max(1, len(stars) or 1),
+                "extra": [],
+            }
+        ] if result == 1 else []
+        return {"RewardList": rewards}
+
+    @staticmethod
+    def stage_extra_reward(uid: int) -> dict[str, object]:
+        return {
+            "UserUid": int(uid),
+            "DrawItems": [
+                {
+                    "ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID,
+                    "Num": 1,
+                }
+            ],
+        }
+
     def resource_stage_info(self, hero_uid: int) -> dict[str, object]:
         completed_stage_ids = sorted(
             stage_id

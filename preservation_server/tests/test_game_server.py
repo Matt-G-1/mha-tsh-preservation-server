@@ -6336,6 +6336,85 @@ async def _run_stage_family_info_packets() -> None:
     ]
 
     writer.data.clear()
+    session.outbound = RollingXor(0x6600112A)
+    hero_rank_end = codec.encode_message(
+        "s_hero_rank_stage_end",
+        {"Id": 160001, "Star": [1, 3]},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_hero_rank_stage_end"],
+        hero_rank_end,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112A))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_hero_rank_stage_update"
+    assert codec.decode_message("c_hero_rank_stage_update", reply_body) == {
+        "Id": 160001,
+        "Star": [1, 3],
+    }
+    assert session.stage.hero_rank_stage_info()["StageList"] == [
+        {"Id": 160001, "Star": [1, 3]}
+    ]
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x6600112B)
+    stage_bonus = codec.encode_message(
+        "s_stage_bonus",
+        {
+            "StageUid": 1600010001,
+            "StageId": 160001,
+            "Result": 1,
+            "StarList": [1, 2, 3],
+            "TotalTime": 70,
+            "PuaseTime": 0,
+            "DramaFinish": [],
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_stage_bonus"],
+        stage_bonus,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112B))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_stage_show_reward"
+    assert codec.decode_message("c_stage_show_reward", reply_body) == {
+        "RewardList": [
+            {
+                "ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID,
+                "count": 3,
+                "extra": [],
+            }
+        ]
+    }
+    assert session.stage.completions[160001].stars == (1, 2, 3)
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x6600112C)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_stage_extra_reward"],
+        codec.encode_message("s_stage_extra_reward", {}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x6600112C))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_stage_extra_reward"
+    assert codec.decode_message("c_stage_extra_reward", reply_body) == {
+        "UserUid": 4242,
+        "DrawItems": [
+            {"ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Num": 1}
+        ],
+    }
+    assert game.profile_store.normal_item_list(session.urs) == [
+        {"ItemId": LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID, "Amount": 3},
+        {"ItemId": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 1},
+    ]
+
+    writer.data.clear()
     session.outbound = RollingXor(0x66001126)
     usj_record = codec.encode_message(
         "s_usj_get_stage_record",
