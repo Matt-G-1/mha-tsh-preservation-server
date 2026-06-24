@@ -1181,9 +1181,10 @@ class GameServer:
             )
         elif name == "s_area_event_fight_over":
             stage_id = int(values.get("StageId") or session.stage.current_stage_id or 0)
+            is_win = int(values.get("IsWin") or 0)
             stage_pass = session.stage.record_area_event_fight_over(
                 stage_id=stage_id,
-                is_win=int(values.get("IsWin") or 0),
+                is_win=is_win,
                 use_time=int(values.get("UseTime") or 0),
             )
             self.profile_store.remember_stage_progress(
@@ -1197,6 +1198,10 @@ class GameServer:
                 "c_area_event_info",
                 session.stage.area_event_info(stage_id),
             )
+            if is_win:
+                task_update = session.tasks.complete_area_event_stage(stage_id)
+                if task_update is not None:
+                    await self._send(writer, session, "c_task_info_update", task_update)
         elif name == "s_area_event_reset_stage_times":
             await self._send(
                 writer,

@@ -592,6 +592,12 @@ environment details are intentionally omitted from Git.
   `280301`/`280302` training/practical exercise entries, with nearby
   stage/NPC/drama references retained for later quest sequencing. This is
   evidence-only for now and does not yet drive live quest state.
+- The 75 recovered `task_cfg.lua` area-event task links are now bridged to the
+  75 parsed `areaevent_cfg.lua` combat stage rows in recovered order. The
+  server exposes them as type-28 task records, keeps both task/event/stage IDs
+  in the condition params, and marks the matching task finished once when an
+  area-event stage is won, starting with `280101` -> stage `21111` for
+  "首次出击".
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.

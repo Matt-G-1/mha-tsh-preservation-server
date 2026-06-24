@@ -183,6 +183,9 @@ from mhatsh_server.stages import (
     stage_candidate_by_key,
 )
 from mhatsh_server.tasks import (
+    RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID,
+    RECOVERED_AREA_EVENT_TASK_RECORDS,
+    RECOVERED_AREA_EVENT_TASK_TYPE,
     STARTER_GUIDE_ID,
     STARTER_GUIDE_STEP,
     STARTER_TASK,
@@ -3844,6 +3847,24 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert stat_state.observe_client_stat(
         {"StatId": 2, "NumData": [0, STARTER_GUIDE_ID, STARTER_GUIDE_STEP]}
     ) is None
+    recovered_area_tasks = state.task_info(RECOVERED_AREA_EVENT_TASK_TYPE)
+    assert len(recovered_area_tasks["tasks"]) == len(RECOVERED_AREA_EVENT_TASK_RECORDS) == 75
+    assert recovered_area_tasks["tasks"][0] == RECOVERED_AREA_EVENT_TASK_RECORDS[
+        0
+    ].to_protocol()
+    assert recovered_area_tasks["tasks"][0]["Id"] == 280101
+    assert recovered_area_tasks["tasks"][0]["Cond"][0]["ParamList"] == [
+        21111,
+        280101,
+        290101,
+    ]
+    area_task_update = state.complete_area_event_stage(21111)
+    assert area_task_update is not None
+    assert area_task_update["task_info"]["Id"] == 280101
+    assert area_task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert area_task_update["task_info"]["Cond"][0]["CompCount"] == 1
+    assert state.complete_area_event_stage(21111) is None
+    assert RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID[21311].id == 280301
 
 
 def test_activity_state_returns_empty_compatibility_payloads() -> None:
@@ -6840,6 +6861,7 @@ async def _run_requested_stage_enter_packets() -> None:
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
         "c_area_event_stage_pass",
         "c_area_event_info",
+        "c_task_info_update",
     ]
     stage_pass = codec.decode_message("c_area_event_stage_pass", replies[0][1])
     assert stage_pass == {
@@ -6855,6 +6877,14 @@ async def _run_requested_stage_enter_packets() -> None:
         "DropCountTimes": 0,
         "Star": 3,
     }
+    task_update = codec.decode_message("c_task_info_update", replies[2][1])
+    assert task_update["task_info"]["Id"] == 280101
+    assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert task_update["task_info"]["Cond"][0]["ParamList"] == [
+        21111,
+        280101,
+        290101,
+    ]
     assert session.stage.completions[21111].pass_count == 1
 
 

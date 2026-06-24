@@ -8,12 +8,16 @@ from .beginner_quest import (
     STARTER_TASK_ID,
     STARTER_TASK_TYPE,
 )
+from .area_event_stages import AREA_EVENT_STAGES
+from .task_cfg_hints import RECOVERED_AREA_EVENT_TASKS
 
 
 TASK_STATUS_AVAILABLE = 1
 TASK_STATUS_ACCEPTED = 2
 TASK_STATUS_FINISHED = 3
 STARTER_GUIDE_ID = STARTER_TASK_ID
+RECOVERED_AREA_EVENT_TASK_TYPE = 28
+RECOVERED_AREA_EVENT_TASK_CONDITION_ID = 1
 
 
 @dataclass(slots=True)
@@ -66,14 +70,20 @@ class TaskRecord:
 
 class TaskState:
     def __init__(self) -> None:
-        self.tasks: dict[int, TaskRecord] = {STARTER_TASK.id: STARTER_TASK.clone()}
+        self.tasks: dict[int, TaskRecord] = {
+            STARTER_TASK.id: STARTER_TASK.clone(),
+            **{
+                task.id: task.clone()
+                for task in RECOVERED_AREA_EVENT_TASKS_BY_ID.values()
+            },
+        }
         self.finished: set[int] = set()
         self.spawned_task_npcs: set[int] = set()
 
     def task_info(self, task_type: int | None = None) -> dict[str, object]:
         tasks = [
             task.to_protocol()
-            for task in sorted(self.tasks.values(), key=lambda item: item.id)
+            for task in sorted(self.tasks.values(), key=_task_sort_key)
             if task_type in (None, 0, task.type)
         ]
         return {
@@ -113,6 +123,18 @@ class TaskState:
         if flag != 1 or guide_id != STARTER_GUIDE_ID or step != STARTER_GUIDE_STEP:
             return None
         return self.complete_guide(guide_id)
+
+    def complete_area_event_stage(self, stage_id: int) -> dict[str, object] | None:
+        task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID.get(int(stage_id))
+        if task is None:
+            return None
+        live_task = self._task(task.id)
+        if live_task.id in self.finished:
+            return None
+        for condition in live_task.conditions:
+            condition.completed_count = max(condition.completed_count, 1)
+        self._finish(live_task)
+        return self.task_update(live_task, action_type=2)
 
     def should_spawn_beginner_npc(self, task_id: int) -> bool:
         if task_id != STARTER_TASK.id:
@@ -172,3 +194,53 @@ STARTER_TASK = TaskRecord(
         ),
     ),
 )
+
+
+def _recovered_area_event_task_records() -> tuple[TaskRecord, ...]:
+    records: list[TaskRecord] = []
+    for task_hint, stage in zip(RECOVERED_AREA_EVENT_TASKS, AREA_EVENT_STAGES):
+        task_id = int(task_hint["task_id"] or task_hint["event_id"])
+        event_id = int(task_hint["event_id"])
+        relate_stage = int(stage.relate_stage)
+        params = tuple(
+            value
+            for value in (int(stage.stage_id), event_id, relate_stage)
+            if value
+        )
+        records.append(
+            TaskRecord(
+                id=task_id,
+                type=RECOVERED_AREA_EVENT_TASK_TYPE,
+                status=TASK_STATUS_AVAILABLE,
+                conditions=(
+                    TaskCondition(
+                        id=RECOVERED_AREA_EVENT_TASK_CONDITION_ID,
+                        completed_count=0,
+                        params=params,
+                    ),
+                ),
+            )
+        )
+    return tuple(records)
+
+
+RECOVERED_AREA_EVENT_TASK_RECORDS = _recovered_area_event_task_records()
+RECOVERED_AREA_EVENT_TASKS_BY_ID = {
+    task.id: task for task in RECOVERED_AREA_EVENT_TASK_RECORDS
+}
+RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID = {
+    stage.stage_id: task
+    for task, stage in zip(RECOVERED_AREA_EVENT_TASK_RECORDS, AREA_EVENT_STAGES)
+}
+RECOVERED_AREA_EVENT_TASK_ORDER = {
+    task.id: index for index, task in enumerate(RECOVERED_AREA_EVENT_TASK_RECORDS)
+}
+
+
+def _task_sort_key(task: TaskRecord) -> tuple[int, int]:
+    if task.id == STARTER_TASK.id:
+        return (0, task.id)
+    area_event_order = RECOVERED_AREA_EVENT_TASK_ORDER.get(task.id)
+    if area_event_order is not None:
+        return (1, area_event_order)
+    return (2, task.id)
