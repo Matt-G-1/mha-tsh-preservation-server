@@ -2388,6 +2388,8 @@ class GameServer:
                     "c_task_info",
                     session.tasks.task_info(),
                 )
+            for auto_update in session.tasks.complete_auto_act_gates():
+                await self._send_task_progression(writer, session, auto_update)
         if int(task_info.get("Id") or 0) != STARTER_TASK_ID:
             return
         if int(task_info.get("Status") or 0) != 3:

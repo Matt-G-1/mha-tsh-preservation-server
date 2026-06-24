@@ -4324,6 +4324,19 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         280201,
     ]
     assert base_state.complete_active_base_station_task() is None
+    gate_state = TaskState()
+    gate_state.skip_starter_quest()
+    assert gate_state.complete_auto_act_gates() == []
+    gate_stage_update = gate_state.complete_area_event_stage(21451)
+    assert gate_stage_update is not None
+    assert gate_stage_update["task_info"]["Id"] == 137003
+    assert 104702 not in gate_state.finished
+    gate_updates = gate_state.complete_auto_act_gates()
+    assert [update["task_info"]["Id"] for update in gate_updates] == [104702]
+    assert 104702 in gate_state.finished
+    visible_gate_tasks = [task["Id"] for task in gate_state.task_info()["tasks"]]
+    assert 141003 in visible_gate_tasks
+    assert visible_gate_tasks.index(104702) < visible_gate_tasks.index(141003)
 
 
 def test_activity_state_returns_empty_compatibility_payloads() -> None:
@@ -4915,6 +4928,10 @@ def test_base_station_activation_progresses_certification_task(
     tmp_path: Path,
 ) -> None:
     asyncio.run(_run_base_station_activation_progression(tmp_path))
+
+
+def test_area_event_completion_auto_finishes_empty_act_gate() -> None:
+    asyncio.run(_run_area_event_auto_gate_progression())
 
 
 def test_finished_task_ids_persist_across_server_instances(tmp_path: Path) -> None:
@@ -5538,6 +5555,58 @@ async def _run_base_station_activation_progression(tmp_path: Path) -> None:
     restored_task_info = second_session.tasks.task_info()
     assert 100902 in restored_task_info["finishs"]
     assert any(task["Id"] == 280201 for task in restored_task_info["tasks"])
+
+
+async def _run_area_event_auto_gate_progression() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x47415445),
+        urs="gate-user",
+        uid=4242,
+    )
+    game._configure_session(session)
+    area_over = codec.encode_message(
+        "s_area_event_fight_over",
+        {"StageId": 21451, "IsWin": 1, "UseTime": 42},
+    )
+
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_area_event_fight_over"],
+        area_over,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x47415445))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_area_event_stage_pass",
+        "c_area_event_info",
+        "c_task_info_update",
+        "c_task_info",
+        "c_task_info_update",
+        "c_task_info",
+        "c_area_event_sync_status",
+    ]
+    stage_update = codec.decode_message("c_task_info_update", replies[2][1])
+    assert stage_update["task_info"]["Id"] == 137003
+    assert stage_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    gate_update = codec.decode_message("c_task_info_update", replies[4][1])
+    assert gate_update["task_info"]["Id"] == 104702
+    assert gate_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    gate_tasks = codec.decode_message("c_task_info", replies[5][1])
+    assert 104702 in gate_tasks["finishs"]
+    assert any(task["Id"] == 141003 for task in gate_tasks["tasks"])
+    area_sync = codec.decode_message("c_area_event_sync_status", replies[6][1])
+    assert area_sync["StageId"] == 21451
+    assert area_sync["EventRound"] == 280405
 
 
 async def _run_finished_task_id_persistence(tmp_path: Path) -> None:

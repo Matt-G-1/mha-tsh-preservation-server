@@ -285,6 +285,16 @@ class TaskState:
         self._finish(task)
         return self.task_update(task, action_type=2)
 
+    def complete_auto_act_gates(self) -> list[dict[str, object]]:
+        updates: list[dict[str, object]] = []
+        while True:
+            task = self._active_auto_act_gate()
+            if task is None:
+                break
+            self._finish(task)
+            updates.append(self.task_update(task, action_type=2))
+        return updates
+
     def enter_stage(self, is_enter: int) -> dict[str, object]:
         return {"IsEnter": is_enter}
 
@@ -391,6 +401,21 @@ class TaskState:
                     "\u57fa\u7ad9" in task.objective
                     or "\u8ba4\u8bc1" in task.objective
                 )
+            ),
+            key=lambda task: (task.quest_order, task.id),
+        )
+        return candidates[0] if candidates else None
+
+    def _active_auto_act_gate(self) -> TaskRecord | None:
+        candidates = sorted(
+            (
+                task
+                for task in self.tasks.values()
+                if task.id not in self.finished
+                and task.source_kind == "act"
+                and task.quest_order > 0
+                and not task.objective.strip()
+                and self._is_visible(task)
             ),
             key=lambda task: (task.quest_order, task.id),
         )
