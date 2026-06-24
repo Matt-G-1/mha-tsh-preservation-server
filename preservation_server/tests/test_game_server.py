@@ -4247,6 +4247,20 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     ]
     assert state.active_quest_dialog_references() == (first_dialogue,)
     assert state.active_quest_contact_candidates() == (first_contact,)
+    assert state.complete_active_quest_contact(102203) is None
+    contact_update = state.complete_active_quest_contact(100602)
+    assert contact_update is not None
+    assert contact_update["task_info"]["Id"] == 100602
+    assert contact_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert 100602 in state.finished
+    assert state.active_quest_contact_candidates() == ()
+    assert [task["Id"] for task in state.task_info()["tasks"][:5]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+        100602,
+        100701,
+    ]
     assert state.complete_area_event_stage(21111) is None
     assert RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID[21311].id == 280301
     out_of_order_state = TaskState()
@@ -6480,6 +6494,54 @@ async def _run_task_requests() -> None:
         "Type": "guide",
         "ParamList": ["1301"],
     }
+
+    assert session.tasks.complete_area_event_stage(21111) is not None
+    writer.data.clear()
+    session.outbound = RollingXor(0x9ABCABCD)
+    contact_sync = codec.encode_message(
+        "s_task_sync_info",
+        {
+            "TaskId": 100602,
+            "Type": "DialogSub",
+            "ParamList": ["6669"],
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_sync_info"],
+        contact_sync,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x9ABCABCD))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_sync_info",
+        "c_task_info_update",
+        "c_task_info",
+    ]
+    assert codec.decode_message("c_task_sync_info", replies[0][1]) == {
+        "TaskId": 100602,
+        "Type": "DialogSub",
+        "ParamList": ["6669"],
+    }
+    contact_update = codec.decode_message("c_task_info_update", replies[1][1])
+    assert contact_update["action_type"] == 2
+    assert contact_update["task_info"]["Id"] == 100602
+    assert contact_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    contact_tasks = codec.decode_message("c_task_info", replies[2][1])
+    assert [task["Id"] for task in contact_tasks["tasks"][:5]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+        100602,
+        100701,
+    ]
+    assert contact_tasks["finishs"] == [
+        1010,
+        STARTER_TASK.id,
+        100602,
+        280101,
+    ]
 
     writer.data.clear()
     session.outbound = RollingXor(0xAABBCCDD)

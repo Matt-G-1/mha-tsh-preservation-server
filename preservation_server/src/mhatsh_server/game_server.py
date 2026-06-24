@@ -824,16 +824,20 @@ class GameServer:
                 session.tasks.submit(int(values.get("task_id") or 0)),
             )
         elif name == "s_task_sync_info":
+            task_id = int(values.get("TaskId") or 0)
             await self._send(
                 writer,
                 session,
                 "c_task_sync_info",
                 session.tasks.sync_info(
-                    int(values.get("TaskId") or 0),
+                    task_id,
                     str(values.get("Type") or ""),
                     list(values.get("ParamList") or []),
                 ),
             )
+            task_update = session.tasks.complete_active_quest_contact(task_id)
+            if task_update is not None:
+                await self._send_task_progression(writer, session, task_update)
         elif name == "s_task_enter_stage":
             await self._send(
                 writer,

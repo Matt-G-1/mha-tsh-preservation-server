@@ -255,6 +255,17 @@ class TaskState:
             "ParamList": params,
         }
 
+    def complete_active_quest_contact(self, task_id: int) -> dict[str, object] | None:
+        task = self.tasks.get(int(task_id))
+        if task is None or task.id in self.finished:
+            return None
+        if task.quest_order <= 0 or not self._is_visible(task):
+            return None
+        if task.id not in RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID:
+            return None
+        self._finish(task)
+        return self.task_update(task, action_type=2)
+
     def enter_stage(self, is_enter: int) -> dict[str, object]:
         return {"IsEnter": is_enter}
 
