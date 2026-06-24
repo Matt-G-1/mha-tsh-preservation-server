@@ -56,6 +56,7 @@ LOCAL_STAGE_PASS_REWARD_ITEM_ID = 1001
 LOCAL_STAGE_FIRST_REWARD_ITEM_ID = 1002
 LOCAL_STAGE_FULL_CLEAR_REWARD_ITEM_ID = 1003
 LOCAL_STAGE_STYLE_REWARD_ITEM_ID = 1004
+NIGHT_FIGHT_DEFAULT_STAGE_IDS = (160001, 299301, 502601)
 
 
 @dataclass(frozen=True, slots=True)
@@ -2980,6 +2981,8 @@ class StageState:
     allsvr_level_counts: dict[int, int] = field(default_factory=dict)
     allsvr_boss_scores: dict[int, int] = field(default_factory=dict)
     empty_shop_max_pass_stage: int = 0
+    night_fight_statuses: dict[int, int] = field(default_factory=dict)
+    night_fight_hero_tired: dict[int, int] = field(default_factory=dict)
     theater_unlocked_stage_ids: set[int] = field(default_factory=set)
     theater_bonus_claims: dict[str, int] = field(default_factory=dict)
     completions: dict[int, StageCompletion] = field(default_factory=dict)
@@ -3080,6 +3083,116 @@ class StageState:
         resolved_stage_id = int(stage_id or self.current_stage_id or 0)
         self.is_back_checks.append(resolved_stage_id)
         return {"StageId": resolved_stage_id}
+
+    def night_fight_stage_ids(
+        self, extra_stage_id: int | None = None
+    ) -> tuple[int, ...]:
+        stage_ids = set(NIGHT_FIGHT_DEFAULT_STAGE_IDS)
+        stage_ids.update(
+            stage_id
+            for stage_id, completion in self.completions.items()
+            if completion.status == 1
+        )
+        stage_ids.update(self.night_fight_statuses)
+        if extra_stage_id:
+            stage_ids.add(int(extra_stage_id))
+        return tuple(sorted(stage_ids))
+
+    def night_fight_info(self) -> dict[str, object]:
+        return {
+            "StageInfo": [
+                {
+                    "NightFightId": stage_id,
+                    "Progress": self.night_fight_statuses.get(
+                        stage_id,
+                        1 if self.completions.get(stage_id, None)
+                        and self.completions[stage_id].status == 1
+                        else 0,
+                    ),
+                    "IsPass": (
+                        1
+                        if self.night_fight_statuses.get(stage_id, 0) >= 1
+                        or (
+                            self.completions.get(stage_id, None) is not None
+                            and self.completions[stage_id].status == 1
+                        )
+                        else 0
+                    ),
+                }
+                for stage_id in self.night_fight_stage_ids()
+            ]
+        }
+
+    @staticmethod
+    def night_fight_hero_lineup(hero_uids: list[int]) -> dict[str, object]:
+        return {"HeroLineup": [int(hero_uid) for hero_uid in hero_uids]}
+
+    def night_fight_sync_status(
+        self, stage_id: int | None = None, hero_uids: list[int] | None = None
+    ) -> dict[str, object]:
+        resolved_stage_id = int(stage_id or self.current_stage_id or 0)
+        return {
+            "StageId": resolved_stage_id,
+            "StageList": [
+                {
+                    "StageId": known_stage_id,
+                    "StageType": max(1, known_stage_id // 100000),
+                    "StageStatus": self.night_fight_statuses.get(
+                        known_stage_id,
+                        1 if self.completions.get(known_stage_id, None)
+                        and self.completions[known_stage_id].status == 1
+                        else 0,
+                    ),
+                    "HasExtraReward": (
+                        1 if self.night_fight_statuses.get(known_stage_id, 0) >= 1 else 0
+                    ),
+                }
+                for known_stage_id in self.night_fight_stage_ids(resolved_stage_id)
+            ],
+            "HeroStatus": [
+                {
+                    "HeroUid": int(hero_uid),
+                    "TiredValue": self.night_fight_hero_tired.get(int(hero_uid), 0),
+                }
+                for hero_uid in (hero_uids or [])
+            ],
+        }
+
+    def night_fight_fight_over(
+        self, stage_id: int, hero_uid: int, is_win: int
+    ) -> dict[str, object]:
+        resolved_stage_id = int(stage_id or self.current_stage_id or 0)
+        result = 1 if int(is_win) else 0
+        if result:
+            self.night_fight_statuses[resolved_stage_id] = 1
+            self.night_fight_hero_tired[int(hero_uid)] = (
+                self.night_fight_hero_tired.get(int(hero_uid), 0) + 5
+            )
+            existing = self.completions.get(resolved_stage_id)
+            self.completions[resolved_stage_id] = StageCompletion(
+                stage_id=resolved_stage_id,
+                status=1,
+                stars=(
+                    tuple(sorted(set(existing.stars).union({1, 2, 3})))
+                    if existing is not None
+                    else (1, 2, 3)
+                ),
+                full_star_time=existing.full_star_time if existing is not None else 0,
+                best_time=existing.best_time if existing is not None else 0,
+                pass_count=(existing.pass_count if existing is not None else 0) + 1,
+            )
+        else:
+            self.night_fight_statuses.setdefault(resolved_stage_id, 0)
+        return {"StageId": resolved_stage_id, "IsWin": result}
+
+    @staticmethod
+    def night_fight_reward(is_win: int) -> dict[str, object]:
+        rewards = (
+            [{"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "count": 1, "extra": []}]
+            if int(is_win)
+            else []
+        )
+        return {"FixedReward": rewards, "ExtraReward": [], "SpecialReward": []}
 
     def resource_stage_info(self, hero_uid: int) -> dict[str, object]:
         completed_stage_ids = sorted(
@@ -4118,6 +4231,12 @@ class StageState:
         self.allsvr_boss_scores = self._int_section(
             values.get("allsvr_boss_scores", {})
         )
+        self.night_fight_statuses = self._int_section(
+            values.get("night_fight_statuses", {})
+        )
+        self.night_fight_hero_tired = self._int_section(
+            values.get("night_fight_hero_tired", {})
+        )
         empty_shop_progress = self._int_section(
             values.get("empty_shop_max_pass_stage", {})
         )
@@ -4148,6 +4267,8 @@ class StageState:
             "daily_stage_counts": dict(sorted(self.daily_stage_counts.items())),
             "allsvr_level_counts": dict(sorted(self.allsvr_level_counts.items())),
             "allsvr_boss_scores": dict(sorted(self.allsvr_boss_scores.items())),
+            "night_fight_statuses": dict(sorted(self.night_fight_statuses.items())),
+            "night_fight_hero_tired": dict(sorted(self.night_fight_hero_tired.items())),
             "empty_shop_max_pass_stage": {1: int(self.empty_shop_max_pass_stage)},
             "theater_unlocked_stage_ids": {
                 stage_id: 1 for stage_id in sorted(self.theater_unlocked_stage_ids)

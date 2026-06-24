@@ -1029,6 +1029,86 @@ class GameServer:
                 stage_id,
                 card_uid=lineup[0] if lineup else 0,
             )
+        elif name == "s_night_fight_info":
+            roster = self._ensure_roster(session)
+            hero_uids = sorted(roster.cards)
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_info",
+                session.stage.night_fight_info(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_hero_lineup",
+                session.stage.night_fight_hero_lineup(hero_uids),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_sync_status",
+                session.stage.night_fight_sync_status(
+                    session.stage.current_stage_id, hero_uids
+                ),
+            )
+        elif name == "s_night_fight_enter_fight":
+            roster = self._ensure_roster(session)
+            hero_uid = int(values.get("HeroUid") or roster.active_card_uid)
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_hero_lineup",
+                session.stage.night_fight_hero_lineup([hero_uid]),
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                int(values.get("StageId") or 0),
+                card_uid=hero_uid,
+            )
+        elif name == "s_night_fight_fight_over":
+            roster = self._ensure_roster(session)
+            stage_id = int(values.get("StageId") or session.stage.current_stage_id or 0)
+            hero_uid = roster.active_card_uid
+            is_win = int(values.get("IsWin") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_fight_over",
+                session.stage.night_fight_fight_over(stage_id, hero_uid, is_win),
+            )
+            reward = session.stage.night_fight_reward(is_win)
+            self._grant_stage_reward_list(
+                session,
+                list(reward.get("FixedReward") or [])
+                + list(reward.get("ExtraReward") or [])
+                + list(reward.get("SpecialReward") or []),
+            )
+            await self._send(writer, session, "c_night_fight_reward", reward)
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_sync_status",
+                session.stage.night_fight_sync_status(
+                    stage_id, sorted(roster.cards)
+                ),
+            )
+            self.profile_store.remember_stage_progress(
+                session.urs,
+                session.stage.export_completions(),
+            )
+            self._remember_stage_family_progress(session)
+        elif name == "s_night_fight_leave_stage":
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_night_fight_sync_status",
+                session.stage.night_fight_sync_status(
+                    session.stage.current_stage_id, sorted(roster.cards)
+                ),
+            )
         elif name == "s_rogue_endless_fight":
             hero_index = int(values.get("HeroIndex") or 0)
             rogue_index = int(values.get("Index") or 0)

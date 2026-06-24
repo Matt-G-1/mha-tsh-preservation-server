@@ -6060,6 +6060,127 @@ async def _run_requested_stage_enter_packets() -> None:
     ] == STARTER_CARD_UID + 2
 
     writer.data.clear()
+    session.outbound = RollingXor(0x55112242)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_night_fight_info"],
+        codec.encode_message("s_night_fight_info", {}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112242))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_night_fight_info",
+        "c_night_fight_hero_lineup",
+        "c_night_fight_sync_status",
+    ]
+    night_info = codec.decode_message("c_night_fight_info", replies[0][1])
+    assert {
+        entry["NightFightId"]
+        for entry in night_info["StageInfo"]
+    }.issuperset({160001, 299301, 502601})
+    night_lineup = codec.decode_message("c_night_fight_hero_lineup", replies[1][1])
+    assert night_lineup["HeroLineup"][:3] == [
+        STARTER_CARD_UID,
+        STARTER_CARD_UID + 1,
+        STARTER_CARD_UID + 2,
+    ]
+    assert len(night_lineup["HeroLineup"]) == len(VERIFIED_PLAYABLE_ROSTER)
+    night_status = codec.decode_message("c_night_fight_sync_status", replies[2][1])
+    assert night_status["StageId"] == 160001
+    assert night_status["HeroStatus"][2] == {
+        "HeroUid": STARTER_CARD_UID + 2,
+        "TiredValue": 0,
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112243)
+    night_enter_fight = codec.encode_message(
+        "s_night_fight_enter_fight",
+        {"StageId": 563903, "HeroUid": STARTER_CARD_UID + 3},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_night_fight_enter_fight"],
+        night_enter_fight,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112243))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_night_fight_hero_lineup",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_night_fight_hero_lineup", replies[0][1]) == {
+        "HeroLineup": [STARTER_CARD_UID + 3]
+    }
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 563903
+    assert session.stage.current_stage_key == "stage_cfg_route_563903"
+    assert codec.decode_message("c_frame_fighter_data", replies[2][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID + 3
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112244)
+    night_over = codec.encode_message(
+        "s_night_fight_fight_over",
+        {"StageId": 563903, "IsWin": 1},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_night_fight_fight_over"],
+        night_over,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112244))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_night_fight_fight_over",
+        "c_night_fight_reward",
+        "c_night_fight_sync_status",
+    ]
+    assert codec.decode_message("c_night_fight_fight_over", replies[0][1]) == {
+        "StageId": 563903,
+        "IsWin": 1,
+    }
+    assert codec.decode_message("c_night_fight_reward", replies[1][1]) == {
+        "FixedReward": [
+            {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "count": 1, "extra": []}
+        ],
+        "ExtraReward": [],
+        "SpecialReward": [],
+    }
+    night_status = codec.decode_message("c_night_fight_sync_status", replies[2][1])
+    assert {
+        stage["StageId"]: stage["StageStatus"]
+        for stage in night_status["StageList"]
+    }[563903] == 1
+    assert {
+        hero["HeroUid"]: hero["TiredValue"]
+        for hero in night_status["HeroStatus"]
+    }[STARTER_CARD_UID + 3] == 5
+    assert session.stage.completions[563903].pass_count == 1
+    assert game.profile_store.normal_item_list(session.urs) == [
+        {"ItemId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "Amount": 1}
+    ]
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112245)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_night_fight_leave_stage"],
+        codec.encode_message("s_night_fight_leave_stage", {"LeaveType": 1}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112245))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_night_fight_sync_status"
+    assert codec.decode_message("c_night_fight_sync_status", reply_body)[
+        "StageId"
+    ] == 563903
+
+    writer.data.clear()
     session.outbound = RollingXor(0x5511223B)
     rogue = codec.encode_message(
         "s_rogue_endless_fight",
