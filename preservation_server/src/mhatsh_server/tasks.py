@@ -272,6 +272,12 @@ class TaskState:
             return 0
         return int(task.source_stage_id)
 
+    def area_event_id_for_stage(self, stage_id: int) -> int:
+        task = RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID.get(int(stage_id))
+        if task is None:
+            return 0
+        return int(task.source_event_id)
+
     def complete_active_base_station_task(self) -> dict[str, object] | None:
         task = self._active_base_station_task()
         if task is None:

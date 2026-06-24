@@ -5284,6 +5284,7 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
             "c_area_event_info",
             "c_task_info_update",
             "c_task_info",
+            "c_area_event_sync_status",
         ]
         task_update = codec.decode_message("c_task_info_update", replies[2][1])
         assert task_update["task_info"]["Id"] == 280101
@@ -5295,6 +5296,10 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
             280101,
             100602,
         ]
+        area_sync = codec.decode_message("c_area_event_sync_status", replies[4][1])
+        assert area_sync["StageId"] == 21111
+        assert area_sync["EventRound"] == 280101
+        assert area_sync["TriggerOnMap"] == [280101]
 
         second_game = GameServer(registry)
         second_session = Session(
@@ -7300,22 +7305,38 @@ async def _run_requested_stage_enter_packets() -> None:
     decoder = FrameDecoder(RollingXor(0x55112235))
     replies = decoder.feed(bytes(writer.data))
     assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_area_event_stage_cache_id",
         "c_stage_enter",
         "c_frame_fighter_data",
         "c_area_event_info",
+        "c_area_event_sync_status",
     ]
-    area_stage_enter = codec.decode_message("c_stage_enter", replies[0][1])
+    assert codec.decode_message("c_area_event_stage_cache_id", replies[0][1]) == {
+        "StageId": 21111
+    }
+    area_stage_enter = codec.decode_message("c_stage_enter", replies[1][1])
     assert area_stage_enter["StageId"] == 21111
     assert area_stage_enter["StageUid"] == 211110001
-    area_fighter = codec.decode_message("c_frame_fighter_data", replies[1][1])
+    area_fighter = codec.decode_message("c_frame_fighter_data", replies[2][1])
     assert area_fighter["CardUid"] == STARTER_CARD_UID + 1
     assert session.stage.current_stage_key == "area_event_stage_21111"
-    area_info = codec.decode_message("c_area_event_info", replies[2][1])
+    area_info = codec.decode_message("c_area_event_info", replies[3][1])
     assert area_info["StageData"] == {
         "StageId": 21111,
         "PassedTimes": 0,
         "DropCountTimes": 0,
         "Star": 0,
+    }
+    area_sync = codec.decode_message("c_area_event_sync_status", replies[4][1])
+    assert area_sync == {
+        "StageId": 21111,
+        "EventRound": 280101,
+        "ControlId": 0,
+        "TriggerOnMap": [280101],
+        "BoxRewardList": [],
+        "HeroInfo": [
+            {"HeroUId": STARTER_CARD_UID + 1, "MoveValue": 0, "Pos": []}
+        ],
     }
     assert session.roster is not None
     assert session.roster.active_card_uid == STARTER_CARD_UID + 1
@@ -7827,6 +7848,7 @@ async def _run_requested_stage_enter_packets() -> None:
         "c_area_event_info",
         "c_task_info_update",
         "c_task_info",
+        "c_area_event_sync_status",
     ]
     stage_pass = codec.decode_message("c_area_event_stage_pass", replies[0][1])
     assert stage_pass == {
@@ -7857,6 +7879,11 @@ async def _run_requested_stage_enter_packets() -> None:
         280101,
         100602,
     ]
+    area_sync = codec.decode_message("c_area_event_sync_status", replies[4][1])
+    assert area_sync["StageId"] == 21111
+    assert area_sync["EventRound"] == 280101
+    assert area_sync["TriggerOnMap"] == [280101]
+    assert area_sync["HeroInfo"][0]["HeroUId"] == session.roster.active_card_uid
     assert session.stage.completions[21111].pass_count == 1
 
 

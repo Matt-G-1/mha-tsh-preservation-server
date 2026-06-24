@@ -1115,6 +1115,12 @@ class GameServer:
         elif name == "s_area_event_enter_stage":
             hero_uids = [int(item) for item in list(values.get("HerosUId") or [])]
             stage_id = int(values.get("StageId") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_area_event_stage_cache_id",
+                session.stage.area_event_stage_cache_id(stage_id),
+            )
             await self._enter_requested_stage(
                 writer,
                 session,
@@ -1126,6 +1132,16 @@ class GameServer:
                 session,
                 "c_area_event_info",
                 session.stage.area_event_info(stage_id),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_area_event_sync_status",
+                session.stage.area_event_sync_status(
+                    stage_id,
+                    event_round=session.tasks.area_event_id_for_stage(stage_id),
+                    hero_uids=hero_uids,
+                ),
             )
         elif name in {
             "s_campaign_fight",
@@ -1285,6 +1301,17 @@ class GameServer:
                 task_update = session.tasks.complete_area_event_stage(stage_id)
                 if task_update is not None:
                     await self._send_task_progression(writer, session, task_update)
+            roster = self._ensure_roster(session)
+            await self._send(
+                writer,
+                session,
+                "c_area_event_sync_status",
+                session.stage.area_event_sync_status(
+                    stage_id,
+                    event_round=session.tasks.area_event_id_for_stage(stage_id),
+                    hero_uids=[roster.active_card_uid],
+                ),
+            )
         elif name == "s_area_event_reset_stage_times":
             await self._send(
                 writer,

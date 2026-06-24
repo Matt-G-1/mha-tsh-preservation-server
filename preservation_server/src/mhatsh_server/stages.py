@@ -3622,6 +3622,38 @@ class StageState:
     def area_event_info(self, stage_id: int) -> dict[str, object]:
         return {"StageData": self.area_event_stage_data(stage_id)}
 
+    @staticmethod
+    def area_event_stage_cache_id(stage_id: int) -> dict[str, object]:
+        return {"StageId": int(stage_id)}
+
+    def area_event_sync_status(
+        self,
+        stage_id: int,
+        *,
+        event_round: int = 0,
+        hero_uids: list[int] | tuple[int, ...] = (),
+        trigger_on_map: list[int] | tuple[int, ...] = (),
+    ) -> dict[str, object]:
+        numeric_stage_id = int(stage_id)
+        numeric_event_round = int(event_round or numeric_stage_id)
+        triggers = [
+            int(item)
+            for item in trigger_on_map
+            if int(item) > 0
+        ] or [numeric_event_round]
+        return {
+            "StageId": numeric_stage_id,
+            "EventRound": numeric_event_round,
+            "ControlId": 0,
+            "TriggerOnMap": triggers,
+            "BoxRewardList": [],
+            "HeroInfo": [
+                {"HeroUId": int(hero_uid), "MoveValue": 0, "Pos": []}
+                for hero_uid in hero_uids
+                if int(hero_uid) > 0
+            ],
+        }
+
     def area_event_stage_times(self) -> list[dict[str, object]]:
         return [
             self.area_event_stage_times_for(stage.stage_id)
