@@ -2549,6 +2549,13 @@ class GameServer:
                 ]
             },
         )
+        for spawn in spawns:
+            await self._send(
+                writer,
+                session,
+                "c_task_trigger_sync",
+                {"Uid": spawn.uid},
+            )
 
     def _intro_stage_definition(self) -> BattleStageDefinition:
         return replace(

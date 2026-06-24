@@ -530,6 +530,10 @@ environment details are intentionally omitted from Git.
   compatibility path for unknown/local task IDs remains intact, but parsed
   quest-chain tasks must be visible through their recovered predecessor links
   before direct task packets can accept or finish them.
+- Verified active quest-contact NPC spawns now also emit
+  `c_task_trigger_sync` for the spawned scene UID. This currently applies to
+  the recovered Tsukauchi contact path and keeps the trigger packet scoped to
+  parser-backed active contacts rather than normal starter/map spawns.
 - Completed stage rewards now also grant saved normal-item counts in the
   profile store, giving later inventory/UI packet work a persistent
   player-data backing store.

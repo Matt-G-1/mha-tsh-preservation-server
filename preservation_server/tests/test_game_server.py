@@ -5914,6 +5914,7 @@ async def _run_area_event_contact_npc_spawn() -> None:
         "c_task_info_update",
         "c_task_info",
         "c_scene_npc_create",
+        "c_task_trigger_sync",
         "c_area_event_sync_status",
     ]
     task_update = codec.decode_message("c_task_info_update", replies[2][1])
@@ -5923,6 +5924,9 @@ async def _run_area_event_contact_npc_spawn() -> None:
     npc_create = codec.decode_message("c_scene_npc_create", replies[4][1])
     assert npc_create == {
         "NpcList": [scene_npc_from_spawn(quest_contact_map_spawn(5009))]
+    }
+    assert codec.decode_message("c_task_trigger_sync", replies[5][1]) == {
+        "Uid": quest_contact_map_spawn(5009).uid
     }
     assert session.tasks.claim_active_quest_contact_spawn_candidates() == ()
 
