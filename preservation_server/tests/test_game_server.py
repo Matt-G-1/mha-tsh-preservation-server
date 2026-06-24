@@ -417,8 +417,8 @@ def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> Non
 
 def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "battle_stage_candidate_catalog" in STAGE_CATALOG_SOURCE
-    assert len(RECOVERED_BATTLE_STAGES) >= 75
-    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 70
+    assert len(RECOVERED_BATTLE_STAGES) >= 260
+    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 145
     stage_ids = [
         stage.stage_id for stage in RECOVERED_BATTLE_STAGES if stage.stage_id is not None
     ]
@@ -438,6 +438,17 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert stage_candidate_by_id(801204).scripts == ("zx_801204_1",)
     assert stage_candidate_by_id(801206).scripts == ("zx_801206_1",)
     assert set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS).issubset(RECOVERED_BATTLE_STAGE_BY_ID)
+
+    area_event_stage = stage_candidate_by_id(21111)
+    assert area_event_stage.key == "area_event_stage_21111"
+    assert area_event_stage.label == "1-1首次出击"
+    assert area_event_stage.scripts == ("area1_1",)
+    assert area_event_stage.source == AREA_EVENT_STAGE_SOURCE
+    assert [spawn.enemy_id for spawn in area_event_stage.encounter_spawns] == [2005]
+    assert area_event_stage.encounter_spawns[0].placement_source == (
+        "generated_fallback"
+    )
+    assert stage_candidate_by_id(211461).label == "14-6林中小路"
 
     starter = stage_candidate_by_id(STARTER_INTRO_STAGE_ID)
     assert starter.key == "starter_intro_299301"
@@ -5089,6 +5100,7 @@ async def _run_requested_stage_enter_packets() -> None:
     area_stage_enter = codec.decode_message("c_stage_enter", replies[0][1])
     assert area_stage_enter["StageId"] == 21111
     assert area_stage_enter["StageUid"] == 211110001
+    assert session.stage.current_stage_key == "area_event_stage_21111"
     area_info = codec.decode_message("c_area_event_info", replies[1][1])
     assert area_info["StageData"] == {
         "StageId": 21111,
