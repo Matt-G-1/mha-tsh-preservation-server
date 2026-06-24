@@ -3979,7 +3979,7 @@ class StageState:
         return {
             "StageData": stage_data,
             "DiffStageData": [],
-            "CacheStageId": AREA_EVENT_STAGES[0].stage_id if AREA_EVENT_STAGES else 0,
+            "CacheStageId": self.area_event_cache_stage_id(),
             "DifficultCacheStageId": 0,
             "NormalLineup": list(normal_lineup),
             "ActLineup": list(act_lineup or []),
@@ -3987,6 +3987,15 @@ class StageState:
             "StageFightTimes": stage_times,
             "DiffStageFightTimes": [],
         }
+
+    def area_event_cache_stage_id(self) -> int:
+        if not AREA_EVENT_STAGES:
+            return 0
+        for stage in AREA_EVENT_STAGES:
+            completion = self.completions.get(stage.stage_id)
+            if completion is None or completion.status != 1:
+                return stage.stage_id
+        return AREA_EVENT_STAGES[-1].stage_id
 
     def area_event_stage_pass(self, stage_id: int) -> dict[str, object]:
         completion = self.completions.get(int(stage_id))

@@ -2614,6 +2614,30 @@ def test_enemy_ai_profiles_can_seed_battle_npcs_and_monster_frames() -> None:
     ]
 
 
+def test_area_event_login_cache_tracks_next_unfinished_stage() -> None:
+    state = StageState()
+    assert state.area_event_cache_stage_id() == 21111
+    assert state.area_event_login_data(normal_lineup=[STARTER_CARD_UID])[
+        "CacheStageId"
+    ] == 21111
+
+    state.ensure_area_event_stage_passed(21111)
+    assert state.area_event_stage_data(21111)["PassedTimes"] == 1
+    assert state.area_event_cache_stage_id() == 21121
+    assert state.area_event_login_data(normal_lineup=[STARTER_CARD_UID])[
+        "CacheStageId"
+    ] == 21121
+
+    for stage in AREA_EVENT_STAGES:
+        state.ensure_area_event_stage_passed(stage.stage_id)
+
+    assert state.area_event_cache_stage_id() == AREA_EVENT_STAGES[-1].stage_id
+    login_data = state.area_event_login_data(normal_lineup=[STARTER_CARD_UID])
+    assert login_data["CacheStageId"] == AREA_EVENT_STAGES[-1].stage_id
+    assert login_data["StageData"][-1]["StageId"] == AREA_EVENT_STAGES[-1].stage_id
+    assert login_data["StageData"][-1]["Star"] == 3
+
+
 def test_enemy_ai_profile_hint_parser_tracks_monster_name_markers() -> None:
     module = _load_enemy_ai_profile_hint_script()
     hints = module.collect_enemy_ai_profile_hints(
@@ -5342,6 +5366,9 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
     assert restored_first_task["Status"] == TASK_STATUS_FINISHED
     assert restored_first_task["Cond"][0]["CompCount"] == 1
     assert 280101 in restored_area_tasks["finishs"]
+    assert second_session.stage.area_event_login_data(
+        normal_lineup=[STARTER_CARD_UID]
+    )["CacheStageId"] == 21121
 
 
 async def _run_contact_sync_progress_persistence(tmp_path: Path) -> None:
