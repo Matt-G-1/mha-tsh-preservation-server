@@ -27,6 +27,14 @@ DRAMA_REF_RE = re.compile(
     r"^(?:cp|zx|fzx|xht|act|stage|area|sj|txbw|beach|bus|huodong|tc)[A-Za-z0-9_|\\.-]*$",
     re.IGNORECASE,
 )
+DIALOG_TEXT_TERMS = (
+    "\u8c08\u8bdd",
+    "\u62dc\u8bbf",
+    "\u6c47\u62a5",
+    "\u544a\u77e5",
+    "\u8be2\u95ee",
+    "\u4e86\u89e3\u60c5\u51b5",
+)
 CONTROL_STRINGS = {
     "API",
     "AccCond",
@@ -112,6 +120,10 @@ def _is_narrative_text(value: str) -> bool:
     if "系统_" in value or value.startswith("地图系统_"):
         return False
     return _has_cjk(value)
+
+
+def _is_dialog_text(value: str) -> bool:
+    return any(term in value for term in DIALOG_TEXT_TERMS)
 
 
 def _is_task_or_stage_id(value: int | None) -> bool:
@@ -336,6 +348,31 @@ def collect_task_cfg_hints(
             int(next_item["task_id"]) if next_item is not None else 0
         )
 
+    quest_chain_by_task_id = {
+        int(item["task_id"]): item
+        for item in quest_chain
+        if int(item["task_id"]) > 0
+    }
+    quest_dialog_references: list[dict[str, object]] = []
+    for item in text_hints:
+        task_id = int(item["task_id"])
+        chain_item = quest_chain_by_task_id.get(task_id)
+        if chain_item is None:
+            continue
+        if not item["nearby_npc_ids"] or not _is_dialog_text(str(item["text"])):
+            continue
+        quest_dialog_references.append(
+            {
+                "constant_index": int(item["constant_index"]),
+                "task_id": task_id,
+                "quest_order": int(chain_item["order"]),
+                "text": str(item["text"]),
+                "nearby_stage_ids": list(item["nearby_stage_ids"]),
+                "nearby_npc_ids": list(item["nearby_npc_ids"]),
+                "drama_refs": list(item["drama_refs"]),
+            }
+        )
+
     return {
         "source": TASK_CFG_SOURCE,
         "constant_count": len(constants),
@@ -344,11 +381,13 @@ def collect_task_cfg_hints(
         "act_marker_count": len(act_markers),
         "act_task_count": len(act_tasks),
         "quest_chain_count": len(quest_chain),
+        "quest_dialog_reference_count": len(quest_dialog_references),
         "text_hints": text_hints,
         "area_events": area_events,
         "act_markers": act_markers,
         "act_tasks": act_tasks,
         "quest_chain": quest_chain,
+        "quest_dialog_references": quest_dialog_references,
     }
 
 
@@ -358,6 +397,7 @@ def _emit_python_module(payload: dict[str, object]) -> str:
     act_markers = payload["act_markers"]
     act_tasks = payload["act_tasks"]
     quest_chain = payload["quest_chain"]
+    quest_dialog_references = payload["quest_dialog_references"]
     return (
         "from __future__ import annotations\n\n"
         "TASK_CFG_HINT_SOURCE = "
@@ -380,6 +420,9 @@ def _emit_python_module(payload: dict[str, object]) -> str:
         + "\n\n"
         "RECOVERED_QUEST_CHAIN = "
         + pformat(quest_chain, width=96, sort_dicts=False)
+        + "\n\n"
+        "RECOVERED_QUEST_DIALOG_REFERENCES = "
+        + pformat(quest_dialog_references, width=96, sort_dicts=False)
         + "\n"
     )
 

@@ -14,6 +14,7 @@ from .task_cfg_hints import (
     RECOVERED_ACT_TASKS,
     RECOVERED_AREA_EVENT_TASKS,
     RECOVERED_QUEST_CHAIN,
+    RECOVERED_QUEST_DIALOG_REFERENCES as RECOVERED_QUEST_DIALOG_HINTS,
 )
 
 
@@ -104,6 +105,16 @@ class QuestNpcReference:
     quest_order: int
     label: str
     objective: str
+    drama_refs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class QuestDialogReference:
+    npc_id: int
+    task_id: int
+    quest_order: int
+    text: str
+    nearby_stage_ids: tuple[int, ...] = ()
     drama_refs: tuple[str, ...] = ()
 
 
@@ -447,6 +458,38 @@ RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID: dict[int, tuple[QuestNpcReference, ...
         if reference.npc_id == npc_id
     )
     for npc_id in sorted({reference.npc_id for reference in RECOVERED_QUEST_NPC_REFERENCES})
+}
+
+
+def _recovered_quest_dialog_references() -> tuple[QuestDialogReference, ...]:
+    references: list[QuestDialogReference] = []
+    for item in RECOVERED_QUEST_DIALOG_HINTS:
+        for npc_id in _int_tuple(item.get("nearby_npc_ids")):
+            references.append(
+                QuestDialogReference(
+                    npc_id=npc_id,
+                    task_id=int(item["task_id"]),
+                    quest_order=int(item["quest_order"]),
+                    text=str(item["text"]),
+                    nearby_stage_ids=_int_tuple(item.get("nearby_stage_ids")),
+                    drama_refs=_str_tuple(item.get("drama_refs")),
+                )
+            )
+    return tuple(references)
+
+
+RECOVERED_QUEST_DIALOG_REFERENCES = _recovered_quest_dialog_references()
+RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID: dict[
+    int, tuple[QuestDialogReference, ...]
+] = {
+    npc_id: tuple(
+        reference
+        for reference in RECOVERED_QUEST_DIALOG_REFERENCES
+        if reference.npc_id == npc_id
+    )
+    for npc_id in sorted(
+        {reference.npc_id for reference in RECOVERED_QUEST_DIALOG_REFERENCES}
+    )
 }
 
 

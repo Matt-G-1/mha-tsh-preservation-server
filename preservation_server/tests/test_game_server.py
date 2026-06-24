@@ -146,6 +146,7 @@ from mhatsh_server.task_cfg_hints import (
     RECOVERED_ACT_TASKS,
     RECOVERED_AREA_EVENT_TASKS,
     RECOVERED_QUEST_CHAIN,
+    RECOVERED_QUEST_DIALOG_REFERENCES as RECOVERED_QUEST_DIALOG_HINTS,
     RECOVERED_TASK_TEXT_HINTS,
     TASK_CFG_CONSTANT_COUNT,
     TASK_CFG_HINT_SOURCE,
@@ -189,6 +190,8 @@ from mhatsh_server.tasks import (
     RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID,
     RECOVERED_AREA_EVENT_TASK_RECORDS,
     RECOVERED_AREA_EVENT_TASK_TYPE,
+    RECOVERED_QUEST_DIALOG_REFERENCES,
+    RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID,
     RECOVERED_QUEST_NPC_REFERENCES,
     RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID,
     STARTER_GUIDE_ID,
@@ -1573,10 +1576,12 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
     assert hints["act_marker_count"] == len(RECOVERED_ACT_MARKERS) == 21
     assert hints["act_task_count"] == len(RECOVERED_ACT_TASKS) == 15
     assert hints["quest_chain_count"] == len(RECOVERED_QUEST_CHAIN) == 90
+    assert hints["quest_dialog_reference_count"] == len(RECOVERED_QUEST_DIALOG_HINTS) == 12
     assert hints["area_events"] == RECOVERED_AREA_EVENT_TASKS
     assert hints["act_markers"] == RECOVERED_ACT_MARKERS
     assert hints["act_tasks"] == RECOVERED_ACT_TASKS
     assert hints["quest_chain"] == RECOVERED_QUEST_CHAIN
+    assert hints["quest_dialog_references"] == RECOVERED_QUEST_DIALOG_HINTS
     assert RECOVERED_QUEST_CHAIN[:5] == [
         {
             "constant_index": 258,
@@ -1683,6 +1688,28 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
     assert act_tasks_by_marker["act_mission2-1"]["task_type"] == 2
     assert act_tasks_by_marker["act1111"]["nearby_npc_ids"] == [5012]
     assert "act_event1-1" not in act_tasks_by_marker
+    dialogue_by_task_id = {
+        int(item["task_id"]): item for item in RECOVERED_QUEST_DIALOG_HINTS
+    }
+    assert dialogue_by_task_id[100602] == {
+        "constant_index": 440,
+        "task_id": 100602,
+        "quest_order": 3,
+        "text": "\u4e0e\u9ad8\u9a6c\u5c3e\u5973\u5b66\u751f\u8c08\u8bdd",
+        "nearby_stage_ids": [280102, 100601, 100602, 106102, 280103, 100701],
+        "nearby_npc_ids": [6669],
+        "drama_refs": [
+            "\u533a\u57df\u4e8b\u4ef6|280102|1",
+            "\u533a\u57df\u4e8b\u4ef6|280103|1",
+        ],
+    }
+    assert dialogue_by_task_id[137003]["text"] == (
+        "\u627e\u6b27\u5c14\u9ea6\u7279\u8c08\u8bdd"
+    )
+    assert dialogue_by_task_id[563702]["text"] == (
+        "\u628a\u521a\u624d\u7684\u7a81\u53d1\u72b6\u51b5\u5411\u8d76\u6765\u7684"
+        "\u8b66\u65b9\u6c47\u62a5"
+    )
 
     area_by_id = {
         int(item["event_id"]): item for item in RECOVERED_AREA_EVENT_TASKS
@@ -4034,6 +4061,30 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID[5012][0].drama_refs == (
         "act1111",
     )
+    assert len(RECOVERED_QUEST_DIALOG_REFERENCES) == 15
+    assert len(RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID) == 15
+    first_dialogue = RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[6669][0]
+    assert first_dialogue.task_id == 100602
+    assert first_dialogue.quest_order == 3
+    assert first_dialogue.text == (
+        "\u4e0e\u9ad8\u9a6c\u5c3e\u5973\u5b66\u751f\u8c08\u8bdd"
+    )
+    assert first_dialogue.nearby_stage_ids == (
+        280102,
+        100601,
+        100602,
+        106102,
+        280103,
+        100701,
+    )
+    assert first_dialogue.drama_refs == (
+        "\u533a\u57df\u4e8b\u4ef6|280102|1",
+        "\u533a\u57df\u4e8b\u4ef6|280103|1",
+    )
+    assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[5000][0].text == (
+        "\u627e\u6b27\u5c14\u9ea6\u7279\u8c08\u8bdd"
+    )
+    assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[6706][0].task_id == 563702
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
     assert area_task_update["task_info"]["Id"] == 280101
