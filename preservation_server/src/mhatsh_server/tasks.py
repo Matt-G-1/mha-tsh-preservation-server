@@ -61,6 +61,9 @@ class TaskRecord:
     quest_order: int = 0
     previous_task_id: int = 0
     next_task_id: int = 0
+    nearby_stage_ids: tuple[int, ...] = ()
+    nearby_npc_ids: tuple[int, ...] = ()
+    drama_refs: tuple[str, ...] = ()
 
     def to_protocol(self) -> dict[str, object]:
         return {
@@ -88,6 +91,9 @@ class TaskRecord:
             quest_order=self.quest_order,
             previous_task_id=self.previous_task_id,
             next_task_id=self.next_task_id,
+            nearby_stage_ids=self.nearby_stage_ids,
+            nearby_npc_ids=self.nearby_npc_ids,
+            drama_refs=self.drama_refs,
         )
 
 
@@ -264,6 +270,14 @@ class TaskState:
         return task.previous_task_id == 0 or task.previous_task_id in self.finished
 
 
+def _int_tuple(value: object) -> tuple[int, ...]:
+    return tuple(int(item) for item in list(value or []))
+
+
+def _str_tuple(value: object) -> tuple[str, ...]:
+    return tuple(str(item) for item in list(value or []))
+
+
 STARTER_TASK = TaskRecord(
     id=STARTER_GUIDE_ID,
     type=STARTER_TASK_TYPE,
@@ -333,6 +347,9 @@ def _recovered_area_event_task_records() -> tuple[TaskRecord, ...]:
                 quest_order=int(chain_item.get("order") or 0),
                 previous_task_id=int(chain_item.get("previous_task_id") or 0),
                 next_task_id=int(chain_item.get("next_task_id") or 0),
+                nearby_stage_ids=_int_tuple(task_hint.get("nearby_stage_ids")),
+                nearby_npc_ids=_int_tuple(task_hint.get("nearby_npc_ids")),
+                drama_refs=_str_tuple(task_hint.get("drama_refs")),
             )
         )
     return tuple(records)
@@ -374,6 +391,9 @@ def _recovered_act_task_records() -> tuple[TaskRecord, ...]:
                 quest_order=int(chain_item.get("order") or 0),
                 previous_task_id=int(chain_item.get("previous_task_id") or 0),
                 next_task_id=int(chain_item.get("next_task_id") or 0),
+                nearby_stage_ids=_int_tuple(task_hint.get("nearby_stage_ids")),
+                nearby_npc_ids=_int_tuple(task_hint.get("nearby_npc_ids")),
+                drama_refs=_str_tuple(task_hint.get("drama_refs")),
             )
         )
     return tuple(records)

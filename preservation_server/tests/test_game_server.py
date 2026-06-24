@@ -3936,6 +3936,14 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert RECOVERED_ACT_TASK_RECORDS[0].quest_order == 1
     assert RECOVERED_ACT_TASK_RECORDS[0].previous_task_id == 0
     assert RECOVERED_ACT_TASK_RECORDS[0].next_task_id == 280101
+    assert RECOVERED_ACT_TASK_RECORDS[0].nearby_stage_ids == (101002, 101203)
+    assert RECOVERED_ACT_TASK_RECORDS[0].nearby_npc_ids == ()
+    assert RECOVERED_ACT_TASK_RECORDS[0].drama_refs == ("cp_24_1", "act1001")
+    act1111 = next(
+        task for task in RECOVERED_ACT_TASK_RECORDS if task.source_marker == "act1111"
+    )
+    assert act1111.nearby_npc_ids == (5012,)
+    assert act1111.drama_refs == ("act1111",)
     accept = state.accept(STARTER_TASK.id)
     assert accept["action_type"] == 1
     assert accept["task_info"]["Status"] == TASK_STATUS_ACCEPTED
@@ -4004,6 +4012,17 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].quest_order == 2
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].previous_task_id == 1010
     assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].next_task_id == 100602
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].nearby_stage_ids == (
+        280101,
+        100502,
+        280102,
+    )
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].nearby_npc_ids == ()
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].drama_refs == (
+        "xht_103",
+        "\u533a\u57df\u4e8b\u4ef6|280101|1",
+        "act_event1-1",
+    )
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
     assert area_task_update["task_info"]["Id"] == 280101

@@ -598,6 +598,12 @@ environment details are intentionally omitted from Git.
   chain rows themselves. This keeps early quest NPC/dialog restoration tied to
   packed task evidence, including examples like `act1111` -> NPC `5012` and
   first-sortie area-event drama refs.
+- Runtime `TaskRecord` objects now preserve those parser-promoted
+  stage/NPC/drama evidence tuples internally, so future quest NPC/dialog
+  restoration can use the recovered task rows directly. A constant-pool pass
+  found sparse task keys such as `CreateNpc`, `SceneId`, `AccNpc`, and
+  `SubNpc`, but the main early chain does not yet expose enough stable
+  coordinate data to spawn those NPCs authoritatively.
 - Non-area-event `act*` task markers are now promoted into task state as
   recovered records with derived task type, label, objective, and source
   marker metadata. The starter task remains first for the archived client path,
