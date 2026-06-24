@@ -192,6 +192,7 @@ from mhatsh_server.tasks import (
     RECOVERED_AREA_EVENT_TASK_TYPE,
     RECOVERED_QUEST_DIALOG_REFERENCES,
     RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID,
+    RECOVERED_QUEST_DIALOG_REFERENCES_BY_TASK_ID,
     RECOVERED_QUEST_NPC_REFERENCES,
     RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID,
     STARTER_GUIDE_ID,
@@ -4085,6 +4086,10 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         "\u627e\u6b27\u5c14\u9ea6\u7279\u8c08\u8bdd"
     )
     assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID[6706][0].task_id == 563702
+    assert RECOVERED_QUEST_DIALOG_REFERENCES_BY_TASK_ID[100602] == (
+        first_dialogue,
+    )
+    assert state.active_quest_dialog_references() == ()
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
     assert area_task_update["task_info"]["Id"] == 280101
@@ -4096,6 +4101,7 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         280101,
         100602,
     ]
+    assert state.active_quest_dialog_references() == (first_dialogue,)
     assert state.complete_area_event_stage(21111) is None
     assert RECOVERED_AREA_EVENT_TASK_BY_STAGE_ID[21311].id == 280301
     out_of_order_state = TaskState()

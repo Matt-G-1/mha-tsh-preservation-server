@@ -246,6 +246,22 @@ class TaskState:
             task.id == STARTER_TASK.id or task.quest_order > 0
         )
 
+    def active_quest_dialog_references(
+        self,
+    ) -> tuple[QuestDialogReference, ...]:
+        active_task_ids = {
+            task.id
+            for task in self.tasks.values()
+            if task.id not in self.finished
+            and task.quest_order > 0
+            and self._is_visible(task)
+        }
+        return tuple(
+            reference
+            for reference in RECOVERED_QUEST_DIALOG_REFERENCES
+            if reference.task_id in active_task_ids
+        )
+
     def _task(self, task_id: int) -> TaskRecord:
         task = self.tasks.get(task_id)
         if task is None:
@@ -489,6 +505,18 @@ RECOVERED_QUEST_DIALOG_REFERENCES_BY_NPC_ID: dict[
     )
     for npc_id in sorted(
         {reference.npc_id for reference in RECOVERED_QUEST_DIALOG_REFERENCES}
+    )
+}
+RECOVERED_QUEST_DIALOG_REFERENCES_BY_TASK_ID: dict[
+    int, tuple[QuestDialogReference, ...]
+] = {
+    task_id: tuple(
+        reference
+        for reference in RECOVERED_QUEST_DIALOG_REFERENCES
+        if reference.task_id == task_id
+    )
+    for task_id in sorted(
+        {reference.task_id for reference in RECOVERED_QUEST_DIALOG_REFERENCES}
     )
 }
 
