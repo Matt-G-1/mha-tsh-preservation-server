@@ -4,6 +4,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import re
 import struct
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -850,6 +851,15 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "nightarea-speciel" in stage_candidate_by_key(
         "night_branch_drama_scripts"
     ).scripts
+    assert "zx_2_7_1" in stage_candidate_by_key(
+        "zx_lowercase_extra_scripts"
+    ).scripts
+    assert "405ceshi" in stage_candidate_by_key(
+        "loose_asset_tail_drama_scripts"
+    ).scripts
+    assert "z\\x08ixian_561004" in stage_candidate_by_key(
+        "loose_misc_drama_scripts"
+    ).scripts
 
     relax_stage = stage_candidate_by_id(400301)
     assert relax_stage.key == "relax_stage_400301"
@@ -1329,8 +1339,8 @@ def test_drama_family_stage_parser_groups_nonnumeric_script_families() -> None:
         for family in hints["families"]
         if isinstance(family, dict)
     }
-    assert hints["family_count"] == 28
-    assert hints["script_count"] == 496
+    assert hints["family_count"] == 32
+    assert hints["script_count"] == 622
     assert DRAMA_FAMILY_STAGE_SOURCE == hints["source"]
     assert len(DRAMA_FAMILY_STAGES) == hints["family_count"]
     assert len(DRAMA_FAMILY_STAGE_BY_KEY["activity_misc_drama_scripts"].scripts) == 91
@@ -1384,6 +1394,35 @@ def test_drama_family_stage_parser_groups_nonnumeric_script_families() -> None:
     assert "nightarea-speciel" in DRAMA_FAMILY_STAGE_BY_KEY[
         "night_branch_drama_scripts"
     ].scripts
+    assert "zx_2_7_1" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "zx_lowercase_extra_scripts"
+    ].scripts
+    assert "405ceshi" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "loose_asset_tail_drama_scripts"
+    ].scripts
+    assert "z\\x08ixian_561004" in DRAMA_FAMILY_STAGE_BY_KEY[
+        "loose_misc_drama_scripts"
+    ].scripts
+
+
+def test_recovered_battle_stage_catalog_represents_every_indexed_drama_script() -> None:
+    text = (ROOT / "analysis" / "intro_qte_asset_index.txt").read_text(
+        encoding="utf-8",
+        errors="ignore",
+    )
+    indexed_scripts = []
+    for match in re.finditer(r"\./script/setting/dramas/([^\s'\"\]]+)\.lua", text):
+        script = match.group(1)
+        if script not in indexed_scripts:
+            indexed_scripts.append(script)
+
+    runtime_refs = set()
+    for stage in RECOVERED_BATTLE_STAGES:
+        runtime_refs.update(stage.scripts)
+        runtime_refs.update(stage.actor_sets)
+
+    assert len(indexed_scripts) == 1257
+    assert [script for script in indexed_scripts if script not in runtime_refs] == []
 
 
 def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:
