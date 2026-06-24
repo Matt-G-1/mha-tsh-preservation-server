@@ -138,6 +138,10 @@ from mhatsh_server.usj_stages import (
     USJ_STAGE_SOURCE,
     USJ_STAGES,
 )
+from mhatsh_server.world_config_hints import (
+    WORLD_CONFIG_CONSTANT_COUNTS,
+    WORLD_CONFIG_HINT_SOURCE,
+)
 from mhatsh_server.skill_info_structured_terms import (
     STRUCTURED_SKILL_INFO_TERMS_BY_MODEL,
 )
@@ -412,6 +416,18 @@ def _load_npc_cfg_hint_script():
     return module
 
 
+def _load_world_config_hint_script():
+    script_path = ROOT / "scripts" / "derive_world_config_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_world_config_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_secret_area_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_secret_area_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
@@ -565,6 +581,29 @@ def roster_card(
 def test_starter_identity_matches_archived_midoriya_config() -> None:
     assert STARTER_HERO_ID == 1011
     assert STARTER_SHAPE_ID == 1001
+
+
+def test_world_config_hints_promote_recovered_caps() -> None:
+    assert "city_level_cfg" in WORLD_CONFIG_HINT_SOURCE
+    assert "user_info_cfg" in WORLD_CONFIG_HINT_SOURCE
+    assert "funcopen_cfg" in WORLD_CONFIG_HINT_SOURCE
+    assert PLAYER_LEVEL_CAP == 70
+    assert CITY_LEVEL_CAP == 60
+    assert FUNCTION_OPEN_IDS[0] == 1
+    assert FUNCTION_OPEN_IDS[-1] == 240
+    assert 82 not in FUNCTION_OPEN_IDS
+    assert len(FUNCTION_OPEN_IDS) == 213
+    assert WORLD_CONFIG_CONSTANT_COUNTS == {
+        "city_level_cfg": 127,
+        "user_info_cfg": 209,
+        "funcopen_cfg": 830,
+    }
+
+    module = _load_world_config_hint_script()
+    payload = module.collect_world_config_hints()
+    assert payload["city_level_cap"] == CITY_LEVEL_CAP
+    assert payload["player_level_cap"] == PLAYER_LEVEL_CAP
+    assert tuple(payload["function_open_ids"]) == FUNCTION_OPEN_IDS
 
 
 def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:

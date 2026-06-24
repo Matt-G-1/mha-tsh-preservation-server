@@ -46,6 +46,11 @@ from .tasks import TaskState
 from .tutorial import TutorialState
 from .world import WorldState
 from .world_tasks import WorldTaskState
+from .world_config_hints import (
+    CITY_LEVEL_CAP,
+    FUNCTION_OPEN_IDS,
+    PLAYER_LEVEL_CAP,
+)
 
 
 LOG = logging.getLogger("mhatsh.game")
@@ -57,10 +62,6 @@ STARTER_SCENE_ID = 1000
 STARTER_SCENE_X = 4221
 STARTER_SCENE_Y = 19931
 STARTER_SCENE_Z = 0
-PLAYER_LEVEL_CAP = 70
-CITY_LEVEL_CAP = 60
-FUNCTION_OPEN_IDS = tuple(range(1, 241))
-
 
 def _env_enabled(name: str, default: str) -> bool:
     return os.environ.get(name, default).lower() not in {"0", "false", "no", "skip"}
