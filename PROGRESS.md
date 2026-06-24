@@ -428,6 +428,10 @@ environment details are intentionally omitted from Git.
   `Face`/`Id` now recovers `40650603` and `56111303`. Authored placement
   recovery is up to 72 hints across 27 stages; the only remaining routed
   combat-coordinate gaps are the tower special rows `56240652` and `56240771`.
+- Runtime authored-spawn data is now parity-checked against the parser output
+  for all 72 recovered placements. This corrected stale promoted coordinates
+  for `40420103` and `40510301`, including the recovered `40510301` Z/face
+  values instead of older local fallback placement data.
 - The English `monster_cfg` packed asset now has a conservative hint extractor:
   `scripts/derive_monster_cfg_hints.py`. It scans animation-key neighborhoods
   for display-name candidates and feeds a typed monster evidence layer for

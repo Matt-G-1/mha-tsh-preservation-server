@@ -1847,6 +1847,27 @@ def test_stage_spawn_hint_parser_tracks_conservative_authored_positions() -> Non
     assert hints["target_count"] == 75
     assert hints["stage_count"] == 27
     assert hints["spawn_count"] == 72
+    parsed_spawns = {
+        int(stage_id): tuple(
+            (
+                int(item["enemy_id"]),
+                int(item["x"]),
+                int(item["y"]),
+                int(item["z"]),
+                int(item["face"]),
+            )
+            for item in items
+        )
+        for stage_id, items in hints["stages"].items()
+    }
+    runtime_spawns = {
+        stage_id: tuple(
+            (spawn.enemy_id, spawn.x, spawn.y, spawn.z, spawn.face)
+            for spawn in spawns
+        )
+        for stage_id, spawns in STAGE_CFG_AUTHORED_SPAWN_HINTS_BY_STAGE.items()
+    }
+    assert runtime_spawns == parsed_spawns
     assert hints["stages"]["160001"] == [
         {
             "enemy_id": 16000101,
