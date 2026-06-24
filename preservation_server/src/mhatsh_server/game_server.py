@@ -467,6 +467,30 @@ class GameServer:
                 "c_world_task_info",
                 session.world_tasks.world_task_info(),
             )
+        elif name == "s_base_station_activate":
+            await self._send(
+                writer,
+                session,
+                "c_base_station_activate",
+                session.tutorial.activate_base_station(
+                    int(values.get("iBaseStationId") or 0)
+                ),
+            )
+            task_update = session.tasks.complete_active_base_station_task()
+            if task_update is not None:
+                await self._send_task_progression(writer, session, task_update)
+        elif name == "s_base_station_uplevel":
+            await self._send(
+                writer,
+                session,
+                "c_base_station_uplevel",
+                session.tutorial.upgrade_base_station(
+                    int(values.get("iBaseStationId") or 0)
+                ),
+            )
+            task_update = session.tasks.complete_active_base_station_task()
+            if task_update is not None:
+                await self._send_task_progression(writer, session, task_update)
         elif name == "s_city_level_click":
             await self._send(
                 writer,

@@ -272,6 +272,13 @@ class TaskState:
             return 0
         return int(task.source_stage_id)
 
+    def complete_active_base_station_task(self) -> dict[str, object] | None:
+        task = self._active_base_station_task()
+        if task is None:
+            return None
+        self._finish(task)
+        return self.task_update(task, action_type=2)
+
     def enter_stage(self, is_enter: int) -> dict[str, object]:
         return {"IsEnter": is_enter}
 
@@ -364,6 +371,24 @@ class TaskState:
         if STARTER_TASK.id not in self.finished:
             return False
         return task.previous_task_id == 0 or task.previous_task_id in self.finished
+
+    def _active_base_station_task(self) -> TaskRecord | None:
+        candidates = sorted(
+            (
+                task
+                for task in self.tasks.values()
+                if task.id not in self.finished
+                and task.source_kind == "act"
+                and task.quest_order > 0
+                and self._is_visible(task)
+                and (
+                    "\u57fa\u7ad9" in task.objective
+                    or "\u8ba4\u8bc1" in task.objective
+                )
+            ),
+            key=lambda task: (task.quest_order, task.id),
+        )
+        return candidates[0] if candidates else None
 
 
 def _int_tuple(value: object) -> tuple[int, ...]:

@@ -4032,6 +4032,30 @@ def test_tutorial_state_accumulates_guides_teach_and_base_station() -> None:
         "arrBaseStationInfo": [],
     }
     assert state.base_station_client_version == 23
+    assert state.activate_base_station(2) == {
+        "iBaseStationId": 2,
+        "iResult": 1,
+    }
+    assert state.base_station_all_info(24) == {
+        "iClientVersion": 24,
+        "arrFinishAidCount": [],
+        "arrBaseStationInfo": [
+            {
+                "iBaseStationId": 2,
+                "iLevel": 1,
+                "iFinishTaskCount": 0,
+                "iFinishEntrustTaskCount": 0,
+            }
+        ],
+    }
+    assert state.upgrade_base_station(2) == {
+        "mpBaseStationInfo": {
+            "iBaseStationId": 2,
+            "iLevel": 2,
+            "iFinishTaskCount": 0,
+            "iFinishEntrustTaskCount": 0,
+        }
+    }
 
 
 def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
@@ -4278,6 +4302,28 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         280101,
         100602,
     ]
+    base_state = TaskState()
+    base_state.skip_starter_quest()
+    assert base_state.complete_active_base_station_task() is None
+    assert base_state.submit(1010)["task_info"]["Id"] == 1010
+    assert base_state.complete_area_event_stage(21111) is not None
+    assert base_state.complete_active_quest_contact(100602) is not None
+    assert base_state.complete_area_event_stage(21131) is not None
+    base_update = base_state.complete_active_base_station_task()
+    assert base_update is not None
+    assert base_update["task_info"]["Id"] == 100902
+    assert base_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert 100902 in base_state.finished
+    assert [task["Id"] for task in base_state.task_info()["tasks"][:7]] == [
+        STARTER_TASK.id,
+        1010,
+        280101,
+        100602,
+        100701,
+        100902,
+        280201,
+    ]
+    assert base_state.complete_active_base_station_task() is None
 
 
 def test_activity_state_returns_empty_compatibility_payloads() -> None:
@@ -4865,6 +4911,12 @@ def test_contact_sync_progress_persists_area_event_stage_state(
     asyncio.run(_run_contact_sync_progress_persistence(tmp_path))
 
 
+def test_base_station_activation_progresses_certification_task(
+    tmp_path: Path,
+) -> None:
+    asyncio.run(_run_base_station_activation_progression(tmp_path))
+
+
 def test_finished_task_ids_persist_across_server_instances(tmp_path: Path) -> None:
     asyncio.run(_run_finished_task_id_persistence(tmp_path))
 
@@ -5365,6 +5417,113 @@ async def _run_contact_sync_progress_persistence(tmp_path: Path) -> None:
     )
     assert restored_contact_task["Status"] == TASK_STATUS_FINISHED
     assert restored_contact_task["Cond"][0]["CompCount"] == 1
+
+
+async def _run_base_station_activation_progression(tmp_path: Path) -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    profile_path = tmp_path / "profiles.json"
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_PROFILE_STORE": str(profile_path),
+            "MHATSH_ROSTER_MODE": "verified",
+        },
+    ):
+        first_game = GameServer(registry)
+        first_writer = BufferWriter()
+        first_session = Session(
+            seed=1,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x53424131),
+            urs="local-guest",
+            uid=4242,
+        )
+        first_game._configure_session(first_session)
+        first_session.tasks.submit(1010)
+        first_session.tasks.complete_area_event_stage(21111)
+        first_session.tasks.complete_active_quest_contact(100602)
+        first_session.tasks.complete_area_event_stage(21131)
+        base_activate = codec.encode_message(
+            "s_base_station_activate",
+            {"iBaseStationId": 2},
+        )
+        await first_game._dispatch(
+            first_session,
+            registry.protocol_ids["s_base_station_activate"],
+            base_activate,
+            first_writer,
+        )
+        decoder = FrameDecoder(RollingXor(0x53424131))
+        replies = decoder.feed(bytes(first_writer.data))
+        assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+            "c_base_station_activate",
+            "c_task_info_update",
+            "c_task_info",
+        ]
+        assert codec.decode_message("c_base_station_activate", replies[0][1]) == {
+            "iBaseStationId": 2,
+            "iResult": 1,
+        }
+        task_update = codec.decode_message("c_task_info_update", replies[1][1])
+        assert task_update["task_info"]["Id"] == 100902
+        assert task_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+        task_info = codec.decode_message("c_task_info", replies[2][1])
+        assert 100902 in task_info["finishs"]
+        assert [task["Id"] for task in task_info["tasks"][:7]] == [
+            STARTER_TASK.id,
+            1010,
+            280101,
+            100602,
+            100701,
+            100902,
+            280201,
+        ]
+
+        first_writer.data.clear()
+        first_session.outbound = RollingXor(0x53424132)
+        base_info = codec.encode_message(
+            "s_base_station_all_info",
+            {"iClientVersion": 7},
+        )
+        await first_game._dispatch(
+            first_session,
+            registry.protocol_ids["s_base_station_all_info"],
+            base_info,
+            first_writer,
+        )
+        decoder = FrameDecoder(RollingXor(0x53424132))
+        replies = decoder.feed(bytes(first_writer.data))
+        assert registry.protocol_names[replies[0][0]] == "c_base_station_all_info"
+        assert codec.decode_message("c_base_station_all_info", replies[0][1])[
+            "arrBaseStationInfo"
+        ] == [
+            {
+                "iBaseStationId": 2,
+                "iLevel": 1,
+                "iFinishTaskCount": 0,
+                "iFinishEntrustTaskCount": 0,
+            }
+        ]
+
+        second_game = GameServer(registry)
+        second_session = Session(
+            seed=2,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x53424133),
+            urs="local-guest",
+            uid=4242,
+        )
+        second_game._configure_session(second_session)
+
+    raw_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    saved_tasks = raw_profile["finished_tasks"]["local-guest"]
+    assert 100902 in saved_tasks
+    restored_task_info = second_session.tasks.task_info()
+    assert 100902 in restored_task_info["finishs"]
+    assert any(task["Id"] == 280201 for task in restored_task_info["tasks"])
 
 
 async def _run_finished_task_id_persistence(tmp_path: Path) -> None:

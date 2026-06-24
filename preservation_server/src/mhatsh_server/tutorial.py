@@ -13,6 +13,7 @@ class TutorialState:
     client_stats: list[dict[str, object]] = field(default_factory=list)
     teach_skill_counts: dict[int, dict[int, int]] = field(default_factory=dict)
     base_station_client_version: int = 0
+    base_station_levels: dict[int, int] = field(default_factory=dict)
 
     def finish_guides(
         self,
@@ -77,5 +78,30 @@ class TutorialState:
         return {
             "iClientVersion": client_version,
             "arrFinishAidCount": [],
-            "arrBaseStationInfo": [],
+            "arrBaseStationInfo": [
+                self.base_station_info(base_station_id)
+                for base_station_id in sorted(self.base_station_levels)
+            ],
+        }
+
+    def activate_base_station(self, base_station_id: int) -> dict[str, object]:
+        numeric_base_station_id = max(1, int(base_station_id or 1))
+        self.base_station_levels.setdefault(numeric_base_station_id, 1)
+        return {"iBaseStationId": numeric_base_station_id, "iResult": 1}
+
+    def upgrade_base_station(self, base_station_id: int) -> dict[str, object]:
+        numeric_base_station_id = max(1, int(base_station_id or 1))
+        self.base_station_levels[numeric_base_station_id] = min(
+            self.base_station_levels.get(numeric_base_station_id, 1) + 1,
+            10,
+        )
+        return {"mpBaseStationInfo": self.base_station_info(numeric_base_station_id)}
+
+    def base_station_info(self, base_station_id: int) -> dict[str, object]:
+        numeric_base_station_id = max(1, int(base_station_id or 1))
+        return {
+            "iBaseStationId": numeric_base_station_id,
+            "iLevel": self.base_station_levels.get(numeric_base_station_id, 1),
+            "iFinishTaskCount": 0,
+            "iFinishEntrustTaskCount": 0,
         }
