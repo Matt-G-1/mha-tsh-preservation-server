@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .characters import support_card_book_entries
+from .characters import SUPPORT_CARD_ITEM_IDS, support_card_book_entries
 from .combat import fight_style_for_character
 from .roster import RosterState
 
@@ -13,9 +13,16 @@ class CharacterMenuState:
     requested_area_lineups: list[tuple[int, tuple[int, ...]]] = field(
         default_factory=list
     )
+    attached_card_slots: dict[int, dict[int, int]] = field(default_factory=dict)
 
     def card_show_info(self) -> dict[str, object]:
-        return {"ActiveAttachedCardIdList": []}
+        active_cards = {
+            attached_card_uid
+            for slots in self.attached_card_slots.values()
+            for attached_card_uid in slots.values()
+            if attached_card_uid > 0
+        }
+        return {"ActiveAttachedCardIdList": sorted(active_cards)}
 
     def card_show_oper(self, card_id: int) -> dict[str, object]:
         if card_id not in self.opened_show_ids:
@@ -126,7 +133,15 @@ class CharacterMenuState:
     def attached_card_info(self, roster: RosterState) -> dict[str, object]:
         return {
             "AttachedCardInfo": [
-                {"HeroId": card.hero_id, "SlotInfo": []}
+                {
+                    "HeroId": card.hero_id,
+                    "SlotInfo": [
+                        {"Index": index, "ACardUid": attached_card_uid}
+                        for index, attached_card_uid in sorted(
+                            self.attached_card_slots.get(card.hero_id, {}).items()
+                        )
+                    ],
+                }
                 for card in sorted(
                     roster.cards.values(), key=lambda item: item.card_uid
                 )
@@ -135,6 +150,28 @@ class CharacterMenuState:
 
     def attached_card_book(self) -> dict[str, object]:
         return {"Page": 0, "Book": support_card_book_entries()}
+
+    def attached_card_oper(
+        self,
+        *,
+        hero_id: int,
+        index: int,
+        oper: int,
+        attached_card_uid: int,
+        roster: RosterState,
+    ) -> dict[str, object]:
+        hero_id = int(hero_id)
+        index = int(index)
+        attached_card_uid = int(attached_card_uid)
+        if index > 0:
+            slots = self.attached_card_slots.setdefault(hero_id, {})
+            if oper == 0 and attached_card_uid in SUPPORT_CARD_ITEM_IDS:
+                slots[index] = attached_card_uid
+            else:
+                slots.pop(index, None)
+            if not slots:
+                self.attached_card_slots.pop(hero_id, None)
+        return self.attached_card_info(roster)
 
     def equip_list(self) -> dict[str, object]:
         return {"UidList": []}

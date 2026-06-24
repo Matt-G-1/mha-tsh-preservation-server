@@ -59,6 +59,7 @@ from mhatsh_server.characters import (
     NON_PUBLIC_PLAYABLE_MODEL_REASONS,
     PLAYABLE_CHARACTERS,
     PUBLIC_PLAYABLE_MODEL_IDS,
+    SUPPORT_CARD_ITEM_IDS,
     STARTER_CHARACTER,
     SUPPORT_CHARACTERS,
     TUTORIAL_MAP_SPAWNS,
@@ -402,6 +403,7 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert SUPPORT_CHARACTERS["h1927"].item_id == 6230016
     assert SUPPORT_CHARACTERS["h1927"].shape_id == 1927
     assert SUPPORT_CHARACTERS["h1927"].support_type == 2
+    assert 6230016 in SUPPORT_CARD_ITEM_IDS
     assert support_card_book_entries()[0] == {"ItemId": 6111045, "Type": 2}
     assert support_card_book_entries()[-1] == {"ItemId": 6230016, "Type": 2}
     assert STARTER_CHARACTER == PLAYABLE_CHARACTERS["h1001"]
@@ -4288,6 +4290,60 @@ async def _run_character_menu_requests() -> None:
             for character in INITIAL_PLAYABLE_ROSTER
         ]
     }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xDDEEFF12)
+    attached_oper = codec.encode_message(
+        "s_attached_card_oper",
+        {
+            "HeroId": STARTER_HERO_ID,
+            "Index": 1,
+            "Oper": 0,
+            "ACardUid": SUPPORT_CHARACTERS["h1927"].item_id,
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_attached_card_oper"],
+        attached_oper,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xDDEEFF12))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_attached_card_info"
+    attached_info = codec.decode_message("c_attached_card_info", reply_body)
+    assert attached_info["AttachedCardInfo"][0] == {
+        "HeroId": STARTER_HERO_ID,
+        "SlotInfo": [{"Index": 1, "ACardUid": SUPPORT_CHARACTERS["h1927"].item_id}],
+    }
+
+    assert session.character_menu.card_show_info() == {
+        "ActiveAttachedCardIdList": [SUPPORT_CHARACTERS["h1927"].item_id]
+    }
+
+    writer.data.clear()
+    session.outbound = RollingXor(0xDDEEFF14)
+    attached_clear = codec.encode_message(
+        "s_attached_card_oper",
+        {
+            "HeroId": STARTER_HERO_ID,
+            "Index": 1,
+            "Oper": 1,
+            "ACardUid": SUPPORT_CHARACTERS["h1927"].item_id,
+        },
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_attached_card_oper"],
+        attached_clear,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0xDDEEFF14))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_attached_card_info"
+    assert codec.decode_message("c_attached_card_info", reply_body)[
+        "AttachedCardInfo"
+    ][0] == {"HeroId": STARTER_HERO_ID, "SlotInfo": []}
 
     writer.data.clear()
     session.outbound = RollingXor(0xEEFF1122)

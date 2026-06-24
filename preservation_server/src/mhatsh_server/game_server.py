@@ -693,7 +693,13 @@ class GameServer:
                 writer,
                 session,
                 "c_attached_card_info",
-                session.character_menu.attached_card_info(roster),
+                session.character_menu.attached_card_oper(
+                    hero_id=int(values.get("HeroId") or 0),
+                    index=int(values.get("Index") or 0),
+                    oper=int(values.get("Oper") or 0),
+                    attached_card_uid=int(values.get("ACardUid") or 0),
+                    roster=roster,
+                ),
             )
         elif name == "s_equip_on":
             await self._send(

@@ -121,6 +121,11 @@ def support_card_book_entries() -> list[dict[str, int]]:
         )
     ]
 
+
+SUPPORT_CARD_ITEM_IDS = frozenset(
+    character.item_id for character in SUPPORT_CHARACTERS.values()
+)
+
 NON_PUBLIC_PLAYABLE_MODEL_REASONS = {
     "h1004": "small-form All Might variant, not a normal roster card",
     "h1018": "Kyoka Jiro has local protocol/model rows but was not public playable",
