@@ -85,6 +85,7 @@ class Session:
     character_menu: CharacterMenuState = field(default_factory=CharacterMenuState)
     stage: StageState = field(default_factory=StageState)
     roster: RosterState | None = None
+    stage_card_uid: int = 0
     pending_starter_intro_stage: bool = False
     profile_configured: bool = False
 
@@ -1542,7 +1543,8 @@ class GameServer:
             session.stage.record_report(values)
             if self.stage_report_response in {"complete", "result"}:
                 roster = self._ensure_roster(session)
-                fight_style = fight_style_for_character(roster.active_card.character)
+                stage_card = self._stage_card(session, roster)
+                fight_style = fight_style_for_character(stage_card.character)
                 stage = self._current_stage_definition(session)
                 stage_drop = session.stage.stage_drop(
                     fight_style=fight_style,
@@ -2231,7 +2233,12 @@ class GameServer:
         session: Session,
         roster: RosterState,
         stage: BattleStageDefinition,
+        *,
+        card_uid: int = 0,
     ) -> None:
+        session.stage_card_uid = (
+            int(card_uid) if int(card_uid) in roster.cards else roster.active_card_uid
+        )
         await self._send(
             writer,
             session,
@@ -2260,7 +2267,7 @@ class GameServer:
     def _frame_fighter_data(
         self, session: Session, roster: RosterState
     ) -> dict[str, Any]:
-        active = roster.active_card
+        active = self._stage_card(session, roster)
         skill_levels = fight_style_for_character(
             active.character
         ).protocol_skill_levels(roster.hero_level)
@@ -2312,6 +2319,18 @@ class GameServer:
             "CampaignBuffArgs": [],
             "GroupBuffs": [],
         }
+
+    def _stage_card(self, session: Session, roster: RosterState):
+        return roster.cards.get(session.stage_card_uid, roster.active_card)
+
+    def _preferred_stage_card_uid(
+        self, roster: RosterState, stage: BattleStageDefinition
+    ) -> int:
+        for model_id in stage.character_refs:
+            for card in roster.cards.values():
+                if card.character.model_asset_id == model_id:
+                    return card.card_uid
+        return roster.active_card_uid
 
     async def _send_scene_player_info(
         self,
@@ -2496,8 +2515,13 @@ class GameServer:
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
         roster = self._ensure_roster(session)
+        stage = self._intro_stage_definition()
         await self._send_stage_enter(
-            writer, session, roster, self._intro_stage_definition()
+            writer,
+            session,
+            roster,
+            stage,
+            card_uid=self._preferred_stage_card_uid(roster, stage),
         )
 
     async def _send_active_quest_contact_npcs(

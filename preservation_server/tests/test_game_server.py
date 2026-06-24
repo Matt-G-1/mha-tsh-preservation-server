@@ -6763,6 +6763,55 @@ def test_intro_stage_key_selects_recovered_candidate_defaults() -> None:
     assert game.intro_stage_uid == 5026010001
 
 
+async def _run_all_might_intro_stage_fighter_override() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_INTRO_STAGE_KEY": "all_might_stage_502601",
+            "MHATSH_INTRO_STAGE_MODE": "starter",
+            "MHATSH_ROSTER_MODE": "verified",
+        },
+        clear=False,
+    ):
+        game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x414C4D31),
+    )
+    enter_stage = codec.encode_message("s_task_enter_stage", {"IsEnter": 1})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_task_enter_stage"],
+        enter_stage,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x414C4D31))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_task_enter_stage",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 502601
+    fighter = codec.decode_message("c_frame_fighter_data", replies[2][1])
+    assert fighter["HeroId"] == 1041
+    assert fighter["Heros"][0]["ShapeId"] == 1003
+    assert session.stage_card_uid != STARTER_CARD_UID
+    assert session.roster is not None
+    assert session.roster.active_hero_id == STARTER_HERO_ID
+
+
+def test_all_might_intro_stage_uses_stage_fighter_without_switching_roster() -> None:
+    asyncio.run(_run_all_might_intro_stage_fighter_override())
+
+
 async def _run_client_stat() -> None:
     registry = SchemaRegistry.from_files(
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
