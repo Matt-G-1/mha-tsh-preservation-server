@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .characters import support_card_book_entries
 from .combat import fight_style_for_character
 from .roster import RosterState
 
@@ -133,7 +134,7 @@ class CharacterMenuState:
         }
 
     def attached_card_book(self) -> dict[str, object]:
-        return {"Page": 0, "Book": []}
+        return {"Page": 0, "Book": support_card_book_entries()}
 
     def equip_list(self) -> dict[str, object]:
         return {"UidList": []}

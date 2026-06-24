@@ -68,6 +68,7 @@ from mhatsh_server.characters import (
     playable_roster,
     scene_npc,
     scene_npc_from_spawn,
+    support_card_book_entries,
 )
 from mhatsh_server.combat import (
     COMBAT_CATALOG_SOURCE,
@@ -394,10 +395,15 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert "AXMD raw-rip" in CATALOG_SOURCE
     assert "en_hero_cfg" in CATALOG_SOURCE
     assert len(PLAYABLE_CHARACTERS) == 31
-    assert len(SUPPORT_CHARACTERS) == 1
+    assert len(SUPPORT_CHARACTERS) == 12
     assert len(MAP_CHARACTERS) == 40
     assert len(CHIBI_MODEL_ASSETS) == 3
     assert SUPPORT_CHARACTERS["h1927"].name == "Best Jeanist"
+    assert SUPPORT_CHARACTERS["h1927"].item_id == 6230016
+    assert SUPPORT_CHARACTERS["h1927"].shape_id == 1927
+    assert SUPPORT_CHARACTERS["h1927"].support_type == 2
+    assert support_card_book_entries()[0] == {"ItemId": 6111045, "Type": 2}
+    assert support_card_book_entries()[-1] == {"ItemId": 6230016, "Type": 2}
     assert STARTER_CHARACTER == PLAYABLE_CHARACTERS["h1001"]
     assert STARTER_CHARACTER.hero_id == 1011
     assert STARTER_CHARACTER.shape_id == 1001
@@ -1915,6 +1921,8 @@ def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
     assert "h1927" not in {
         character.model_asset_id for character in VERIFIED_PLAYABLE_ROSTER
     }
+    assert "h1927" in SUPPORT_CHARACTERS
+    assert "h1018" in SUPPORT_CHARACTERS
 
 
 def test_fight_style_catalog_covers_verified_playable_roster() -> None:
@@ -4256,7 +4264,7 @@ async def _run_character_menu_requests() -> None:
     assert registry.protocol_names[reply_id] == "c_attached_card_book"
     assert codec.decode_message("c_attached_card_book", reply_body) == {
         "Page": 0,
-        "Book": [],
+        "Book": support_card_book_entries(),
     }
 
     writer.data.clear()

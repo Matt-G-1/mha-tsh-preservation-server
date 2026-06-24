@@ -26,6 +26,13 @@ class PlayableCharacter:
 class SupportCharacter:
     name: str
     model_asset_id: str
+    item_id: int
+    shape_id: int
+    support_type: int = 1
+    sort_id: int = 0
+
+    def to_book_entry(self) -> dict[str, int]:
+        return {"ItemId": self.item_id, "Type": self.support_type}
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +97,29 @@ PLAYABLE_CHARACTERS = {
 }
 
 SUPPORT_CHARACTERS = {
-    "h1927": SupportCharacter("Best Jeanist", "h1927"),
+    "h1003": SupportCharacter("All Might", "h1003", 6111045, 1003, 2, 1),
+    "h5006": SupportCharacter("Mt. Lady", "h5006", 6121016, 5006, 1, 2),
+    "h1017": SupportCharacter("Mina Ashido", "h1017", 6135016, 1017, 1, 3),
+    "h5008": SupportCharacter("Kamui Woods", "h5008", 6140016, 5008, 1, 4),
+    "h1021": SupportCharacter("Endeavor", "h1021", 6150016, 1021, 2, 5),
+    "h5041": SupportCharacter("Gran Torino", "h5041", 6160016, 5041, 1, 6),
+    "h5057": SupportCharacter("Himiko Toga", "h5057", 6180016, 5057, 1, 7),
+    "h5058": SupportCharacter("Rody", "h5058", 6190016, 5058, 1, 8),
+    "h2152": SupportCharacter("Beros", "h2152", 6200016, 2152, 1, 9),
+    "h2151": SupportCharacter("Sidero", "h2151", 6210016, 2151, 1, 9),
+    "h1018": SupportCharacter("Kyoka Jiro", "h1018", 6220016, 1018, 1, 11),
+    "h1927": SupportCharacter("Best Jeanist", "h1927", 6230016, 1927, 2, 12),
 }
+
+
+def support_card_book_entries() -> list[dict[str, int]]:
+    return [
+        character.to_book_entry()
+        for character in sorted(
+            SUPPORT_CHARACTERS.values(),
+            key=lambda item: (item.sort_id, item.item_id),
+        )
+    ]
 
 NON_PUBLIC_PLAYABLE_MODEL_REASONS = {
     "h1004": "small-form All Might variant, not a normal roster card",

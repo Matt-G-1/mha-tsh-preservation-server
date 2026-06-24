@@ -85,6 +85,12 @@ playable hero list. Public guides identify both active and passive support-card
 types, and community card guides list examples such as Kamui Woods, Snipe, Nezu,
 Rody, Muscular, Kurogiri, Mr. Compress, Nomu, and Mastermind.
 
+Implementation note: the local `en_hero_cfg` `AttachName` block now backs the
+server's `c_attached_card_book` response. That catalog currently exposes 12
+support-card rows, including Best Jeanist / Finest Threading as `ItemId`
+`6230016`, `ShapeId` `1927`, while keeping those rows separate from playable
+hero ownership.
+
 ## Game Systems To Preserve
 
 The official game page and beginner guides describe the game as an open-world
