@@ -545,6 +545,9 @@ environment details are intentionally omitted from Git.
 - Completed stage rewards now also grant saved normal-item counts in the
   profile store, giving later inventory/UI packet work a persistent
   player-data backing store.
+- Saved normal-item counts now surface through protocol packets: accounts with
+  stored items receive a startup `c_item_normal_list`, and lottery/ex-lottery
+  rewards send `c_item_amount` updates after the draw result.
 - The recovered stage catalog now tracks numeric `stage500` plus major
   script-only `zx_ruxue`, USJ, beach, commercial-street, and training-yard
   drama groups. Generated fallback encounters now select enemy-specific AI

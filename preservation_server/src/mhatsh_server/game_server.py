@@ -1758,7 +1758,7 @@ class GameServer:
                 int(values.get("DrawId") or 0),
                 int(values.get("Times") or 0),
             )
-            self._grant_stage_reward_list(
+            item_amounts = self._grant_stage_reward_list(
                 session,
                 [
                     reward
@@ -1769,6 +1769,7 @@ class GameServer:
                 ],
             )
             await self._send(writer, session, "c_lottery_draw", draw_result)
+            await self._send_item_amount(writer, session, item_amounts)
         elif name == "s_act_exlottery_info":
             await self._send(
                 writer,
@@ -1781,7 +1782,7 @@ class GameServer:
                 int(values.get("DrawId") or 0),
                 int(values.get("Times") or 0),
             )
-            self._grant_stage_reward_list(
+            item_amounts = self._grant_stage_reward_list(
                 session,
                 [
                     reward
@@ -1792,6 +1793,7 @@ class GameServer:
                 ],
             )
             await self._send(writer, session, "c_act_exlottery_draw", draw_result)
+            await self._send_item_amount(writer, session, item_amounts)
         elif name == "s_grid_box_lottery":
             await self._send(
                 writer,
@@ -2115,6 +2117,20 @@ class GameServer:
                 "ShowShapeId": roster.active_shape_id,
                 "ShowShapeCacheId": 0,
             },
+        )
+        await self._send_initial_normal_items(writer, session)
+
+    async def _send_initial_normal_items(
+        self, writer: asyncio.StreamWriter, session: Session
+    ) -> None:
+        normal_items = self.profile_store.normal_item_list(session.urs)
+        if not normal_items:
+            return
+        await self._send(
+            writer,
+            session,
+            "c_item_normal_list",
+            {"page": 1, "totalpage": 1, "item": normal_items},
         )
 
     async def _send_initial_scene(
@@ -2500,10 +2516,29 @@ class GameServer:
 
     def _grant_stage_reward_list(
         self, session: Session, reward_list: list[dict[str, object]]
+    ) -> list[dict[str, int]]:
+        rewards = self._stage_reward_items(reward_list)
+        self.profile_store.grant_items(session.urs, rewards)
+        changed_item_ids = {item_id for item_id, count in rewards if count > 0}
+        return [
+            item
+            for item in self.profile_store.normal_item_list(session.urs)
+            if int(item["ItemId"]) in changed_item_ids
+        ]
+
+    async def _send_item_amount(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        item_amounts: list[dict[str, int]],
     ) -> None:
-        self.profile_store.grant_items(
-            session.urs,
-            self._stage_reward_items(reward_list),
+        if not item_amounts:
+            return
+        await self._send(
+            writer,
+            session,
+            "c_item_amount",
+            {"ItemList": item_amounts},
         )
 
     @staticmethod
