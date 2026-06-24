@@ -14,6 +14,7 @@ from .act_daily_stages import (
 )
 from .combat import CombatResolution, FightStyle
 from .herochip_stages import HEROCHIP_STAGE_SOURCE, HEROCHIP_STAGES
+from .roguelike_stages import ROGUELIKE_STAGE_SOURCE, ROGUELIKE_STAGES
 from .usj_stages import USJ_STAGE_SOURCE, USJ_STAGES
 
 
@@ -2211,6 +2212,29 @@ def _herochip_stage_definitions() -> tuple[BattleStageDefinition, ...]:
     )
 
 
+def _roguelike_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | set(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+        | set(STAGE_CFG_SCRIPT_ROUTE_GROUPS)
+        | {stage.stage_id for stage in AREA_EVENT_STAGES}
+        | {stage.stage_id for stage in ACT_DAILY_STAGES}
+        | {stage.stage_id for stage in USJ_STAGES}
+        | {stage.stage_id for stage in HEROCHIP_STAGES}
+    )
+    return tuple(
+        BattleStageDefinition(
+            key=f"roguelike_stage_{stage.stage_id}",
+            label=stage.label,
+            stage_id=stage.stage_id,
+            source=ROGUELIKE_STAGE_SOURCE,
+        )
+        for stage in ROGUELIKE_STAGES
+        if stage.stage_id not in occupied_ids
+    )
+
+
 RECOVERED_BATTLE_STAGES = (
     BattleStageDefinition(
         key="starter_intro_299301",
@@ -2454,6 +2478,7 @@ RECOVERED_BATTLE_STAGES = (
     *_act_daily_stage_definitions(),
     *_usj_stage_definitions(),
     *_herochip_stage_definitions(),
+    *_roguelike_stage_definitions(),
     *_zx_numeric_stage_definitions(),
     BattleStageDefinition(
         key="battle_drama_zx_only",
