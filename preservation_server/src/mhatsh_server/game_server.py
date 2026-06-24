@@ -476,6 +476,10 @@ class GameServer:
                     int(values.get("iBaseStationId") or 0)
                 ),
             )
+            self.profile_store.remember_base_station_levels(
+                session.urs,
+                session.tutorial.base_station_levels,
+            )
             task_update = session.tasks.complete_active_base_station_task()
             if task_update is not None:
                 await self._send_task_progression(writer, session, task_update)
@@ -487,6 +491,10 @@ class GameServer:
                 session.tutorial.upgrade_base_station(
                     int(values.get("iBaseStationId") or 0)
                 ),
+            )
+            self.profile_store.remember_base_station_levels(
+                session.urs,
+                session.tutorial.base_station_levels,
             )
             task_update = session.tasks.complete_active_base_station_task()
             if task_update is not None:
@@ -2220,6 +2228,14 @@ class GameServer:
         )
         session.tasks.seed_finished_tasks(
             self.profile_store.finished_tasks.get(session.urs, ())
+        )
+        session.tutorial.base_station_levels.update(
+            {
+                int(base_station_id): int(level)
+                for base_station_id, level in self.profile_store.base_station_levels.get(
+                    session.urs, {}
+                ).items()
+            }
         )
         session.tasks.seed_completed_area_event_stages(
             stage_id

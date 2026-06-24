@@ -5521,6 +5521,15 @@ async def _run_base_station_activation_progression(tmp_path: Path) -> None:
     raw_profile = json.loads(profile_path.read_text(encoding="utf-8"))
     saved_tasks = raw_profile["finished_tasks"]["local-guest"]
     assert 100902 in saved_tasks
+    assert raw_profile["base_station_levels"]["local-guest"] == {"2": 1}
+    assert second_session.tutorial.base_station_all_info(8)["arrBaseStationInfo"] == [
+        {
+            "iBaseStationId": 2,
+            "iLevel": 1,
+            "iFinishTaskCount": 0,
+            "iFinishEntrustTaskCount": 0,
+        }
+    ]
     restored_task_info = second_session.tasks.task_info()
     assert 100902 in restored_task_info["finishs"]
     assert any(task["Id"] == 280201 for task in restored_task_info["tasks"])

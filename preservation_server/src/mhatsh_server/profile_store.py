@@ -14,6 +14,7 @@ class ProfileStore:
         self.stage_family_progress: dict[str, dict[str, dict[str, int]]] = {}
         self.normal_items: dict[str, dict[str, int]] = {}
         self.finished_tasks: dict[str, set[int]] = {}
+        self.base_station_levels: dict[str, dict[str, int]] = {}
         self.load()
 
     def load(self) -> None:
@@ -33,6 +34,9 @@ class ProfileStore:
         )
         self.normal_items = self._normal_items_map(raw.get("normal_items"))
         self.finished_tasks = self._finished_tasks_map(raw.get("finished_tasks"))
+        self.base_station_levels = self._base_station_levels_map(
+            raw.get("base_station_levels")
+        )
 
     def remember_role(self, urs: str, uid: int) -> None:
         self.roles[str(urs)] = int(uid)
@@ -75,6 +79,16 @@ class ProfileStore:
         self.finished_tasks[str(urs)] = normalized
         self.save()
 
+    def remember_base_station_levels(
+        self, urs: str, levels: dict[int, int]
+    ) -> None:
+        self.base_station_levels[str(urs)] = {
+            str(base_station_id): int(level)
+            for base_station_id, level in levels.items()
+            if int(base_station_id) > 0 and int(level) > 0
+        }
+        self.save()
+
     def grant_items(self, urs: str, rewards: Iterable[tuple[int, int]]) -> None:
         item_counts = self.normal_items.setdefault(str(urs), {})
         changed = False
@@ -115,6 +129,7 @@ class ProfileStore:
                         str(urs): sorted(task_ids)
                         for urs, task_ids in self.finished_tasks.items()
                     },
+                    "base_station_levels": self.base_station_levels,
                 },
                 indent=2,
                 sort_keys=True,
@@ -232,5 +247,25 @@ class ProfileStore:
                     continue
                 if numeric_task_id > 0:
                     normalized.add(numeric_task_id)
+            output[str(urs)] = normalized
+        return output
+
+    @staticmethod
+    def _base_station_levels_map(value: Any) -> dict[str, dict[str, int]]:
+        if not isinstance(value, dict):
+            return {}
+        output: dict[str, dict[str, int]] = {}
+        for urs, levels in value.items():
+            if not isinstance(levels, dict):
+                continue
+            normalized: dict[str, int] = {}
+            for base_station_id, level in levels.items():
+                try:
+                    numeric_base_station_id = int(base_station_id)
+                    numeric_level = int(level)
+                except (TypeError, ValueError):
+                    continue
+                if numeric_base_station_id > 0 and numeric_level > 0:
+                    normalized[str(numeric_base_station_id)] = numeric_level
             output[str(urs)] = normalized
         return output
