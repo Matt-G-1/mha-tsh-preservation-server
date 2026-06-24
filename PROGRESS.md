@@ -285,13 +285,17 @@ environment details are intentionally omitted from Git.
   `Vigor` evidence. These are parser-backed annotations for combat telemetry,
   not a claim that every packet-side skill slot is fully proven yet.
 - A third conservative `skill_info` pass now uses skill-ID neighborhoods to
-  annotate 24 recovered hero models instead of only the late roster. The
-  structured parser classifies 1,267 human-readable terms into command buckets,
+  annotate 27 recovered hero models instead of only the late roster. The
+  structured parser classifies 1,477 human-readable terms into command buckets,
   adding move/variant evidence for older heroes such as Midoriya, Bakugo,
-  Asui, Mina, Mineta, and Hawks as well as WHM Midoriya, WHM Bakugo, WHM
-  Todoroki, Nejire, Tamaki, and Mirio. Runtime combat telemetry exposes those
-  labels as `SkillInfoVariants`, improving ATK/Q/W/E/R/Dodge/Passive evidence
-  without overwriting curated primary move names.
+  Todoroki, Asui, Mina, Mineta, Tokoyami, Stain, and Hawks as well as WHM
+  Midoriya, WHM Bakugo, WHM Todoroki, Nejire, Tamaki, and Mirio. The parser
+  now preserves recovered alternate skill-info prefixes for Todoroki
+  (`1005xx`), Tokoyami (`1221xx`/`1231xx`), and Stain (`1111xx`) instead of
+  dropping those rows because they do not match the model ID directly.
+  Runtime combat telemetry exposes those labels as `SkillInfoVariants`,
+  improving ATK/Q/W/E/R/Dodge/Passive evidence without overwriting curated
+  primary move names.
 - The `skill_info` extractor now reads both recovered localized skill-info
   assets (`language/en/skill_info.lua` and the sibling base
   `skill_info.lua`) by default, merging structured command neighborhoods across

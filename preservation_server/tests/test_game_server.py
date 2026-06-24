@@ -2646,12 +2646,12 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         PLAYABLE_CHARACTERS["h1014"]
     ).evidence_sources_by_command()
     assert asui_evidence["PASSIVE"] == ("skill_video", "skill_info")
-    assert len(STRUCTURED_SKILL_INFO_TERMS_BY_MODEL) == 24
+    assert len(STRUCTURED_SKILL_INFO_TERMS_BY_MODEL) == 27
     assert sum(
         len(terms)
         for command_terms in STRUCTURED_SKILL_INFO_TERMS_BY_MODEL.values()
         for terms in command_terms.values()
-    ) == 1267
+    ) == 1477
 
     deku_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1001"])
     assert deku_style.style_name == "One For All Rookie"
@@ -3407,6 +3407,9 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     assert "SecondSkill" in hints["h1001"]["structured_terms"]["W"]
     assert "Dodge 2" in hints["h1020"]["structured_terms"]["DODGE"]
     assert "Hawks passive 1" in hints["h1026"]["structured_terms"]["PASSIVE"]
+    assert "Ice Wall" in hints["h1008"]["structured_terms"]["Q"]
+    assert "Abyssal Claw" in hints["h1022"]["structured_terms"]["W"]
+    assert "Dagger Throw" in hints["h1110"]["structured_terms"]["ATK"]
     assert hints["h1027"]["terms"]["Midoriya Q"]["count"] >= 1
     assert hints["h1027"]["terms"]["whm绿谷R"]["count"] == 2
     assert "Midoriya Q" in hints["h1027"]["structured_terms"]["Q"]
@@ -3444,6 +3447,15 @@ def test_skill_info_hint_parser_tracks_recovered_move_text() -> None:
     )
     assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1020"]["R"] == tuple(
         hints["h1020"]["structured_terms"]["R"]
+    )
+    assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1008"]["DODGE"] == tuple(
+        hints["h1008"]["structured_terms"]["DODGE"]
+    )
+    assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1022"]["W"] == tuple(
+        hints["h1022"]["structured_terms"]["W"]
+    )
+    assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1110"]["PASSIVE"] == tuple(
+        hints["h1110"]["structured_terms"]["PASSIVE"]
     )
     assert STRUCTURED_SKILL_INFO_TERMS_BY_MODEL["h1028"]["W"] == tuple(
         hints["h1028"]["structured_terms"]["W"]

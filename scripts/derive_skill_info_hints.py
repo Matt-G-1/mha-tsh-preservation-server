@@ -183,8 +183,15 @@ SKILL_INFO_TERMS_BY_MODEL = {
 }
 
 
+STRUCTURED_SKILL_INFO_PREFIX_OVERRIDES = {
+    "h1008": (1005,),
+    "h1022": (1221, 1231),
+    "h1110": (1111,),
+}
+
+
 STRUCTURED_SKILL_INFO_MODEL_PREFIXES = {
-    model_id: int(model_id[1:])
+    model_id: (int(model_id[1:]), *STRUCTURED_SKILL_INFO_PREFIX_OVERRIDES.get(model_id, ()))
     for model_id in SKILL_INFO_TERMS_BY_MODEL
     if model_id.startswith("h") and model_id[1:].isdigit()
 }
@@ -264,6 +271,13 @@ def _is_human_skill_term(value: str) -> bool:
 
 def _command_for_skill_term(term: str, fallback: str) -> str:
     normalized = term.lower()
+    for command in ("Q", "W", "E", "R"):
+        lowered_command = command.lower()
+        if (
+            f"({lowered_command})" in normalized
+            or f"（{lowered_command}）" in normalized
+        ):
+            return command
     if "normal atk" in normalized or "普攻" in term:
         return "ATK"
     if "闪避" in term or "dodge" in normalized:
@@ -294,7 +308,9 @@ def _command_for_skill_term(term: str, fallback: str) -> str:
 def collect_structured_skill_info_hints(path: Path = DEFAULT_SKILL_INFO_ASSET) -> dict[str, dict[str, object]]:
     constants = _RootConstantReader(path.read_bytes()).root_constants()
     model_by_prefix = {
-        prefix: model_id for model_id, prefix in STRUCTURED_SKILL_INFO_MODEL_PREFIXES.items()
+        prefix: model_id
+        for model_id, prefixes in STRUCTURED_SKILL_INFO_MODEL_PREFIXES.items()
+        for prefix in prefixes
     }
     hints: dict[str, dict[str, object]] = {
         model_id: {"command_terms": {}} for model_id in STRUCTURED_SKILL_INFO_MODEL_PREFIXES
