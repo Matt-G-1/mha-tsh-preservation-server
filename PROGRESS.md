@@ -1,6 +1,6 @@
 # MHA TSH Preservation Progress
 
-Last updated: 2026-06-23
+Last updated: 2026-06-24
 
 ## Goal
 
@@ -77,6 +77,21 @@ environment details are intentionally omitted from Git.
   activity/task panels that can be reached from world UI probes:
   stage-activity info, activity-shop info, entrust-task list, secret-area task,
   USJ task, offline-PVP task, battlefield-task info, and group-map opening.
+- The All-Server/Theater activity stage family is now parsed from the recovered
+  `act_allsvr_stage_cfg.lua` asset: 84 regular stages and 9 boss stages are
+  cataloged, exposed through `c_act_allsvr_stage_info`, and enterable through
+  `s_act_allsvr_stage_enter` / `s_act_allsvr_stage_boss`.
+- Theater compatibility now covers `s_theater_open`, `s_theater_unlock`,
+  `s_theater_bonus`, `s_theater_chapterbonus`, and `s_stage_theater`, with
+  stateful local unlock/clear/bonus records and protocol-encoded tests.
+- Public playable character handling is now separated from recovered local hero
+  rows: the gameplay-facing roster is the 26 public playable heroes, while
+  Jiro, Small Might, alternate Deku, All For One, and the art-test All Might
+  variant remain recovered/internal evidence unless explicitly used in a test.
+  Best Jeanist remains support-only.
+- Recovered dash action paths are now classified as dodge/counter evidence
+  before generic attack-folder matching, reducing false move-evidence gaps for
+  the public playable roster.
 - World-session telemetry now records player movement (`s_scene_move`),
   frame-stat heartbeats (`s_client_stat_frame`), and client error reports
   (`s_client_error`) without sending unsafe extra replies.
