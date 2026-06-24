@@ -5954,6 +5954,104 @@ async def _run_requested_stage_enter_packets() -> None:
     assert session.stage.current_stage_key == "allsvr_boss_stage_880312"
 
     writer.data.clear()
+    session.outbound = RollingXor(0x55112246)
+    boss_join = codec.encode_message(
+        "s_act_boss_challenge_join",
+        {"HeroUid": STARTER_CARD_UID + 4},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_boss_challenge_join"],
+        boss_join,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112246))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+        "c_act_boss_challenge_server_ach",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 880110
+    assert codec.decode_message("c_frame_fighter_data", replies[1][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID + 4
+    assert codec.decode_message(
+        "c_act_boss_challenge_server_ach", replies[2][1]
+    ) == {"AchList": []}
+    assert session.stage.current_stage_key == "allsvr_boss_stage_880110"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112247)
+    boss_over = codec.encode_message(
+        "s_act_boss_challenge_over",
+        {"Damage": 45678},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_boss_challenge_over"],
+        boss_over,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112247))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_act_boss_challenge_over",
+        "c_act_boss_challenge_svr_point",
+        "c_act_boss_challenge_server_ach",
+    ]
+    assert codec.decode_message("c_act_boss_challenge_over", replies[0][1]) == {
+        "JoinTimes": 1,
+        "Damage": 45678,
+        "TotalDamage": 45678,
+        "Point": 456,
+        "TotalPoint": 456,
+    }
+    assert codec.decode_message("c_act_boss_challenge_svr_point", replies[1][1]) == {
+        "TotalPoint": 456
+    }
+    assert codec.decode_message(
+        "c_act_boss_challenge_server_ach", replies[2][1]
+    ) == {"AchList": [100]}
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112248)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_boss_challenge_svr_ach_reward"],
+        codec.encode_message(
+            "s_act_boss_challenge_svr_ach_reward",
+            {"AchId": 100},
+        ),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112248))
+    [(reply_id, reply_body)] = decoder.feed(bytes(writer.data))
+    assert registry.protocol_names[reply_id] == "c_act_boss_challenge_svr_ach_reward"
+    assert codec.decode_message(
+        "c_act_boss_challenge_svr_ach_reward", reply_body
+    ) == {"AchId": 100}
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112249)
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_boss_challenge_rejoin"],
+        codec.encode_message("s_act_boss_challenge_rejoin", {}),
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112249))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_stage_enter", replies[0][1])["StageId"] == 880110
+    assert codec.decode_message("c_frame_fighter_data", replies[1][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID + 4
+
+    writer.data.clear()
     session.outbound = RollingXor(0x55112240)
     empty_shop = codec.encode_message(
         "s_act_empty_shop_stage_enter",

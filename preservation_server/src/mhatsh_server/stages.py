@@ -2983,6 +2983,10 @@ class StageState:
     empty_shop_max_pass_stage: int = 0
     night_fight_statuses: dict[int, int] = field(default_factory=dict)
     night_fight_hero_tired: dict[int, int] = field(default_factory=dict)
+    boss_challenge_join_times: int = 0
+    boss_challenge_total_damage: int = 0
+    boss_challenge_total_point: int = 0
+    boss_challenge_achievements: set[int] = field(default_factory=set)
     theater_unlocked_stage_ids: set[int] = field(default_factory=set)
     theater_bonus_claims: dict[str, int] = field(default_factory=dict)
     completions: dict[int, StageCompletion] = field(default_factory=dict)
@@ -3267,6 +3271,36 @@ class StageState:
                     "Num": 1,
                 }
             ],
+        }
+
+    def boss_challenge_point(self) -> dict[str, object]:
+        return {"TotalPoint": int(self.boss_challenge_total_point)}
+
+    def boss_challenge_server_ach(self) -> dict[str, object]:
+        return {"AchList": sorted(self.boss_challenge_achievements)}
+
+    def boss_challenge_ach_reward(self, ach_id: int) -> dict[str, object]:
+        numeric_ach_id = int(ach_id)
+        if numeric_ach_id > 0:
+            self.boss_challenge_achievements.add(numeric_ach_id)
+        return {"AchId": numeric_ach_id}
+
+    def boss_challenge_over(self, damage: int) -> dict[str, object]:
+        numeric_damage = max(0, int(damage))
+        point = max(1, numeric_damage // 100) if numeric_damage else 0
+        self.boss_challenge_join_times += 1
+        self.boss_challenge_total_damage += numeric_damage
+        self.boss_challenge_total_point += point
+        if self.boss_challenge_total_point >= 100:
+            self.boss_challenge_achievements.add(100)
+        if self.boss_challenge_total_point >= 500:
+            self.boss_challenge_achievements.add(500)
+        return {
+            "JoinTimes": self.boss_challenge_join_times,
+            "Damage": numeric_damage,
+            "TotalDamage": self.boss_challenge_total_damage,
+            "Point": point,
+            "TotalPoint": self.boss_challenge_total_point,
         }
 
     def resource_stage_info(self, hero_uid: int) -> dict[str, object]:
@@ -4312,6 +4346,15 @@ class StageState:
         self.night_fight_hero_tired = self._int_section(
             values.get("night_fight_hero_tired", {})
         )
+        boss_challenge_progress = self._int_section(
+            values.get("boss_challenge", {})
+        )
+        self.boss_challenge_join_times = boss_challenge_progress.get(1, 0)
+        self.boss_challenge_total_damage = boss_challenge_progress.get(2, 0)
+        self.boss_challenge_total_point = boss_challenge_progress.get(3, 0)
+        self.boss_challenge_achievements = set(
+            self._int_section(values.get("boss_challenge_achievements", {}))
+        )
         empty_shop_progress = self._int_section(
             values.get("empty_shop_max_pass_stage", {})
         )
@@ -4344,6 +4387,14 @@ class StageState:
             "allsvr_boss_scores": dict(sorted(self.allsvr_boss_scores.items())),
             "night_fight_statuses": dict(sorted(self.night_fight_statuses.items())),
             "night_fight_hero_tired": dict(sorted(self.night_fight_hero_tired.items())),
+            "boss_challenge": {
+                1: int(self.boss_challenge_join_times),
+                2: int(self.boss_challenge_total_damage),
+                3: int(self.boss_challenge_total_point),
+            },
+            "boss_challenge_achievements": {
+                ach_id: 1 for ach_id in sorted(self.boss_challenge_achievements)
+            },
             "empty_shop_max_pass_stage": {1: int(self.empty_shop_max_pass_stage)},
             "theater_unlocked_stage_ids": {
                 stage_id: 1 for stage_id in sorted(self.theater_unlocked_stage_ids)

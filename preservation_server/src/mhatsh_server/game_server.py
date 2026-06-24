@@ -922,6 +922,62 @@ class GameServer:
                 stage.stage_id,
                 hero_id=int(values.get("Cid") or 0),
             )
+        elif name == "s_act_boss_challenge_svr_point":
+            await self._send(
+                writer,
+                session,
+                "c_act_boss_challenge_svr_point",
+                session.stage.boss_challenge_point(),
+            )
+        elif name == "s_act_boss_challenge_svr_ach_reward":
+            await self._send(
+                writer,
+                session,
+                "c_act_boss_challenge_svr_ach_reward",
+                session.stage.boss_challenge_ach_reward(
+                    int(values.get("AchId") or 0)
+                ),
+            )
+            self._remember_stage_family_progress(session)
+        elif name == "s_act_boss_challenge_join":
+            await self._enter_requested_stage(
+                writer,
+                session,
+                session.stage.allsvr_boss_stage().stage_id,
+                card_uid=int(values.get("HeroUid") or 0),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_act_boss_challenge_server_ach",
+                session.stage.boss_challenge_server_ach(),
+            )
+        elif name == "s_act_boss_challenge_rejoin":
+            roster = self._ensure_roster(session)
+            await self._enter_requested_stage(
+                writer,
+                session,
+                session.stage.allsvr_boss_stage().stage_id,
+                card_uid=roster.active_card_uid,
+            )
+        elif name == "s_act_boss_challenge_over":
+            over = session.stage.boss_challenge_over(
+                int(values.get("Damage") or 0)
+            )
+            await self._send(writer, session, "c_act_boss_challenge_over", over)
+            await self._send(
+                writer,
+                session,
+                "c_act_boss_challenge_svr_point",
+                session.stage.boss_challenge_point(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_act_boss_challenge_server_ach",
+                session.stage.boss_challenge_server_ach(),
+            )
+            self._remember_stage_family_progress(session)
         elif name == "s_act_daily_stage_choose":
             await self._send(
                 writer,
