@@ -81,6 +81,11 @@ environment details are intentionally omitted from Git.
   empty/local state: `s_mail_get_list`, `s_mail_get_info`,
   `s_mail_get_attach`, `s_mail_quickly_get_attach`, and `s_mail_delete` return
   schema-matched list/detail/attach/delete acknowledgments.
+- Campaign compatibility now has a stateful overview/status layer:
+  `s_campaign_data_list`, `s_campaign_enter`, trigger on/see/interact, campaign
+  task accept/update/submit, shop info/buy, buff selection, drama-index
+  recording, position/control updates, cache clearing, and leave requests all
+  encode through recovered `c_campaign_*` schemas.
 - Activity client triggers now keep session state and reply with
   `c_act_client_trigger_update` for `s_act_client_trigger`; `s_task_lock_trigger`
   is accepted as a no-op because no recovered response packet exists.

@@ -16,6 +16,7 @@ from .beginner_quest import (
     STARTER_MAP_GUIDE_SET_ID,
     STARTER_TASK_ID,
 )
+from .campaign import CampaignState
 from .character_menu import CharacterMenuState
 from .characters import (
     STARTER_CHARACTER,
@@ -87,6 +88,7 @@ class Session:
     world: WorldState = field(default_factory=WorldState)
     world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
     activities: ActivityState = field(default_factory=ActivityState)
+    campaign: CampaignState = field(default_factory=CampaignState)
     character_menu: CharacterMenuState = field(default_factory=CharacterMenuState)
     lottery: LotteryState = field(default_factory=LotteryState)
     stage: StageState = field(default_factory=StageState)
@@ -1064,27 +1066,119 @@ class GameServer:
                             session,
                             active_stage_id,
                         )
+        elif name == "s_campaign_data_list":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_data_list",
+                session.campaign.data_list(),
+            )
+        elif name == "s_campaign_enter":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_internal_status",
+                session.campaign.enter(int(values.get("CampaignId") or 0)),
+            )
+        elif name == "s_campaign_leave":
+            session.campaign.leave()
+        elif name == "s_campaign_clear_cache":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_cache_update",
+                session.campaign.clear_cache(),
+            )
+        elif name == "s_campaign_control_update":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_internal_status",
+                session.campaign.update_control(int(values.get("ControlUid") or 0)),
+            )
+        elif name == "s_campaign_sync_pos":
+            session.campaign.update_position(dict(values.get("UserPos") or {}))
+        elif name == "s_campaign_shop_info":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_shop_info",
+                session.campaign.shop_info(int(values.get("ShopId") or 0)),
+            )
+        elif name == "s_campaign_buy":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_buy",
+                session.campaign.buy(
+                    int(values.get("ShopId") or 0),
+                    int(values.get("Pos") or 0),
+                    int(values.get("Count") or 1),
+                ),
+            )
+        elif name == "s_campaign_select_buff":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_select_buff_update",
+                session.campaign.select_buff(int(values.get("Index") or 0)),
+            )
+        elif name == "s_campaign_drama_index_add":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_internal_status",
+                session.campaign.add_drama_index(
+                    int(values.get("DramaIndex") or 0)
+                ),
+            )
+        elif name == "s_campaign_task_accept":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_task_add",
+                session.campaign.accept_task(int(values.get("Id") or 0)),
+            )
+        elif name == "s_campaign_task_update":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_task_update",
+                session.campaign.update_task(int(values.get("Id") or 0)),
+            )
+        elif name == "s_campaign_task_submit":
+            await self._send(
+                writer,
+                session,
+                "c_campaign_task_finish",
+                session.campaign.finish_task(int(values.get("Id") or 0)),
+            )
         elif name == "s_campaign_trigger_on":
+            trigger = session.campaign.mark_trigger_on(
+                int(values.get("FieldId") or 0),
+                int(values.get("AreaId") or 0),
+            )
             await self._send(
                 writer,
                 session,
                 "c_campaign_trigger_on",
-                {
-                    "FieldId": int(values.get("FieldId") or 0),
-                    "AreaId": int(values.get("AreaId") or 0),
-                },
+                trigger,
             )
         elif name == "s_campaign_trigger_see":
-            pass
+            session.campaign.mark_trigger_seen(
+                int(values.get("FieldId") or 0),
+                int(values.get("AreaId") or 0),
+            )
         elif name == "s_campaign_trigger_interact":
+            trigger = session.campaign.mark_trigger_finished(
+                int(values.get("FieldId") or 0),
+                int(values.get("AreaId") or 0),
+            )
             await self._send(
                 writer,
                 session,
                 "c_campaign_trigger_on",
-                {
-                    "FieldId": int(values.get("FieldId") or 0),
-                    "AreaId": int(values.get("AreaId") or 0),
-                },
+                trigger,
             )
             task_update = session.tasks.complete_active_quest_contact_by_ids(
                 [

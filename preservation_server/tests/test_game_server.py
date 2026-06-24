@@ -41,6 +41,7 @@ from mhatsh_server.beginner_quest import (
     STARTER_MAP_GUIDE_ID,
     STARTER_MAP_GUIDE_SET_ID,
 )
+from mhatsh_server.campaign import CampaignState
 from mhatsh_server.game_server import (
     CITY_LEVEL_CAP,
     FUNCTION_OPEN_IDS,
@@ -4585,6 +4586,44 @@ def test_mail_state_returns_empty_and_ack_payloads() -> None:
     )
     assert state.quickly_get_attach() == {"arrMailIds": [1]}
     assert state.delete([1, 99]) == {"arrMailIds": [1, 99]}
+
+
+def test_campaign_state_tracks_overview_status_tasks_and_rewards() -> None:
+    state = CampaignState()
+    assert state.data_list() == {
+        "Data": [
+            {
+                "CampaignId": 1,
+                "Cache": 0,
+                "FinishTrigger": [],
+                "FinishTask": [],
+                "EnterFlag": 1,
+            }
+        ]
+    }
+    status = state.enter(2)
+    assert status["CampaignId"] == 2
+    assert status["UserPos"] == {"SceneId": 1000, "Pos": [4221, 19931, 0]}
+    assert status["TriggerOnMap"] == []
+
+    assert state.mark_trigger_on(6669, 3) == {"FieldId": 6669, "AreaId": 3}
+    state.mark_trigger_seen(6669, 3)
+    assert state.mark_trigger_finished(6669, 3) == {
+        "FieldId": 6669,
+        "AreaId": 3,
+    }
+    task_add = state.accept_task(501)
+    assert task_add == {
+        "TaskInfo": {"Id": 501, "Status": 1, "Cond": [{"CompCount": 0}]}
+    }
+    assert state.update_task(501) == {
+        "TaskInfo": {"Id": 501, "Status": 1, "Cond": [{"CompCount": 1}]}
+    }
+    assert state.finish_task(501) == {"Id": 501, "Reward": []}
+    assert state.data_list()["Data"][0]["FinishTask"] == [501]
+    assert state.data_list()["Data"][0]["FinishTrigger"] == [
+        {"FieldId": 6669, "TriggerList": [3]}
+    ]
 
 
 def test_version_and_account_login_exchange() -> None:
@@ -9734,6 +9773,10 @@ def test_activity_and_side_task_requests_receive_empty_state_replies() -> None:
     asyncio.run(_run_activity_and_side_task_requests())
 
 
+def test_campaign_requests_receive_stateful_compatibility_replies() -> None:
+    asyncio.run(_run_campaign_requests())
+
+
 def test_lottery_requests_return_stateful_draw_payloads() -> None:
     asyncio.run(_run_lottery_requests())
 
@@ -9874,6 +9917,128 @@ async def _run_secret_area_requests() -> None:
     assert records["ActId"] == 9
     assert records["RecordList"][0]["StageGroupId"] == 11001
     assert records["RecordList"][0]["Floor"] == 1
+
+
+async def _run_campaign_requests() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x22334455),
+    )
+
+    requests = [
+        ("s_campaign_data_list", {}),
+        ("s_campaign_enter", {"CampaignId": 2}),
+        ("s_campaign_trigger_on", {"FieldId": 6669, "AreaId": 3}),
+        ("s_campaign_trigger_see", {"FieldId": 6669, "AreaId": 3}),
+        ("s_campaign_trigger_interact", {"FieldId": 6669, "AreaId": 3}),
+        ("s_campaign_task_accept", {"Id": 501}),
+        ("s_campaign_task_update", {"Id": 501}),
+        ("s_campaign_task_submit", {"Id": 501}),
+        ("s_campaign_shop_info", {"ShopId": 7}),
+        ("s_campaign_buy", {"ShopId": 7, "Pos": 2, "Count": 1}),
+        ("s_campaign_select_buff", {"Index": 4}),
+        ("s_campaign_drama_index_add", {"DramaIndex": 9}),
+        (
+            "s_campaign_sync_pos",
+            {"UserPos": {"SceneId": 1000, "Pos": [11, 22, 33]}},
+        ),
+        ("s_campaign_control_update", {"ControlUid": 1001}),
+        ("s_campaign_clear_cache", {}),
+        ("s_campaign_leave", {}),
+    ]
+    for packet_name, values in requests:
+        await game._dispatch(
+            session,
+            registry.protocol_ids[packet_name],
+            codec.encode_message(packet_name, values),
+            writer,
+        )
+
+    decoder = FrameDecoder(RollingXor(0x22334455))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_campaign_data_list",
+        "c_campaign_internal_status",
+        "c_campaign_trigger_on",
+        "c_campaign_trigger_on",
+        "c_campaign_task_add",
+        "c_campaign_task_update",
+        "c_campaign_task_finish",
+        "c_campaign_shop_info",
+        "c_campaign_buy",
+        "c_campaign_select_buff_update",
+        "c_campaign_internal_status",
+        "c_campaign_internal_status",
+        "c_campaign_cache_update",
+    ]
+    assert codec.decode_message("c_campaign_data_list", replies[0][1]) == {
+        "Data": [
+            {
+                "CampaignId": 1,
+                "Cache": 0,
+                "FinishTrigger": [],
+                "FinishTask": [],
+                "EnterFlag": 1,
+            }
+        ]
+    }
+    enter_status = codec.decode_message("c_campaign_internal_status", replies[1][1])
+    assert enter_status["CampaignId"] == 2
+    assert enter_status["UserPos"] == {"SceneId": 1000, "Pos": [4221, 19931, 0]}
+    assert enter_status["TaskList"] == []
+    assert codec.decode_message("c_campaign_trigger_on", replies[2][1]) == {
+        "FieldId": 6669,
+        "AreaId": 3,
+    }
+    assert codec.decode_message("c_campaign_trigger_on", replies[3][1]) == {
+        "FieldId": 6669,
+        "AreaId": 3,
+    }
+    assert codec.decode_message("c_campaign_task_add", replies[4][1]) == {
+        "TaskInfo": {"Id": 501, "Status": 1, "Cond": [{"CompCount": 0}]}
+    }
+    assert codec.decode_message("c_campaign_task_update", replies[5][1]) == {
+        "TaskInfo": {"Id": 501, "Status": 1, "Cond": [{"CompCount": 1}]}
+    }
+    assert codec.decode_message("c_campaign_task_finish", replies[6][1]) == {
+        "Id": 501,
+        "Reward": [],
+    }
+    assert codec.decode_message("c_campaign_shop_info", replies[7][1]) == {
+        "ShopId": 7,
+        "Buff": [],
+        "BuyCount": [],
+    }
+    assert codec.decode_message("c_campaign_buy", replies[8][1]) == {
+        "ShopId": 7,
+        "Pos": 2,
+        "Count": 1,
+    }
+    assert codec.decode_message("c_campaign_select_buff_update", replies[9][1]) == {
+        "SelectBuff": [4]
+    }
+    drama_status = codec.decode_message("c_campaign_internal_status", replies[10][1])
+    assert drama_status["FinishTriggerList"] == [
+        {"FieldId": 6669, "TriggerList": [3]}
+    ]
+    assert drama_status["FinishTask"] == [501]
+    assert drama_status["DramaIndex"] == [9]
+    control_status = codec.decode_message(
+        "c_campaign_internal_status", replies[11][1]
+    )
+    assert control_status["ControlUid"] == 1001
+    assert control_status["UserPos"] == {"SceneId": 1000, "Pos": [11, 22, 33]}
+    assert codec.decode_message("c_campaign_cache_update", replies[12][1]) == {
+        "CampaignId": 2,
+        "HasCache": 0,
+    }
 
 
 async def _run_activity_and_side_task_requests() -> None:
