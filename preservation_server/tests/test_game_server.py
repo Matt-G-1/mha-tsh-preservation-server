@@ -2218,20 +2218,22 @@ def test_fight_style_catalog_covers_verified_playable_roster() -> None:
         "h1031": ("DODGE", "PASSIVE"),
         "h1032": ("DODGE", "PASSIVE"),
     }
-    original_evidence_gaps = {}
+    recovered_evidence_gaps = {}
     for character in VERIFIED_PLAYABLE_ROSTER:
-        resolution = fight_style_for_character(character).resolve_usage(
-            (),
-            hero_level=70,
-        )
-        missing = tuple(
-            move_result.command
-            for move_result in resolution.move_results
-            if not move_result.evidence_sources
-        )
+        style = fight_style_for_character(character)
+        missing = style.missing_recovered_evidence_commands()
         if missing:
-            original_evidence_gaps[character.model_asset_id] = missing
-    assert original_evidence_gaps == {}
+            recovered_evidence_gaps[character.model_asset_id] = missing
+    assert recovered_evidence_gaps == {}
+    whm_deku_evidence = fight_style_for_character(
+        PLAYABLE_CHARACTERS["h1027"]
+    ).evidence_sources_by_command()
+    assert whm_deku_evidence["DODGE"] == ("skill_video", "skill_info")
+    assert whm_deku_evidence["PASSIVE"] == ("skill_video", "skill_info")
+    asui_evidence = fight_style_for_character(
+        PLAYABLE_CHARACTERS["h1014"]
+    ).evidence_sources_by_command()
+    assert asui_evidence["PASSIVE"] == ("skill_video",)
 
     deku_style = fight_style_for_character(PLAYABLE_CHARACTERS["h1001"])
     assert deku_style.style_name == "One For All Rookie"

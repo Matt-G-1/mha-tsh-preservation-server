@@ -219,6 +219,41 @@ class FightStyle:
             if count == 0
         )
 
+    def evidence_sources_by_command(self) -> dict[str, tuple[str, ...]]:
+        video_evidence = self.recovered_skill_video_evidence()
+        skill_info_evidence = self.recovered_skill_info_evidence()
+        move_commands = {move.command for move in self.moves}
+        output: dict[str, tuple[str, ...]] = {}
+        for command in REPORT_BUTTON_COMMANDS.values():
+            if command not in move_commands:
+                continue
+            action_hints = self.action_hints_for_command(command)
+            skill_video_paths = (
+                video_evidence.videos_for_command(command)
+                if video_evidence is not None
+                else ()
+            )
+            skill_info_terms = (
+                skill_info_evidence.terms_for_command(command)
+                if skill_info_evidence is not None
+                else ()
+            )
+            skill_info_variants = self.structured_skill_info_terms_for_command(command)
+            output[command] = _move_evidence_sources(
+                action_hints=action_hints,
+                skill_video_paths=skill_video_paths,
+                skill_info_terms=skill_info_terms,
+                skill_info_variants=skill_info_variants,
+            )
+        return output
+
+    def missing_recovered_evidence_commands(self) -> tuple[str, ...]:
+        return tuple(
+            command
+            for command, sources in self.evidence_sources_by_command().items()
+            if not sources
+        )
+
     def hero_cfg_skill_ids(self) -> tuple[int, ...]:
         if self.hero_cfg is None:
             return ()
