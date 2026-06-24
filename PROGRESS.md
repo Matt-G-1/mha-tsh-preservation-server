@@ -590,14 +590,15 @@ environment details are intentionally omitted from Git.
   `mhatsh_server.task_cfg_hints`. Early anchors include `act1001`, the
   `280101`/`280102`/`280103` first-sortie area-event chain, and the
   `280301`/`280302` training/practical exercise entries, with nearby
-  stage/NPC/drama references retained for later quest sequencing. This is
-  evidence-only for now and does not yet drive live quest state.
+  stage/NPC/drama references retained for later quest sequencing. The parser
+  now also emits task type and condition ID from the recovered
+  `区域事件|event|step` marker instead of relying on literal server constants.
 - The 75 recovered `task_cfg.lua` area-event task links are now bridged to the
   75 parsed `areaevent_cfg.lua` combat stage rows in recovered order. The
   server exposes them as type-28 task records, keeps both task/event/stage IDs
-  in the condition params, and marks the matching task finished once when an
-  area-event stage is won, starting with `280101` -> stage `21111` for
-  "首次出击".
+  in the condition params, preserves recovered label/objective/source metadata
+  internally, and marks the matching task finished once when an area-event
+  stage is won, starting with `280101` -> stage `21111` for "首次出击".
 - Recovered area-event task completion now restores from saved stage progress:
   when a profile already has a passed area-event stage, the next session seeds
   the paired recovered task as finished with its condition complete. This keeps

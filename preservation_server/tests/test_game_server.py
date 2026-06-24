@@ -1598,6 +1598,8 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
         "\u9996\u6b21\u51fa\u51fb\uff01\u51fb\u8d25\u7ed1\u67b6\u4e8b\u4ef6\u7684\u654c\u4eba"
     )
     assert area_by_id[280101]["name"] == "\u9996\u6b21\u51fa\u51fb"
+    assert area_by_id[280101]["task_type"] == 28
+    assert area_by_id[280101]["condition_id"] == 1
     assert area_by_id[280301]["name"] == "\u6559\u5b66\u6f14\u4e60"
     assert area_by_id[280302]["name"] == "\u5b9e\u6218\u6f14\u4e60"
     assert 280301 in area_by_id[280301]["nearby_stage_ids"]
@@ -3858,6 +3860,13 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
         280101,
         290101,
     ]
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].label == "\u9996\u6b21\u51fa\u51fb"
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].objective == (
+        "\u9996\u6b21\u51fa\u51fb\uff01\u51fb\u8d25\u7ed1\u67b6\u4e8b\u4ef6\u7684\u654c\u4eba"
+    )
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_event_id == 280101
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_stage_id == 21111
+    assert RECOVERED_AREA_EVENT_TASK_RECORDS[0].source_relate_stage_id == 290101
     area_task_update = state.complete_area_event_stage(21111)
     assert area_task_update is not None
     assert area_task_update["task_info"]["Id"] == 280101

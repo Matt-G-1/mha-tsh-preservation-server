@@ -17,8 +17,6 @@ TASK_STATUS_AVAILABLE = 1
 TASK_STATUS_ACCEPTED = 2
 TASK_STATUS_FINISHED = 3
 STARTER_GUIDE_ID = STARTER_TASK_ID
-RECOVERED_AREA_EVENT_TASK_TYPE = 28
-RECOVERED_AREA_EVENT_TASK_CONDITION_ID = 1
 
 
 @dataclass(slots=True)
@@ -49,6 +47,11 @@ class TaskRecord:
     status: int = TASK_STATUS_AVAILABLE
     loop_times: int = 0
     conditions: tuple[TaskCondition, ...] = ()
+    label: str = ""
+    objective: str = ""
+    source_event_id: int = 0
+    source_stage_id: int = 0
+    source_relate_stage_id: int = 0
 
     def to_protocol(self) -> dict[str, object]:
         return {
@@ -66,6 +69,11 @@ class TaskRecord:
             status=self.status,
             loop_times=self.loop_times,
             conditions=tuple(condition.clone() for condition in self.conditions),
+            label=self.label,
+            objective=self.objective,
+            source_event_id=self.source_event_id,
+            source_stage_id=self.source_stage_id,
+            source_relate_stage_id=self.source_relate_stage_id,
         )
 
 
@@ -230,21 +238,31 @@ def _recovered_area_event_task_records() -> tuple[TaskRecord, ...]:
         records.append(
             TaskRecord(
                 id=task_id,
-                type=RECOVERED_AREA_EVENT_TASK_TYPE,
+                type=int(task_hint["task_type"]),
                 status=TASK_STATUS_AVAILABLE,
                 conditions=(
                     TaskCondition(
-                        id=RECOVERED_AREA_EVENT_TASK_CONDITION_ID,
+                        id=int(task_hint["condition_id"]),
                         completed_count=0,
                         params=params,
                     ),
                 ),
+                label=str(task_hint["name"]),
+                objective=str(task_hint["description"]),
+                source_event_id=event_id,
+                source_stage_id=int(stage.stage_id),
+                source_relate_stage_id=relate_stage,
             )
         )
     return tuple(records)
 
 
 RECOVERED_AREA_EVENT_TASK_RECORDS = _recovered_area_event_task_records()
+RECOVERED_AREA_EVENT_TASK_TYPE = (
+    RECOVERED_AREA_EVENT_TASK_RECORDS[0].type
+    if RECOVERED_AREA_EVENT_TASK_RECORDS
+    else 0
+)
 RECOVERED_AREA_EVENT_TASKS_BY_ID = {
     task.id: task for task in RECOVERED_AREA_EVENT_TASK_RECORDS
 }

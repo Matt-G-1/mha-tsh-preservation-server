@@ -226,6 +226,8 @@ def collect_task_cfg_hints(
                 "constant_index": index,
                 "event_id": event_id,
                 "step": int(match.group("step")),
+                "task_type": event_id // 10000,
+                "condition_id": int(match.group("step")),
                 "task_id": _nearest_task_id(constants, index),
                 "description": _text_before(constants, index),
                 "name": _text_after(constants, index),
