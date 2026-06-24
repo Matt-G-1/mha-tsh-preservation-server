@@ -240,6 +240,8 @@ def collect_task_cfg_hints(
                 "description": _text_before(constants, index),
                 "name": _text_after(constants, index),
                 "nearby_stage_ids": list(_nearby_numbers(constants, index, _is_stage_id)),
+                "nearby_npc_ids": list(_nearby_numbers(constants, index, _is_npc_id)),
+                "drama_refs": list(_nearby_drama_refs(constants, index)),
             }
         )
 
@@ -255,6 +257,13 @@ def collect_task_cfg_hints(
                     "task_type": _task_type_from_task_id(task_id),
                     "previous_text": _text_before(constants, index),
                     "next_text": _text_after(constants, index),
+                    "nearby_stage_ids": list(
+                        _nearby_numbers(constants, index, _is_stage_id)
+                    ),
+                    "nearby_npc_ids": list(
+                        _nearby_numbers(constants, index, _is_npc_id)
+                    ),
+                    "drama_refs": list(_nearby_drama_refs(constants, index)),
                 }
             )
 
@@ -276,6 +285,9 @@ def collect_task_cfg_hints(
                 "task_type": int(item["task_type"]),
                 "label": str(item["previous_text"]),
                 "objective": str(item["next_text"]),
+                "nearby_stage_ids": list(item["nearby_stage_ids"]),
+                "nearby_npc_ids": list(item["nearby_npc_ids"]),
+                "drama_refs": list(item["drama_refs"]),
             }
         )
 
@@ -290,6 +302,9 @@ def collect_task_cfg_hints(
                 "marker": str(item["marker"]),
                 "label": str(item["label"]),
                 "objective": str(item["objective"]),
+                "nearby_stage_ids": list(item["nearby_stage_ids"]),
+                "nearby_npc_ids": list(item["nearby_npc_ids"]),
+                "drama_refs": list(item["drama_refs"]),
             }
         )
     for item in area_events:
@@ -303,6 +318,9 @@ def collect_task_cfg_hints(
                 "condition_id": int(item["condition_id"]),
                 "label": str(item["name"]),
                 "objective": str(item["description"]),
+                "nearby_stage_ids": list(item["nearby_stage_ids"]),
+                "nearby_npc_ids": list(item["nearby_npc_ids"]),
+                "drama_refs": list(item["drama_refs"]),
             }
         )
     quest_chain.sort(key=lambda item: int(item["constant_index"]))

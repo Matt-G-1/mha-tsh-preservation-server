@@ -593,6 +593,11 @@ environment details are intentionally omitted from Git.
   stage/NPC/drama references retained for later quest sequencing. The parser
   now also emits task type and condition ID from the recovered
   `区域事件|event|step` marker instead of relying on literal server constants.
+- The same parser now promotes nearby stage IDs, NPC IDs, and drama refs onto
+  the recovered area-event rows, non-area `act*` task rows, and ordered quest
+  chain rows themselves. This keeps early quest NPC/dialog restoration tied to
+  packed task evidence, including examples like `act1111` -> NPC `5012` and
+  first-sortie area-event drama refs.
 - Non-area-event `act*` task markers are now promoted into task state as
   recovered records with derived task type, label, objective, and source
   marker metadata. The starter task remains first for the archived client path,

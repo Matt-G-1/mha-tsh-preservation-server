@@ -1584,6 +1584,9 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "marker": "act1001",
             "label": "\u7b49\u7ea7",
             "objective": "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f",
+            "nearby_stage_ids": [101002, 101203],
+            "nearby_npc_ids": [],
+            "drama_refs": ["cp_24_1", "act1001"],
             "order": 1,
             "previous_task_id": 0,
             "next_task_id": 280101,
@@ -1597,6 +1600,9 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "condition_id": 1,
             "label": "\u9996\u6b21\u51fa\u51fb",
             "objective": "\u9996\u6b21\u51fa\u51fb\uff01\u51fb\u8d25\u7ed1\u67b6\u4e8b\u4ef6\u7684\u654c\u4eba",
+            "nearby_stage_ids": [280101, 100502, 280102],
+            "nearby_npc_ids": [],
+            "drama_refs": ["xht_103", "\u533a\u57df\u4e8b\u4ef6|280101|1", "act_event1-1"],
             "order": 2,
             "previous_task_id": 1010,
             "next_task_id": 100602,
@@ -1610,6 +1616,9 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "condition_id": 1,
             "label": "\u62ef\u6551\u5e02\u6c11",
             "objective": "\u62ef\u6551\u51fa\u88ab\u7ed1\u67b6\u7684\u5e02\u6c11\u4eec",
+            "nearby_stage_ids": [100502, 280102, 100601, 100602, 106102, 280103],
+            "nearby_npc_ids": [6669],
+            "drama_refs": ["\u533a\u57df\u4e8b\u4ef6|280102|1"],
             "order": 3,
             "previous_task_id": 280101,
             "next_task_id": 100701,
@@ -1623,6 +1632,9 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "condition_id": 1,
             "label": "\u843d\u5e55",
             "objective": "\u6293\u6355\u7ed1\u67b6\u4e8b\u4ef6\u7684\u5e55\u540e\u654c\u4eba",
+            "nearby_stage_ids": [106102, 280103, 100701, 201007, 100902],
+            "nearby_npc_ids": [6669],
+            "drama_refs": ["\u533a\u57df\u4e8b\u4ef6|280103|1"],
             "order": 4,
             "previous_task_id": 100602,
             "next_task_id": 100902,
@@ -1635,6 +1647,9 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
             "marker": "act1111",
             "label": "\u8c03\u67e5\u7ed3\u679c",
             "objective": "\u524d\u5f80\u65b0\u5174\u533a\u57fa\u7ad9\u8fdb\u884c\u8ba4\u8bc1",
+            "nearby_stage_ids": [201007, 100902],
+            "nearby_npc_ids": [5012],
+            "drama_refs": ["act1111"],
             "order": 5,
             "previous_task_id": 100701,
             "next_task_id": 280201,
@@ -1659,8 +1674,12 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
         "task_type": 1,
         "label": "\u7b49\u7ea7",
         "objective": "\u5582\uff01\u4f60\u5c31\u662f\u65b0\u6765\u7684\u7ecf\u7406\u4eba\u5417\uff01\uff1f",
+        "nearby_stage_ids": [101002, 101203],
+        "nearby_npc_ids": [],
+        "drama_refs": ["cp_24_1", "act1001"],
     }
     assert act_tasks_by_marker["act_mission2-1"]["task_type"] == 2
+    assert act_tasks_by_marker["act1111"]["nearby_npc_ids"] == [5012]
     assert "act_event1-1" not in act_tasks_by_marker
 
     area_by_id = {
@@ -1684,6 +1703,11 @@ def test_task_cfg_hint_parser_tracks_quest_order_evidence() -> None:
     assert area_by_id[280101]["name"] == "\u9996\u6b21\u51fa\u51fb"
     assert area_by_id[280101]["task_type"] == 28
     assert area_by_id[280101]["condition_id"] == 1
+    assert area_by_id[280101]["drama_refs"] == [
+        "xht_103",
+        "\u533a\u57df\u4e8b\u4ef6|280101|1",
+        "act_event1-1",
+    ]
     assert area_by_id[280301]["name"] == "\u6559\u5b66\u6f14\u4e60"
     assert area_by_id[280302]["name"] == "\u5b9e\u6218\u6f14\u4e60"
     assert 280301 in area_by_id[280301]["nearby_stage_ids"]
