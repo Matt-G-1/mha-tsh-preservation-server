@@ -140,6 +140,7 @@ from mhatsh_server.schema import SchemaRegistry
 from mhatsh_server.stages import (
     ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS,
     ENEMY_AI_PROFILES,
+    INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS,
     RECOVERED_BATTLE_STAGE_BY_ID,
     RECOVERED_BATTLE_STAGE_BY_KEY,
     RECOVERED_BATTLE_STAGES,
@@ -213,6 +214,18 @@ def _load_asset_drama_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_asset_drama_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
         "derive_asset_drama_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_index_numeric_drama_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_index_numeric_drama_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_index_numeric_drama_stage_hints", script_path
     )
     assert spec is not None
     assert spec.loader is not None
@@ -751,6 +764,21 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert stage_candidate_by_id(400318).label == "06 End of the Light Hard"
     assert stage_candidate_by_key("asset_drama_stage_520001").scripts == ("520001",)
     assert stage_candidate_by_id(901008).scripts == ("901008",)
+    indexed_stage = stage_candidate_by_id(1015023)
+    assert indexed_stage.key == "index_numeric_drama_stage_1015023"
+    assert indexed_stage.scripts == (
+        "1015023",
+        "1015023-1",
+        "1015023-2",
+        "1015023-3",
+        "1015023-4",
+    )
+    assert [spawn.ai_profile_key for spawn in indexed_stage.encounter_spawns] == [
+        "melee_chaser",
+        "ranged_pressure",
+        "nomu_brute",
+    ]
+    assert stage_candidate_by_id(36050101).scripts == ("36050101", "36050101b")
     assert [spawn.ai_profile_key for spawn in relax_stage.encounter_spawns] == [
         "melee_chaser",
         "training_enemy",
@@ -1092,6 +1120,36 @@ def test_asset_drama_stage_hint_parser_tracks_numeric_stage_groups() -> None:
     ]
     assert hints["numeric_stage_groups"]["520001"] == ["520001"]
     assert hints["numeric_stage_groups"]["901008"] == ["901008"]
+
+
+def test_index_numeric_drama_stage_parser_tracks_additional_stage_groups() -> None:
+    module = _load_index_numeric_drama_stage_hint_script()
+    hints = module.collect_index_numeric_drama_stage_hints(
+        ROOT / module.DEFAULT_DRAMA_INDEX
+    )
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert hints["stage_count"] == 139
+    assert generated_rows[1015023]["scripts"] == [
+        "1015023",
+        "1015023-1",
+        "1015023-2",
+        "1015023-3",
+        "1015023-4",
+    ]
+    assert generated_rows[36050101]["scripts"] == ["36050101", "36050101b"]
+    assert generated_rows[90100703]["scripts"] == ["90100703"]
+    assert INDEX_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS[1015023] == (
+        "1015023",
+        "1015023-1",
+        "1015023-2",
+        "1015023-3",
+        "1015023-4",
+    )
 
 
 def test_stage_cfg_route_hint_parser_tracks_script_to_stage_routes() -> None:

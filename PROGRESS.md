@@ -535,6 +535,13 @@ environment details are intentionally omitted from Git.
   six relax stages (`400301` through `400306`) now carry their recovered
   `40030x` script groups into runtime `BattleStageDefinition` metadata, so
   those enterable stages preserve both config rows and local drama hooks.
+- A new numeric-drama-index extractor promotes 43 additional pure numeric
+  script groups from `analysis/intro_qte_asset_index.txt` into enterable
+  generated battle-stage definitions when no stronger explicit, `zx`, or asset
+  header definition already owns the stage ID. Newly represented groups include
+  `1015023`, `36050101`, `56110901`, and `90100703`, keeping the recovered
+  local script names while using generated encounters until enemy placement
+  data is recovered.
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.
