@@ -24,6 +24,13 @@ from .act_daily_stages import (
     ACT_DAILY_STAGES,
 )
 from .combat import CombatResolution, FightStyle
+from .empty_shop_stages import (
+    DEFAULT_EMPTY_SHOP_STAGE,
+    EMPTY_SHOP_STAGE_BY_CHALLENGE_INDEX,
+    EMPTY_SHOP_STAGE_BY_INDEX,
+    EMPTY_SHOP_STAGE_SOURCE,
+    EMPTY_SHOP_STAGES,
+)
 from .herochip_stages import HEROCHIP_STAGE_SOURCE, HEROCHIP_STAGES
 from .relax_stages import RELAX_STAGE_BY_ID, RELAX_STAGE_SOURCE, RELAX_STAGES
 from .roguelike_stages import ROGUELIKE_STAGE_SOURCE, ROGUELIKE_STAGES
@@ -2115,6 +2122,7 @@ def _asset_numeric_drama_stage_definitions() -> tuple[BattleStageDefinition, ...
         | {stage.stage_id for stage in RELAX_STAGES}
         | {stage.stage_id for stage in ALLSVR_STAGES}
         | {stage.stage_id for stage in ALLSVR_BOSS_STAGES}
+        | {stage.stage_id for stage in EMPTY_SHOP_STAGES}
     )
     return tuple(
         BattleStageDefinition(
@@ -2332,6 +2340,34 @@ def _allsvr_stage_definitions() -> tuple[BattleStageDefinition, ...]:
         if stage.stage_id not in occupied_ids
     )
     return regular + bosses
+
+
+def _empty_shop_stage_definitions() -> tuple[BattleStageDefinition, ...]:
+    occupied_ids = (
+        EXPLICIT_RECOVERED_STAGE_IDS
+        | set(ZX_NUMERIC_STAGE_SCRIPT_GROUPS)
+        | set(ASSET_NUMERIC_DRAMA_STAGE_SCRIPT_GROUPS)
+        | set(STAGE_CFG_SCRIPT_ROUTE_GROUPS)
+        | {stage.stage_id for stage in AREA_EVENT_STAGES}
+        | {stage.stage_id for stage in ACT_DAILY_STAGES}
+        | {stage.stage_id for stage in USJ_STAGES}
+        | {stage.stage_id for stage in HEROCHIP_STAGES}
+        | {stage.stage_id for stage in ROGUELIKE_STAGES}
+        | {stage.stage_id for stage in RELAX_STAGES}
+        | {stage.stage_id for stage in SECRET_AREA_STAGES}
+        | {stage.stage_id for stage in ALLSVR_STAGES}
+        | {stage.stage_id for stage in ALLSVR_BOSS_STAGES}
+    )
+    return tuple(
+        BattleStageDefinition(
+            key=f"empty_shop_stage_{stage.stage_id}",
+            label=stage.label,
+            stage_id=stage.stage_id,
+            source=EMPTY_SHOP_STAGE_SOURCE,
+        )
+        for stage in EMPTY_SHOP_STAGES
+        if stage.stage_id not in occupied_ids
+    )
 
 
 RECOVERED_BATTLE_STAGES = (
@@ -2582,6 +2618,7 @@ RECOVERED_BATTLE_STAGES = (
     *_relax_stage_definitions(),
     *_secret_area_stage_definitions(),
     *_allsvr_stage_definitions(),
+    *_empty_shop_stage_definitions(),
     BattleStageDefinition(
         key="battle_drama_zx_only",
         label="battle drama scripts without recovered numeric stage id",
@@ -2942,6 +2979,7 @@ class StageState:
     daily_stage_counts: dict[int, int] = field(default_factory=dict)
     allsvr_level_counts: dict[int, int] = field(default_factory=dict)
     allsvr_boss_scores: dict[int, int] = field(default_factory=dict)
+    empty_shop_max_pass_stage: int = 0
     theater_unlocked_stage_ids: set[int] = field(default_factory=set)
     theater_bonus_claims: dict[str, int] = field(default_factory=dict)
     completions: dict[int, StageCompletion] = field(default_factory=dict)
@@ -3552,6 +3590,28 @@ class StageState:
             ],
         }
 
+    def empty_shop_stage(self, stage_index: int | None = None):
+        numeric_index = int(stage_index or 0)
+        return (
+            EMPTY_SHOP_STAGE_BY_INDEX.get(numeric_index)
+            or EMPTY_SHOP_STAGE_BY_CHALLENGE_INDEX.get(numeric_index)
+            or DEFAULT_EMPTY_SHOP_STAGE
+        )
+
+    def empty_shop_stage_update(
+        self, act_id: int = 0, stage_index: int = 0
+    ) -> dict[str, object]:
+        stage = self.empty_shop_stage(stage_index)
+        pass_stage = max(0, stage.challenge_index)
+        self.empty_shop_max_pass_stage = max(self.empty_shop_max_pass_stage, pass_stage)
+        return self.empty_shop_info(act_id)
+
+    def empty_shop_info(self, act_id: int = 0) -> dict[str, object]:
+        return {
+            "ActId": int(act_id),
+            "MaxPassStage": int(self.empty_shop_max_pass_stage),
+        }
+
     def allsvr_stage(self, level_id: int | None = None):
         return ALLSVR_STAGE_BY_ID.get(int(level_id or 0), DEFAULT_ALLSVR_STAGE)
 
@@ -4058,6 +4118,10 @@ class StageState:
         self.allsvr_boss_scores = self._int_section(
             values.get("allsvr_boss_scores", {})
         )
+        empty_shop_progress = self._int_section(
+            values.get("empty_shop_max_pass_stage", {})
+        )
+        self.empty_shop_max_pass_stage = max(empty_shop_progress.values(), default=0)
         self.theater_unlocked_stage_ids = set(
             self._int_section(values.get("theater_unlocked_stage_ids", {}))
         )
@@ -4084,6 +4148,7 @@ class StageState:
             "daily_stage_counts": dict(sorted(self.daily_stage_counts.items())),
             "allsvr_level_counts": dict(sorted(self.allsvr_level_counts.items())),
             "allsvr_boss_scores": dict(sorted(self.allsvr_boss_scores.items())),
+            "empty_shop_max_pass_stage": {1: int(self.empty_shop_max_pass_stage)},
             "theater_unlocked_stage_ids": {
                 stage_id: 1 for stage_id in sorted(self.theater_unlocked_stage_ids)
             },

@@ -865,6 +865,23 @@ class GameServer:
                 int(values.get("Id") or 0),
                 hero_id=int(values.get("HeroId") or 0),
             )
+        elif name in {
+            "s_act_empty_shop_stage_enter",
+            "s_act_empty_shop_stage_reenter",
+        }:
+            stage_index = int(values.get("StageIndex") or 0)
+            await self._send(
+                writer,
+                session,
+                "c_act_empty_shop_info",
+                session.stage.empty_shop_stage_update(stage_index=stage_index),
+            )
+            await self._enter_requested_stage(
+                writer,
+                session,
+                session.stage.empty_shop_stage(stage_index).stage_id,
+                card_uid=int(values.get("HeroUid") or 0),
+            )
         elif name == "s_act_allsvr_stage_enter":
             act_id = int(values.get("ActId") or 0)
             level_id = int(values.get("LevelId") or 0)

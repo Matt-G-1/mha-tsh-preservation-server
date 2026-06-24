@@ -28,6 +28,13 @@ from mhatsh_server.act_daily_stages import (
     ACT_DAILY_STAGES,
     ACT_DAILY_TOTAL_LIMIT,
 )
+from mhatsh_server.empty_shop_stages import (
+    EMPTY_SHOP_END_TASK_ID,
+    EMPTY_SHOP_STAGE_BY_ID,
+    EMPTY_SHOP_STAGE_SOURCE,
+    EMPTY_SHOP_START_TASK_ID,
+    EMPTY_SHOP_STAGES,
+)
 from mhatsh_server.beginner_quest import (
     BEGINNER_QUEST_DEATH_ARMS_UID,
     STARTER_MAP_GUIDE_ID,
@@ -302,6 +309,18 @@ def _load_allsvr_stage_hint_script():
     return module
 
 
+def _load_empty_shop_stage_hint_script():
+    script_path = ROOT / "scripts" / "derive_empty_shop_stage_hints.py"
+    spec = importlib.util.spec_from_file_location(
+        "derive_empty_shop_stage_hints", script_path
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_secret_area_stage_hint_script():
     script_path = ROOT / "scripts" / "derive_secret_area_stage_hints.py"
     spec = importlib.util.spec_from_file_location(
@@ -557,8 +576,8 @@ def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> Non
 
 def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert "battle_stage_candidate_catalog" in STAGE_CATALOG_SOURCE
-    assert len(RECOVERED_BATTLE_STAGES) >= 833
-    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 826
+    assert len(RECOVERED_BATTLE_STAGES) >= 851
+    assert len(RECOVERED_BATTLE_STAGE_BY_ID) >= 844
     stage_ids = [
         stage.stage_id for stage in RECOVERED_BATTLE_STAGES if stage.stage_id is not None
     ]
@@ -738,6 +757,19 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     allsvr_boss_stage = stage_candidate_by_id(880312)
     assert allsvr_boss_stage.key == "allsvr_boss_stage_880312"
     assert allsvr_boss_stage.label == "Sidero Nightmare"
+
+    empty_shop_stage = stage_candidate_by_id(9001001)
+    assert empty_shop_stage.key == "empty_shop_stage_9001001"
+    assert empty_shop_stage.label == "起跑开始，击败敌人完成热身运动吧！"
+    assert empty_shop_stage.source == EMPTY_SHOP_STAGE_SOURCE
+    assert stage_candidate_by_id(9006003).key == "empty_shop_stage_9006003"
+    assert EMPTY_SHOP_STAGE_BY_ID[9005001].fighting == (
+        17320,
+        21640,
+        25960,
+        31160,
+        37400,
+    )
 
     stage_cfg_route = stage_candidate_by_id(563903)
     assert stage_cfg_route.key == "stage_cfg_route_563903"
@@ -1278,6 +1310,39 @@ def test_allsvr_stage_hint_parser_tracks_activity_rows() -> None:
         if isinstance(stage, dict)
     }
     assert boss_rows[880211]["difficulty_name"] == "Danger"
+
+
+def test_empty_shop_stage_hint_parser_tracks_challenge_rows() -> None:
+    module = _load_empty_shop_stage_hint_script()
+    hints = module.collect_empty_shop_stage_hints(
+        ROOT / module.DEFAULT_EMPTY_SHOP_STAGE_ASSET
+    )
+
+    assert hints["constant_count"] == 110
+    assert hints["stage_count"] == 18
+    assert hints["start_task_id"] == EMPTY_SHOP_START_TASK_ID
+    assert hints["end_task_id"] == EMPTY_SHOP_END_TASK_ID
+    assert EMPTY_SHOP_STAGE_SOURCE == f"{hints['source']}, parsed 2026-06-24"
+    assert len(EMPTY_SHOP_STAGES) == hints["stage_count"]
+    assert EMPTY_SHOP_STAGES[0].stage_id == 9001001
+    assert EMPTY_SHOP_STAGES[0].challenge_index == 1
+    assert EMPTY_SHOP_STAGES[-1].stage_id == 9006003
+
+    generated_rows = {
+        stage["stage_id"]: stage
+        for stage in hints["stages"]
+        if isinstance(stage, dict)
+    }
+    assert generated_rows[9001001]["label"] == "起跑开始，击败敌人完成热身运动吧！"
+    assert generated_rows[9002001]["fighting"] == [
+        6920,
+        8640,
+        10360,
+        12440,
+        14920,
+    ]
+    assert generated_rows[9006002]["challenge_index"] == 6
+    assert generated_rows[9001003]["label"] == "Empty Shop challenge 13"
 
 
 def test_secret_area_stage_hint_parser_tracks_stage_key_rows() -> None:
@@ -5869,6 +5934,59 @@ async def _run_requested_stage_enter_packets() -> None:
     assert allsvr_boss_update["BossInfo"]["Score"] == 100
     assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 880312
     assert session.stage.current_stage_key == "allsvr_boss_stage_880312"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112240)
+    empty_shop = codec.encode_message(
+        "s_act_empty_shop_stage_enter",
+        {"StageIndex": 1, "HeroUid": STARTER_CARD_UID},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_empty_shop_stage_enter"],
+        empty_shop,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112240))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_act_empty_shop_info",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    empty_shop_info = codec.decode_message("c_act_empty_shop_info", replies[0][1])
+    assert empty_shop_info == {"ActId": 0, "MaxPassStage": 1}
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 9001001
+    assert codec.decode_message("c_frame_fighter_data", replies[2][1])[
+        "CardUid"
+    ] == STARTER_CARD_UID
+    assert session.stage.current_stage_key == "empty_shop_stage_9001001"
+
+    writer.data.clear()
+    session.outbound = RollingXor(0x55112241)
+    empty_shop_reenter = codec.encode_message(
+        "s_act_empty_shop_stage_reenter",
+        {"StageIndex": 2, "HeroUid": STARTER_CARD_UID},
+    )
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_act_empty_shop_stage_reenter"],
+        empty_shop_reenter,
+        writer,
+    )
+    decoder = FrameDecoder(RollingXor(0x55112241))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_act_empty_shop_info",
+        "c_stage_enter",
+        "c_frame_fighter_data",
+    ]
+    assert codec.decode_message("c_act_empty_shop_info", replies[0][1]) == {
+        "ActId": 0,
+        "MaxPassStage": 2,
+    }
+    assert codec.decode_message("c_stage_enter", replies[1][1])["StageId"] == 9002001
+    assert session.stage.current_stage_key == "empty_shop_stage_9002001"
 
     writer.data.clear()
     session.outbound = RollingXor(0x55112239)
