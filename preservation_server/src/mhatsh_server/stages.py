@@ -4001,6 +4001,30 @@ class StageState:
             )
         return self.area_event_stage_pass(summary.stage_id)
 
+    def ensure_area_event_stage_passed(
+        self,
+        stage_id: int,
+        *,
+        use_time: int = 0,
+    ) -> dict[str, object]:
+        numeric_stage_id = int(stage_id)
+        existing = self.completions.get(numeric_stage_id)
+        if existing is not None and existing.status == 1:
+            return self.area_event_stage_pass(numeric_stage_id)
+        self.complete_stage(
+            StageCombatSummary(
+                stage_id=numeric_stage_id,
+                result=1,
+                time=max(0, int(use_time)),
+                max_combo=0,
+                combo_damage=0,
+                all_damage=0,
+                on_hit_num=0,
+                solo_boss_num=0,
+            )
+        )
+        return self.area_event_stage_pass(numeric_stage_id)
+
     def pressure_stage_detail(
         self,
         stage_id: int,

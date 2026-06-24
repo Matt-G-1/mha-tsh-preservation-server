@@ -266,6 +266,12 @@ class TaskState:
         self._finish(task)
         return self.task_update(task, action_type=2)
 
+    def area_event_stage_id_for_task(self, task_id: int) -> int:
+        task = self.tasks.get(int(task_id))
+        if task is None or task.source_kind != "area_event":
+            return 0
+        return int(task.source_stage_id)
+
     def enter_stage(self, is_enter: int) -> dict[str, object]:
         return {"IsEnter": is_enter}
 

@@ -4252,6 +4252,9 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert contact_update is not None
     assert contact_update["task_info"]["Id"] == 100602
     assert contact_update["task_info"]["Status"] == TASK_STATUS_FINISHED
+    assert state.area_event_stage_id_for_task(100602) == 21121
+    assert state.area_event_stage_id_for_task(102203) == 21321
+    assert state.area_event_stage_id_for_task(424242) == 0
     assert 100602 in state.finished
     assert state.active_quest_contact_candidates() == ()
     assert [task["Id"] for task in state.task_info()["tasks"][:5]] == [
@@ -4856,6 +4859,12 @@ def test_area_event_task_progress_restores_from_stage_progress(
     asyncio.run(_run_area_event_task_progress_persistence(tmp_path))
 
 
+def test_contact_sync_progress_persists_area_event_stage_state(
+    tmp_path: Path,
+) -> None:
+    asyncio.run(_run_contact_sync_progress_persistence(tmp_path))
+
+
 def test_finished_task_ids_persist_across_server_instances(tmp_path: Path) -> None:
     asyncio.run(_run_finished_task_id_persistence(tmp_path))
 
@@ -5259,6 +5268,103 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
     assert restored_first_task["Status"] == TASK_STATUS_FINISHED
     assert restored_first_task["Cond"][0]["CompCount"] == 1
     assert 280101 in restored_area_tasks["finishs"]
+
+
+async def _run_contact_sync_progress_persistence(tmp_path: Path) -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    profile_path = tmp_path / "profiles.json"
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_PROFILE_STORE": str(profile_path),
+            "MHATSH_ROSTER_MODE": "verified",
+        },
+    ):
+        first_game = GameServer(registry)
+        first_writer = BufferWriter()
+        first_session = Session(
+            seed=1,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x434F4E31),
+            urs="local-guest",
+            uid=4242,
+        )
+        first_game._configure_session(first_session)
+        submit_first_act = codec.encode_message("s_task_submit", {"task_id": 1010})
+        await first_game._dispatch(
+            first_session,
+            registry.protocol_ids["s_task_submit"],
+            submit_first_act,
+            first_writer,
+        )
+        first_session.outbound = RollingXor(0x434F4E32)
+        first_writer.data.clear()
+        area_over = codec.encode_message(
+            "s_area_event_fight_over",
+            {"StageId": 21111, "IsWin": 1, "UseTime": 12},
+        )
+        await first_game._dispatch(
+            first_session,
+            registry.protocol_ids["s_area_event_fight_over"],
+            area_over,
+            first_writer,
+        )
+        first_session.outbound = RollingXor(0x434F4E33)
+        first_writer.data.clear()
+        contact_sync = codec.encode_message(
+            "s_task_sync_info",
+            {
+                "TaskId": 100602,
+                "Type": "DialogSub",
+                "ParamList": ["6669"],
+            },
+        )
+        await first_game._dispatch(
+            first_session,
+            registry.protocol_ids["s_task_sync_info"],
+            contact_sync,
+            first_writer,
+        )
+        decoder = FrameDecoder(RollingXor(0x434F4E33))
+        replies = decoder.feed(bytes(first_writer.data))
+        assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+            "c_task_sync_info",
+            "c_task_info_update",
+            "c_task_info",
+            "c_area_event_stage_pass",
+            "c_area_event_info",
+        ]
+
+        second_game = GameServer(registry)
+        second_session = Session(
+            seed=2,
+            decoder=FrameDecoder(None),
+            outbound=RollingXor(0x434F4E34),
+            urs="local-guest",
+            uid=4242,
+        )
+        second_game._configure_session(second_session)
+
+    raw_profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    saved_tasks = raw_profile["finished_tasks"]["local-guest"]
+    assert 100602 in saved_tasks
+    assert 280101 in saved_tasks
+    assert raw_profile["stage_progress"]["local-guest"]["21121"]["status"] == 1
+    assert raw_profile["stage_progress"]["local-guest"]["21121"]["pass_count"] == 1
+
+    restored_completion = second_session.stage.completions[21121]
+    assert restored_completion.status == 1
+    assert restored_completion.pass_count == 1
+    restored_task_info = second_session.tasks.task_info()
+    assert 100602 in restored_task_info["finishs"]
+    restored_contact_task = next(
+        task for task in restored_task_info["tasks"] if task["Id"] == 100602
+    )
+    assert restored_contact_task["Status"] == TASK_STATUS_FINISHED
+    assert restored_contact_task["Cond"][0]["CompCount"] == 1
 
 
 async def _run_finished_task_id_persistence(tmp_path: Path) -> None:
@@ -6518,6 +6624,8 @@ async def _run_task_requests() -> None:
         "c_task_sync_info",
         "c_task_info_update",
         "c_task_info",
+        "c_area_event_stage_pass",
+        "c_area_event_info",
     ]
     assert codec.decode_message("c_task_sync_info", replies[0][1]) == {
         "TaskId": 100602,
@@ -6542,6 +6650,21 @@ async def _run_task_requests() -> None:
         100602,
         280101,
     ]
+    stage_pass = codec.decode_message("c_area_event_stage_pass", replies[3][1])
+    assert stage_pass == {
+        "Star": [1, 2, 3],
+        "FirstPass": 1,
+        "FirstPassPrize": [],
+        "ImportantPrize": [],
+    }
+    area_event_info = codec.decode_message("c_area_event_info", replies[4][1])
+    assert area_event_info["StageData"] == {
+        "StageId": 21121,
+        "PassedTimes": 1,
+        "DropCountTimes": 0,
+        "Star": 3,
+    }
+    assert session.stage.completions[21121].pass_count == 1
 
     writer.data.clear()
     session.outbound = RollingXor(0xAABBCCDD)

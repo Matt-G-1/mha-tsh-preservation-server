@@ -838,6 +838,27 @@ class GameServer:
             task_update = session.tasks.complete_active_quest_contact(task_id)
             if task_update is not None:
                 await self._send_task_progression(writer, session, task_update)
+                area_stage_id = session.tasks.area_event_stage_id_for_task(task_id)
+                if area_stage_id:
+                    stage_pass = session.stage.ensure_area_event_stage_passed(
+                        area_stage_id
+                    )
+                    self.profile_store.remember_stage_progress(
+                        session.urs,
+                        session.stage.export_completions(),
+                    )
+                    await self._send(
+                        writer,
+                        session,
+                        "c_area_event_stage_pass",
+                        stage_pass,
+                    )
+                    await self._send(
+                        writer,
+                        session,
+                        "c_area_event_info",
+                        session.stage.area_event_info(area_stage_id),
+                    )
         elif name == "s_task_enter_stage":
             await self._send(
                 writer,
