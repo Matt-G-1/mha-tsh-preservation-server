@@ -62,6 +62,7 @@ from mhatsh_server.intro import (
     STARTER_INTRO_STAGE_CANDIDATES,
     STARTER_RECAP_VIDEO,
 )
+from mhatsh_server.mail import MailState, MailRecord
 from mhatsh_server.characters import (
     CATALOG_SOURCE,
     CHIBI_MODEL_ASSETS,
@@ -4563,6 +4564,27 @@ def test_userinfo_state_builds_profile_payloads() -> None:
         "Quality": 1,
         "Level": 1,
     }
+
+
+def test_mail_state_returns_empty_and_ack_payloads() -> None:
+    state = MailState()
+    assert state.mail_list(0) == {
+        "iVersion": 1,
+        "arrMailSimpleInfos": [],
+        "iIsFinish": 1,
+    }
+    assert state.mail_info(77) == {
+        "mpMailInfo": {"iMailId": 77, "arrAttachList": []}
+    }
+    assert state.get_attach(77) is None
+    state.mails[1] = MailRecord(
+        1,
+        attachments=(
+            {"iType": 1, "iId": LOCAL_STAGE_PASS_REWARD_ITEM_ID, "iAmount": 1, "cExtraInfo": ""},
+        ),
+    )
+    assert state.quickly_get_attach() == {"arrMailIds": [1]}
+    assert state.delete([1, 99]) == {"arrMailIds": [1, 99]}
 
 
 def test_version_and_account_login_exchange() -> None:
@@ -9872,6 +9894,11 @@ async def _run_activity_and_side_task_requests() -> None:
         ("s_relax_stage_get_box", {}),
         ("s_relax_cond_get_reward", {"Type": 1, "Id": 400301}),
         ("s_activity_shop_info", {"ActType": 17}),
+        ("s_mail_get_list", {"iVersion": 0}),
+        ("s_mail_get_info", {"iMailId": 99}),
+        ("s_mail_get_attach", {"iMailId": 99}),
+        ("s_mail_quickly_get_attach", {}),
+        ("s_mail_delete", {"arrMailIds": [99]}),
         ("s_entrust_task_list", {}),
         ("s_secret_area_task", {}),
         ("s_usj_task", {}),
@@ -9913,6 +9940,11 @@ async def _run_activity_and_side_task_requests() -> None:
         "c_relax_stage_boxinfo",
         "c_relax_stage_sync_cond",
         "c_activity_shop_info",
+        "c_mail_get_list",
+        "c_mail_get_info",
+        "c_mail_cannot_get_attach",
+        "c_mail_quickly_get_attach",
+        "c_mail_delete",
         "c_entrust_task_list",
         "c_secret_area_task",
         "c_usj_task",
@@ -9957,18 +9989,33 @@ async def _run_activity_and_side_task_requests() -> None:
     assert codec.decode_message("c_activity_shop_info", replies[5][1]) == {
         "BuyInfo": []
     }
-    assert codec.decode_message("c_entrust_task_list", replies[6][1]) == {
+    assert codec.decode_message("c_mail_get_list", replies[6][1]) == {
+        "iVersion": 1,
+        "arrMailSimpleInfos": [],
+        "iIsFinish": 1,
+    }
+    assert codec.decode_message("c_mail_get_info", replies[7][1]) == {
+        "mpMailInfo": {"iMailId": 99, "arrAttachList": []}
+    }
+    assert codec.decode_message("c_mail_cannot_get_attach", replies[8][1]) == {}
+    assert codec.decode_message("c_mail_quickly_get_attach", replies[9][1]) == {
+        "arrMailIds": []
+    }
+    assert codec.decode_message("c_mail_delete", replies[10][1]) == {
+        "arrMailIds": [99]
+    }
+    assert codec.decode_message("c_entrust_task_list", replies[11][1]) == {
         "Version": 1,
         "EntrustTaskData": [],
     }
-    assert codec.decode_message("c_secret_area_task", replies[7][1]) == {
+    assert codec.decode_message("c_secret_area_task", replies[12][1]) == {
         "TaskList": []
     }
-    assert codec.decode_message("c_usj_task", replies[8][1]) == {"TaskList": []}
-    assert codec.decode_message("c_offlinepvp_task", replies[9][1]) == {
+    assert codec.decode_message("c_usj_task", replies[13][1]) == {"TaskList": []}
+    assert codec.decode_message("c_offlinepvp_task", replies[14][1]) == {
         "TaskList": []
     }
-    assert codec.decode_message("c_battlefield_task_info", replies[10][1]) == {
+    assert codec.decode_message("c_battlefield_task_info", replies[15][1]) == {
         "IsFightOver": 0,
         "IsGetDayReward": 0,
         "IsGetWeekReward": 0,
@@ -9976,32 +10023,32 @@ async def _run_activity_and_side_task_requests() -> None:
         "FreshenTime": 0,
         "Tasks": [],
     }
-    assert codec.decode_message("c_group_open_map", replies[11][1]) == {
+    assert codec.decode_message("c_group_open_map", replies[16][1]) == {
         "MapAttackArea": []
     }
-    assert codec.decode_message("c_act_client_trigger_update", replies[12][1]) == {
+    assert codec.decode_message("c_act_client_trigger_update", replies[17][1]) == {
         "ActId": 17,
         "List": [{"Id": 3, "State": 1}],
     }
-    theater_open = codec.decode_message("c_theater_open", replies[13][1])
+    theater_open = codec.decode_message("c_theater_open", replies[18][1])
     assert len(theater_open["StageInfo"]) == len(ALLSVR_STAGES)
     assert theater_open["StageInfo"][0]["Id"] == 880101
     assert theater_open["StageInfo"][0]["Status"] == 1
     assert theater_open["UserContri"] == 0
-    assert codec.decode_message("c_theater_unlock", replies[14][1]) == {
+    assert codec.decode_message("c_theater_unlock", replies[19][1]) == {
         "StageId": 880101,
         "Status": 1,
     }
-    assert codec.decode_message("c_theater_bonus", replies[15][1]) == {
+    assert codec.decode_message("c_theater_bonus", replies[20][1]) == {
         "CfgType": 1,
         "BonusIdx": 2,
         "Reward": [{"Id": LOCAL_STAGE_STYLE_REWARD_ITEM_ID, "Amount": 1}],
     }
-    assert codec.decode_message("c_theater_chapterbonus", replies[16][1]) == {
+    assert codec.decode_message("c_theater_chapterbonus", replies[21][1]) == {
         "chapterid": 1,
         "starIdx": 3,
     }
-    assert codec.decode_message("c_theater_finish", replies[17][1]) == {
+    assert codec.decode_message("c_theater_finish", replies[22][1]) == {
         "newChapterInfo": [{"Id": 1, "Status": 1}],
         "newStageInfo": [{"Id": 880101, "Status": 1}],
     }

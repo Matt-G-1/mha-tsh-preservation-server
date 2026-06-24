@@ -77,6 +77,10 @@ environment details are intentionally omitted from Git.
   activity/task panels that can be reached from world UI probes:
   stage-activity info, activity-shop info, entrust-task list, secret-area task,
   USJ task, offline-PVP task, battlefield-task info, and group-map opening.
+- Mail panel compatibility now covers the recovered mailbox packet family for
+  empty/local state: `s_mail_get_list`, `s_mail_get_info`,
+  `s_mail_get_attach`, `s_mail_quickly_get_attach`, and `s_mail_delete` return
+  schema-matched list/detail/attach/delete acknowledgments.
 - Activity client triggers now keep session state and reply with
   `c_act_client_trigger_update` for `s_act_client_trigger`; `s_task_lock_trigger`
   is accepted as a no-op because no recovered response packet exists.

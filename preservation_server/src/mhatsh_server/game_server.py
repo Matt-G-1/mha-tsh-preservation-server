@@ -28,6 +28,7 @@ from .characters import (
 from .combat import fight_style_for_character
 from .intro import SCHOOL_MIDORIYA_INTRO_COSTUME
 from .lottery import LotteryState
+from .mail import MailState
 from .profile_store import ProfileStore
 from .protocol import FrameDecoder, ProtocolCodec, ProtocolError, RollingXor, encode_frame
 from .roguelike_stages import ROGUELIKE_STAGES
@@ -81,6 +82,7 @@ class Session:
     account_info_urs: str | None = None
     tutorial: TutorialState = field(default_factory=TutorialState)
     userinfo: UserInfoState = field(default_factory=UserInfoState)
+    mail: MailState = field(default_factory=MailState)
     tasks: TaskState = field(default_factory=TaskState)
     world: WorldState = field(default_factory=WorldState)
     world_tasks: WorldTaskState = field(default_factory=WorldTaskState)
@@ -1905,6 +1907,42 @@ class GameServer:
                 "c_activity_shop_info",
                 session.activities.activity_shop_info(
                     int(values.get("ActType") or 0)
+                ),
+            )
+        elif name == "s_mail_get_list":
+            await self._send(
+                writer,
+                session,
+                "c_mail_get_list",
+                session.mail.mail_list(int(values.get("iVersion") or 0)),
+            )
+        elif name == "s_mail_get_info":
+            await self._send(
+                writer,
+                session,
+                "c_mail_get_info",
+                session.mail.mail_info(int(values.get("iMailId") or 0)),
+            )
+        elif name == "s_mail_get_attach":
+            attach = session.mail.get_attach(int(values.get("iMailId") or 0))
+            if attach is None:
+                await self._send(writer, session, "c_mail_cannot_get_attach", {})
+            else:
+                await self._send(writer, session, "c_mail_get_attach", attach)
+        elif name == "s_mail_quickly_get_attach":
+            await self._send(
+                writer,
+                session,
+                "c_mail_quickly_get_attach",
+                session.mail.quickly_get_attach(),
+            )
+        elif name == "s_mail_delete":
+            await self._send(
+                writer,
+                session,
+                "c_mail_delete",
+                session.mail.delete(
+                    [int(item) for item in list(values.get("arrMailIds") or [])]
                 ),
             )
         elif name == "s_team_recruit":
