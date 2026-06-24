@@ -25,6 +25,7 @@ FALLBACK_RELAX_STAGE_ASSET = (
     / "0QIU"
     / "bc4767502c3d543d"
 )
+DEFAULT_DRAMA_INDEX = Path("analysis") / "intro_qte_asset_index.txt"
 RELAX_STAGE_SOURCE = (
     "phone_dump/apk_extract/assets/0QIU/bc4767502c3d543d, "
     "./script/setting/language/en/stage/relax_stage_cfg.lua"
@@ -157,13 +158,42 @@ def _stage_fighting(segment: list[object]) -> tuple[int, ...]:
     return ()
 
 
+def _relax_stage_scripts(path: Path = DEFAULT_DRAMA_INDEX) -> dict[int, tuple[str, ...]]:
+    if not path.exists():
+        return {}
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    scripts: dict[int, list[str]] = {}
+    for match in re.finditer(
+        r"\./script/setting/dramas/(4003\d{2}(?:_\d+)?)\.lua",
+        text,
+    ):
+        script = match.group(1)
+        stage_id = int(script.split("_", 1)[0])
+        scripts.setdefault(stage_id, [])
+        if script not in scripts[stage_id]:
+            scripts[stage_id].append(script)
+    def sort_key(script: str) -> tuple[int, str]:
+        suffix = script.split("_", 1)[1] if "_" in script else "0"
+        try:
+            return (int(suffix), script)
+        except ValueError:
+            return (0, script)
+
+    return {
+        stage_id: tuple(sorted(values, key=sort_key))
+        for stage_id, values in sorted(scripts.items())
+    }
+
+
 def collect_relax_stage_hints(
     relax_stage_asset: Path = DEFAULT_RELAX_STAGE_ASSET,
+    drama_index: Path = DEFAULT_DRAMA_INDEX,
 ) -> dict[str, object]:
     asset = _asset_path(relax_stage_asset)
     constants = _RootConstantReader(asset.read_bytes()).root_constants()
     stages: list[dict[str, object]] = []
     groups = _groups(constants)
+    scripts_by_stage = _relax_stage_scripts(drama_index)
     for index, value in enumerate(constants):
         stage_id = _as_int(value)
         if stage_id is None or not 400301 <= stage_id <= 400399:
@@ -185,6 +215,7 @@ def collect_relax_stage_hints(
                 "fighting": list(_stage_fighting(segment)),
                 "show_rewards": list(_stage_rewards(segment)),
                 "tips": _stage_tip(constants, index),
+                "scripts": list(scripts_by_stage.get(stage_id, ())),
                 "source": RELAX_STAGE_SOURCE,
             }
         )
@@ -201,10 +232,11 @@ def main() -> None:
         description="Recover Joint Operations / relax stage rows from packed Lua constants."
     )
     parser.add_argument("--asset", type=Path, default=DEFAULT_RELAX_STAGE_ASSET)
+    parser.add_argument("--drama-index", type=Path, default=DEFAULT_DRAMA_INDEX)
     args = parser.parse_args()
     print(
         json.dumps(
-            collect_relax_stage_hints(args.asset),
+            collect_relax_stage_hints(args.asset, args.drama_index),
             indent=2,
             ensure_ascii=True,
             sort_keys=True,

@@ -20,6 +20,7 @@ class RelaxStageDefinition:
     fighting: tuple[int, ...]
     tips: str = ""
     show_rewards: tuple[int, ...] = ()
+    scripts: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -42,6 +43,7 @@ RELAX_STAGES = tuple(
             "fighting": (2640, 2940, 3080, 3240, 3520),
             "tips": "Challenge from the No.1 Hero, All Might. Detroit Smash: Stay within the green circles to avoid damage.",
             "show_rewards": (1021005, 1029040, 1021025, 1021026, 1029034),
+            "scripts": ("400301_1", "400301_2", "400301_3"),
         },
         {
             "stage_id": 400302,
@@ -53,6 +55,7 @@ RELAX_STAGES = tuple(
             "fighting": (4700, 5220, 5480, 5740, 6260),
             "tips": "Challenge from the No.1 Hero, All Might. Tornado: Stay outside the yellow circle to mitigate the pulling effect.",
             "show_rewards": (1029001, 1029035),
+            "scripts": ("400302", "400302_1", "400302_2", "400302_3"),
         },
         {
             "stage_id": 400303,
@@ -64,6 +67,7 @@ RELAX_STAGES = tuple(
             "fighting": (7480, 8300, 8720, 9140, 9960),
             "tips": "Challenge from the No.1 Hero, All Might. When the shield is broken, All Might will be weakened, giving you a chance to deal damage.",
             "show_rewards": (1021027,),
+            "scripts": ("400303", "400303_1", "400303_2", "400303_3"),
         },
         {
             "stage_id": 400304,
@@ -75,6 +79,7 @@ RELAX_STAGES = tuple(
             "fighting": (6220, 6900, 7240, 7600, 8280),
             "tips": "Challenge from Todoroki, it's dangerous to get close, be careful with the Fire Fist Charge!",
             "show_rewards": (1029036,),
+            "scripts": ("400304", "400304_1", "400304_2", "400304_3"),
         },
         {
             "stage_id": 400305,
@@ -85,6 +90,7 @@ RELAX_STAGES = tuple(
             "difficulty_name": "Elite",
             "fighting": (12340, 13700, 14380, 15080, 16440),
             "show_rewards": (1029002,),
+            "scripts": ("400305", "400305_1", "400305_2", "400305_3"),
         },
         {
             "stage_id": 400306,
@@ -94,6 +100,7 @@ RELAX_STAGES = tuple(
             "difficulty": 3,
             "difficulty_name": "Hard",
             "fighting": (16480, 18300, 19220, 20140, 21960),
+            "scripts": ("400306_1", "400306_2", "400306_3"),
         },
         {
             "stage_id": 400307,

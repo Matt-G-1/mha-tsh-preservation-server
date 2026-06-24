@@ -530,6 +530,11 @@ environment details are intentionally omitted from Git.
   packets, and daily-stage report results. Generated rewards now distinguish
   base pass, full-clear, and style-pressure bonuses when the client does not
   submit an explicit item list.
+- Relax/Joint Operations stage recovery now cross-links its packed
+  `relax_stage_cfg.lua` rows with the extracted drama-script index. The first
+  six relax stages (`400301` through `400306`) now carry their recovered
+  `40030x` script groups into runtime `BattleStageDefinition` metadata, so
+  those enterable stages preserve both config rows and local drama hooks.
 - Pressure-stage scores, daily-stage counts, and daily-stage reward item
   grants are now profile-backed, so those stage-family loops survive a fresh
   server process alongside normal stage clears and active-card state.

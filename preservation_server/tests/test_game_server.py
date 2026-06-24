@@ -746,6 +746,7 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     relax_stage = stage_candidate_by_id(400301)
     assert relax_stage.key == "relax_stage_400301"
     assert relax_stage.label == "01 Trial of the Strongest Easy"
+    assert relax_stage.scripts == ("400301_1", "400301_2", "400301_3")
     assert relax_stage.source == RELAX_STAGE_SOURCE
     assert stage_candidate_by_id(400318).label == "06 End of the Light Hard"
     assert stage_candidate_by_key("asset_drama_stage_520001").scripts == ("520001",)
@@ -1276,6 +1277,7 @@ def test_relax_stage_hint_parser_tracks_joint_operations_rows() -> None:
     assert RELAX_STAGES[0].stage_id == 400301
     assert RELAX_STAGES[0].group_name == "01 Trial of the Strongest"
     assert RELAX_STAGES[0].fighting == (2640, 2940, 3080, 3240, 3520)
+    assert RELAX_STAGES[0].scripts == ("400301_1", "400301_2", "400301_3")
     assert RELAX_STAGE_BY_ID[400310].group_name == "04 Explosive Crisis"
     assert RELAX_STAGE_BY_ID[400316].open_level == 65
 
@@ -1287,6 +1289,11 @@ def test_relax_stage_hint_parser_tracks_joint_operations_rows() -> None:
     assert generated_rows[400301]["tips"].startswith(
         "Challenge from the No.1 Hero"
     )
+    assert generated_rows[400301]["scripts"] == [
+        "400301_1",
+        "400301_2",
+        "400301_3",
+    ]
     assert generated_rows[400309]["tips"].endswith(
         "to cancel out Creation Stance."
     )

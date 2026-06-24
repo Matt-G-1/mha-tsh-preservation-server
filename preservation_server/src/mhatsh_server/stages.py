@@ -2274,6 +2274,7 @@ def _relax_stage_definitions() -> tuple[BattleStageDefinition, ...]:
             key=f"relax_stage_{stage.stage_id}",
             label=stage.label,
             stage_id=stage.stage_id,
+            scripts=stage.scripts,
             source=RELAX_STAGE_SOURCE,
         )
         for stage in RELAX_STAGES
