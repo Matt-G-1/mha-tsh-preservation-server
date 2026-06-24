@@ -749,9 +749,17 @@ def test_recovered_battle_stage_catalog_promotes_parsed_stage_assets() -> None:
     assert route_only_signal_stage.encounter_spawns[0].label == (
         "stage_cfg_561115_enemy_56111503"
     )
+    assert route_only_signal_stage.encounter_spawns[0].placement_source == (
+        "stage_cfg_generated"
+    )
+    assert route_only_signal_stage.encounter_spawns[0].is_authored_placement is False
     assert route_only_signal_stage.encounter_spawns[1].label == (
         "stage_cfg_authored_561115_enemy_56111505"
     )
+    assert route_only_signal_stage.encounter_spawns[1].placement_source == (
+        "stage_cfg_authored"
+    )
+    assert route_only_signal_stage.encounter_spawns[1].is_authored_placement is True
     assert (
         route_only_signal_stage.encounter_spawns[1].x,
         route_only_signal_stage.encounter_spawns[1].y,
@@ -1294,6 +1302,8 @@ def test_enemy_ai_profiles_can_seed_battle_npcs_and_monster_frames() -> None:
 
     sludge_spawn = stage_candidate_by_key("starter_intro_299301").enemy_spawns[0]
     assert sludge_spawn.ai_profile is sludge_ai
+    assert sludge_spawn.placement_source == "explicit"
+    assert sludge_spawn.is_authored_placement is True
     assert sludge_spawn.to_scene_npc()["BTName"] == sludge_ai.bt_name
     monster_seed = sludge_spawn.to_monster_frame_seed()
     assert monster_seed["Uid"] == sludge_spawn.uid
@@ -1305,6 +1315,8 @@ def test_enemy_ai_profiles_can_seed_battle_npcs_and_monster_frames() -> None:
     assert directive["Behavior"] == sludge_ai.behavior
     assert directive["AttackRange"] == sludge_ai.attack_range
     assert directive["CombatHp"] == sludge_spawn.combat_hp
+    assert directive["PlacementSource"] == "explicit"
+    assert directive["AuthoredPlacement"] == 1
 
     state = StageState()
     assert state.record_monster_frame_data({"monster_data": [monster_seed]}) == [
@@ -1449,6 +1461,8 @@ def test_stage_combat_summary_uses_client_report_and_damage_info() -> None:
     assert [enemy["EnemyId"] for enemy in summary.enemy_result_list] == [3002, 2005]
     assert all(enemy["Defeated"] == 1 for enemy in summary.enemy_result_list)
     assert summary.enemy_result_list[0]["LastSkill"] == "Detroit Smash"
+    assert summary.enemy_result_list[0]["PlacementSource"] == "explicit"
+    assert summary.enemy_result_list[0]["AuthoredPlacement"] == 1
     assert summary.enemy_result_list[0]["ThreatScore"] >= 8
     assert summary.enemy_result_list[0]["ActionHint"] == "defeated"
     result = state.result()
@@ -1490,6 +1504,8 @@ def test_stage_combat_summary_keeps_live_ai_hints_for_surviving_enemies() -> Non
         "keeps distance and fires intermittent ranged attacks; next=ranged_shot"
     )
     assert summary.enemy_result_list[2]["AIProfile"] == "elite_chaser"
+    assert summary.enemy_result_list[2]["PlacementSource"] == "stage_cfg_authored"
+    assert summary.enemy_result_list[2]["AuthoredPlacement"] == 1
     assert summary.enemy_result_list[2]["ThreatScore"] > (
         summary.enemy_result_list[0]["ThreatScore"]
     )

@@ -70,6 +70,20 @@ class StageEnemySpawn:
         return evidence.preferred_name if evidence is not None else self.label
 
     @property
+    def placement_source(self) -> str:
+        if self.label.startswith("stage_cfg_authored_"):
+            return "stage_cfg_authored"
+        if self.label.startswith("stage_cfg_"):
+            return "stage_cfg_generated"
+        if self.label.startswith("generated_stage_"):
+            return "generated_fallback"
+        return "explicit"
+
+    @property
+    def is_authored_placement(self) -> bool:
+        return self.placement_source in {"explicit", "stage_cfg_authored"}
+
+    @property
     def combat_hp(self) -> int:
         base_hp = 1600 + max(1, int(self.level)) * 45
         if self.ai_profile_key in {
@@ -150,6 +164,8 @@ class StageEnemySpawn:
             "LeashRadius": profile.leash_radius,
             "SkillRotation": list(profile.skill_rotation),
             "CombatHp": self.combat_hp,
+            "PlacementSource": self.placement_source,
+            "AuthoredPlacement": int(self.is_authored_placement),
         }
 
 
@@ -160,6 +176,8 @@ class StageEnemyCombatResult:
     label: str
     display_name: str
     ai_profile_key: str
+    placement_source: str
+    authored_placement: bool
     max_hp: int
     damage_taken: int
     defeated: bool
@@ -174,6 +192,8 @@ class StageEnemyCombatResult:
             "Label": self.label,
             "DisplayName": self.display_name,
             "AIProfile": self.ai_profile_key,
+            "PlacementSource": self.placement_source,
+            "AuthoredPlacement": int(self.authored_placement),
             "MaxHP": self.max_hp,
             "DamageTaken": self.damage_taken,
             "Defeated": int(self.defeated),
@@ -3289,6 +3309,8 @@ def _resolve_enemy_results(
                 label=spawn.label,
                 display_name=spawn.display_name,
                 ai_profile_key=spawn.ai_profile_key,
+                placement_source=spawn.placement_source,
+                authored_placement=spawn.is_authored_placement,
                 max_hp=hp,
                 damage_taken=damage_taken,
                 defeated=damage_taken >= hp,

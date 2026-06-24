@@ -444,6 +444,11 @@ environment details are intentionally omitted from Git.
   summary tests also cover surviving enemies, including their next action hint
   and threat score, so AI behavior remains visible even when an encounter is
   not fully defeated.
+- Stage enemy AI directives and combat summaries now also report placement
+  provenance: explicit hand-authored spawn, parser-authored `stage_cfg`
+  coordinate, generated `stage_cfg` fallback, or pure generated-stage fallback.
+  This keeps validation rows such as the unresolved `56111503` separate from
+  recovered authored placements without changing the client scene-NPC schema.
 - Stage combat summaries now distribute estimated damage across the active
   stage encounter and produce enemy-by-enemy outcome telemetry: target UID,
   enemy ID, AI profile, HP, damage taken, defeated state, and last active move.
