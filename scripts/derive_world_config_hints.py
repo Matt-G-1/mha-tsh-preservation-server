@@ -19,6 +19,16 @@ WORLD_CONFIG_SOURCE = (
 OFFICE_LEVEL_RE = re.compile(r"(?:事务所等级达到|通关)(?P<level>\d+)级")
 
 
+def _resolve_cfg_dir(cfg_dir: Path) -> Path:
+    if cfg_dir.is_absolute() or cfg_dir.exists():
+        return cfg_dir
+    for parent in (Path(__file__).resolve().parent, *Path(__file__).resolve().parents):
+        candidate = parent / cfg_dir
+        if candidate.exists():
+            return candidate
+    return cfg_dir
+
+
 def _constants(path: Path) -> list[object]:
     return _RootConstantReader(path.read_bytes()).root_constants()
 
@@ -54,6 +64,7 @@ def _max_office_level(constants: list[object]) -> int:
 
 
 def collect_world_config_hints(cfg_dir: Path = DEFAULT_CFG_DIR) -> dict[str, object]:
+    cfg_dir = _resolve_cfg_dir(cfg_dir)
     city_constants = _constants(cfg_dir / "city_level_cfg.luac")
     user_info_constants = _constants(cfg_dir / "user_info_cfg.luac")
     funcopen_constants = _constants(cfg_dir / "funcopen_cfg.luac")

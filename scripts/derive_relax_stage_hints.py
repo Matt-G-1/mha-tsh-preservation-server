@@ -34,6 +34,16 @@ DIFFICULTY_NAMES = ("Easy", "Elite", "Hard")
 GROUP_NAME_RE = re.compile(r"^\d{2} ")
 
 
+def _resolve_related_path(anchor: Path, related: Path) -> Path:
+    if related.is_absolute() or related.exists():
+        return related
+    for parent in (anchor.resolve().parent, *anchor.resolve().parents):
+        candidate = parent / related
+        if candidate.exists():
+            return candidate
+    return related
+
+
 def _as_int(value: object) -> int | None:
     if isinstance(value, int):
         return value
@@ -190,6 +200,7 @@ def collect_relax_stage_hints(
     drama_index: Path = DEFAULT_DRAMA_INDEX,
 ) -> dict[str, object]:
     asset = _asset_path(relax_stage_asset)
+    drama_index = _resolve_related_path(asset, drama_index)
     constants = _RootConstantReader(asset.read_bytes()).root_constants()
     stages: list[dict[str, object]] = []
     groups = _groups(constants)

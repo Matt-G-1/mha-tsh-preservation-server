@@ -31,6 +31,16 @@ DRAMA_INDEX_SCRIPT_RE = re.compile(r"\./script/setting/dramas/([^\s'\"\]]+)\.lua
 AREA_INDEX_SCRIPT_RE = re.compile(r"^area[`_-]?(?P<chapter>\d+)[_-](?P<step>\d+)")
 
 
+def _resolve_related_path(anchor: Path, related: Path) -> Path:
+    if related.is_absolute() or related.exists():
+        return related
+    for parent in (anchor.resolve().parent, *anchor.resolve().parents):
+        candidate = parent / related
+        if candidate.exists():
+            return candidate
+    return related
+
+
 def _as_int(value: object) -> int | None:
     if isinstance(value, int):
         return value
@@ -156,6 +166,7 @@ def collect_area_event_stage_hints(
     area_event_asset: Path = DEFAULT_AREA_EVENT_ASSET,
     drama_index: Path = DEFAULT_DRAMA_INDEX,
 ) -> dict[str, object]:
+    drama_index = _resolve_related_path(area_event_asset, drama_index)
     constants = _RootConstantReader(area_event_asset.read_bytes()).root_constants()
     script_groups = _area_event_scripts_by_chapter_step(drama_index)
     name_positions: list[tuple[int, str, int, int]] = []
