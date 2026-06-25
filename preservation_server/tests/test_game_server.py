@@ -685,10 +685,29 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert all(character.public_rank for character in VERIFIED_PLAYABLE_ROSTER)
     assert all(character.battle_type for character in VERIFIED_PLAYABLE_ROSTER)
     assert all(character.quirk for character in VERIFIED_PLAYABLE_ROSTER)
+    assert all(character.role for character in VERIFIED_PLAYABLE_ROSTER)
+    assert all(character.availability for character in VERIFIED_PLAYABLE_ROSTER)
+    assert all(character.fandom_page_url for character in VERIFIED_PLAYABLE_ROSTER)
+    assert all(character.source_basis for character in VERIFIED_PLAYABLE_ROSTER)
     assert PLAYABLE_CHARACTERS["h1001"].public_rank == "B"
     assert PLAYABLE_CHARACTERS["h1001"].battle_type == "Speed"
+    assert PLAYABLE_CHARACTERS["h1001"].role == "hero"
+    assert PLAYABLE_CHARACTERS["h1001"].availability.startswith("starter/free")
+    assert PLAYABLE_CHARACTERS["h1001"].fandom_page_url.endswith(
+        "/Izuku_Midoriya"
+    )
     assert PLAYABLE_CHARACTERS["h1002"].public_rank == "S"
     assert PLAYABLE_CHARACTERS["h1002"].battle_type == "Power"
+    assert PLAYABLE_CHARACTERS["h1012"].role == "villain"
+    assert PLAYABLE_CHARACTERS["h1012"].availability == (
+        "standard/limited recruit (verify)"
+    )
+    assert PLAYABLE_CHARACTERS["h1015"].availability == (
+        "event/limited/quest reward or recruit (verify)"
+    )
+    assert PLAYABLE_CHARACTERS["h1027"].availability == (
+        "World Heroes Mission limited event"
+    )
     assert PLAYABLE_CHARACTERS["h1031"].name == "Tamaki Amajiki"
     assert PLAYABLE_CHARACTERS["h1031"].hero_id == 1311
     assert PLAYABLE_CHARACTERS["h1031"].shape_id == 1031

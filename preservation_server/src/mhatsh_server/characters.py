@@ -29,6 +29,10 @@ class PlayableCharacter:
     quirk: str = ""
     battle_type: str = ""
     public_rank: str = ""
+    role: str = ""
+    availability: str = ""
+    fandom_page_url: str = ""
+    source_basis: str = ""
 
     @property
     def is_protocol_verified(self) -> bool:
@@ -46,6 +50,17 @@ class SupportCharacter:
 
     def to_book_entry(self) -> dict[str, int]:
         return {"ItemId": self.item_id, "Type": self.support_type}
+
+
+@dataclass(frozen=True, slots=True)
+class PublicPlayableMetadata:
+    quirk: str
+    battle_type: str
+    public_rank: str
+    role: str
+    availability: str
+    fandom_page_url: str
+    source_basis: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,33 +162,250 @@ NON_PUBLIC_PLAYABLE_MODEL_REASONS = {
     "h1998": "All Might art-test variant, not a normal roster card",
 }
 
+def _public_meta(
+    name: str,
+    *,
+    quirk: str,
+    battle_type: str,
+    public_rank: str,
+    role: str,
+    availability: str,
+    source_basis: str = "Fandom Characters roster linked page",
+) -> PublicPlayableMetadata:
+    return PublicPlayableMetadata(
+        quirk=quirk,
+        battle_type=battle_type,
+        public_rank=public_rank,
+        role=role,
+        availability=availability,
+        fandom_page_url=(
+            "https://myheroacademiathestrongesthero.fandom.com/wiki/"
+            + name.replace(" ", "_")
+        ),
+        source_basis=source_basis,
+    )
+
+
 PUBLIC_PLAYABLE_METADATA = {
-    "h1001": ("One For All", "Speed", "B"),
-    "h1002": ("Explosion", "Power", "S"),
-    "h1003": ("One For All", "Power", "S"),
-    "h1006": ("Engine", "Speed", "A"),
-    "h1007": ("Zero Gravity", "Power", "A"),
-    "h1008": ("Half-Cold Half-Hot", "Technical", "S"),
-    "h1009": ("Creation", "Technical", "S"),
-    "h1010": ("Electrification", "Technical", "B"),
-    "h1012": ("Unknown", "Technical", "S"),
-    "h1013": ("Hardening", "Power", "B"),
-    "h1014": ("Frog", "Speed", "A"),
-    "h1015": ("Erasure", "Speed", "S"),
-    "h1016": ("Tail", "Power", "A"),
-    "h1017": ("Acid", "Technical", "A"),
-    "h1019": ("Decay", "Technical", "S"),
-    "h1020": ("Pop Off", "Technical", "A"),
-    "h1021": ("Hellflame", "Technical", "S"),
-    "h1022": ("Dark Shadow", "Speed", "S"),
-    "h1026": ("Fierce Wings", "Speed", "S"),
-    "h1027": ("One For All", "Speed", "S"),
-    "h1028": ("Explosion", "Power", "S"),
-    "h1029": ("Half-Cold Half-Hot", "Technical", "S"),
-    "h1030": ("Wave Motion", "Power", "S"),
-    "h1031": ("Manifest", "Technical", "S"),
-    "h1032": ("Permeation", "Power", "S"),
-    "h1110": ("Bloodcurdle", "Speed", "S"),
+    "h1001": _public_meta(
+        "Izuku Midoriya",
+        quirk="One For All",
+        battle_type="Speed",
+        public_rank="B",
+        role="hero",
+        availability="starter/free; further copies via character banner",
+        source_basis="Fandom Characters roster linked page and character page",
+    ),
+    "h1002": _public_meta(
+        "Katsuki Bakugo",
+        quirk="Explosion",
+        battle_type="Power",
+        public_rank="S",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1003": _public_meta(
+        "All Might",
+        quirk="One For All",
+        battle_type="Power",
+        public_rank="S",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1006": _public_meta(
+        "Tenya Iida",
+        quirk="Engine",
+        battle_type="Speed",
+        public_rank="A",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1007": _public_meta(
+        "Ochaco Uraraka",
+        quirk="Zero Gravity",
+        battle_type="Power",
+        public_rank="A",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1008": _public_meta(
+        "Shoto Todoroki",
+        quirk="Half-Cold Half-Hot",
+        battle_type="Technical",
+        public_rank="S",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1009": _public_meta(
+        "Momo Yaoyorozu",
+        quirk="Creation",
+        battle_type="Technical",
+        public_rank="S",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1010": _public_meta(
+        "Denki Kaminari",
+        quirk="Electrification",
+        battle_type="Technical",
+        public_rank="B",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1012": _public_meta(
+        "Dabi",
+        quirk="Unknown",
+        battle_type="Technical",
+        public_rank="S",
+        role="villain",
+        availability="standard/limited recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1013": _public_meta(
+        "Eijiro Kirishima",
+        quirk="Hardening",
+        battle_type="Power",
+        public_rank="B",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1014": _public_meta(
+        "Tsuyu Asui",
+        quirk="Frog",
+        battle_type="Speed",
+        public_rank="A",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1015": _public_meta(
+        "Shota Aizawa",
+        quirk="Erasure",
+        battle_type="Speed",
+        public_rank="S",
+        role="hero",
+        availability="event/limited/quest reward or recruit (verify)",
+    ),
+    "h1016": _public_meta(
+        "Mashirao Ojiro",
+        quirk="Tail",
+        battle_type="Power",
+        public_rank="A",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1017": _public_meta(
+        "Mina Ashido",
+        quirk="Acid",
+        battle_type="Technical",
+        public_rank="A",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1019": _public_meta(
+        "Tomura Shigaraki",
+        quirk="Decay",
+        battle_type="Technical",
+        public_rank="S",
+        role="villain",
+        availability="limited/S-rank recruit (verify)",
+    ),
+    "h1020": _public_meta(
+        "Minoru Mineta",
+        quirk="Pop Off",
+        battle_type="Technical",
+        public_rank="A",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+    ),
+    "h1021": _public_meta(
+        "Endeavor",
+        quirk="Hellflame",
+        battle_type="Technical",
+        public_rank="S",
+        role="hero",
+        availability="limited/S-rank recruit (verify)",
+    ),
+    "h1022": _public_meta(
+        "Fumikage Tokoyami",
+        quirk="Dark Shadow",
+        battle_type="Speed",
+        public_rank="S",
+        role="hero",
+        availability="standard/permanent recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1026": _public_meta(
+        "Hawks",
+        quirk="Fierce Wings",
+        battle_type="Speed",
+        public_rank="S",
+        role="hero",
+        availability="limited/S-rank recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1027": _public_meta(
+        "WHM Izuku Midoriya",
+        quirk="One For All",
+        battle_type="Speed",
+        public_rank="S",
+        role="hero",
+        availability="World Heroes Mission limited event",
+        source_basis="Fandom Characters roster linked page and character page",
+    ),
+    "h1028": _public_meta(
+        "WHM Katsuki Bakugo",
+        quirk="Explosion",
+        battle_type="Power",
+        public_rank="S",
+        role="hero",
+        availability="World Heroes Mission limited event",
+    ),
+    "h1029": _public_meta(
+        "WHM Shoto Todoroki",
+        quirk="Half-Cold Half-Hot",
+        battle_type="Technical",
+        public_rank="S",
+        role="hero",
+        availability="World Heroes Mission limited event",
+    ),
+    "h1030": _public_meta(
+        "Nejire Hado",
+        quirk="Wave Motion",
+        battle_type="Power",
+        public_rank="S",
+        role="hero",
+        availability="limited/S-rank recruit (verify)",
+    ),
+    "h1031": _public_meta(
+        "Tamaki Amajiki",
+        quirk="Manifest",
+        battle_type="Technical",
+        public_rank="S",
+        role="hero",
+        availability="limited/S-rank recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1032": _public_meta(
+        "Mirio Togata",
+        quirk="Permeation",
+        battle_type="Power",
+        public_rank="S",
+        role="hero",
+        availability="limited/S-rank recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
+    "h1110": _public_meta(
+        "Stain",
+        quirk="Bloodcurdle",
+        battle_type="Speed",
+        public_rank="S",
+        role="villain",
+        availability="limited/S-rank recruit (verify)",
+        source_basis="Fandom Characters roster; page link not exposed in scraped table",
+    ),
 }
 
 # hero_cfg verifies the hero rows and ShapeId values; shape_info independently
@@ -210,17 +442,19 @@ for model_id, name, hero_id, shape_id in (
     ("h1110", "Stain", 1111, 1011),
     ("h1998", "All Might (Art Test Variant)", 1981, 9051),
 ):
-    quirk, battle_type, public_rank = PUBLIC_PLAYABLE_METADATA.get(
-        model_id, ("", "", "")
-    )
+    metadata = PUBLIC_PLAYABLE_METADATA.get(model_id)
     RECOVERED_HERO_CHARACTERS[model_id] = PlayableCharacter(
         name=name,
         model_asset_id=model_id,
         hero_id=hero_id,
         shape_id=shape_id,
-        quirk=quirk,
-        battle_type=battle_type,
-        public_rank=public_rank,
+        quirk="" if metadata is None else metadata.quirk,
+        battle_type="" if metadata is None else metadata.battle_type,
+        public_rank="" if metadata is None else metadata.public_rank,
+        role="" if metadata is None else metadata.role,
+        availability="" if metadata is None else metadata.availability,
+        fandom_page_url="" if metadata is None else metadata.fandom_page_url,
+        source_basis="" if metadata is None else metadata.source_basis,
     )
 
 PUBLIC_PLAYABLE_MODEL_IDS = (
