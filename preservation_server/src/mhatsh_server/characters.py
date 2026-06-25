@@ -9,9 +9,11 @@ CATALOG_SOURCE = (
     "User-supplied AXMD raw-rip list plus en_hero_cfg evidence, 2026-06-15"
 )
 
-# hero_cfg VmInfo.TrainCardList uses these built-in card defaults.
-DEFAULT_CARD_FIGHTING = 9999
-DEFAULT_CARD_EXP = 9999
+# hero_cfg VmInfo.TrainCardList is only small level-60 internal test data with
+# Fighting=9999. The preservation profile defaults to a capped account, so use
+# a stronger live roster baseline until the full combat-power formula is wired.
+DEFAULT_CARD_FIGHTING = 50000
+DEFAULT_CARD_EXP = 0
 DEFAULT_CARD_SATIETY = 694
 DEFAULT_CARD_WORKOUT_LEVEL = 10
 DEFAULT_CARD_RESONATE_LEVEL = 5
@@ -295,12 +297,37 @@ MAP_CHARACTERS[5007] = MapCharacter(
 # map-system NPC block. These are packet-validation rows, not starter-area
 # placement data.
 for model_id, name in (
+    (5000, "All Might Contact"),
     (5001, "Mei Hatsume (Story)"),
+    (5005, "Principal Contact"),
+    (5006, "Recovery Girl"),
     (5008, "Kamui Woods"),
     (5009, "Naomasa Tsukauchi"),
     (5011, "Mt. Lady"),
+    (5012, "Base Station Contact"),
+    (5016, "Uwabami"),
+    (5031, "Midnight"),
+    (5034, "Training Contact"),
     (5035, "Shota Aizawa"),
+    (5037, "All Might"),
+    (5038, "All Might"),
+    (5043, "Midnight"),
+    (5049, "Arson Case Police"),
     (5041, "Mei Hatsume (U.A.)"),
+    (6000, "Midnight Contact"),
+    (6611, "Arson Case Police"),
+    (6612, "Arson Case Police"),
+    (6669, "High Ponytail Student"),
+    (6675, "Fourth Kind"),
+    (6676, "Fourth Kind"),
+    (6677, "Fourth Kind Contact"),
+    (6678, "Bank President"),
+    (6680, "Fourth Kind Contact"),
+    (6682, "Young Man"),
+    (6683, "Female Engineer"),
+    (6706, "Responding Police"),
+    (6716, "Store Owner"),
+    (6819, "Power Outage Contact"),
 ):
     MAP_CHARACTERS[model_id] = MapCharacter(
         name=name,
@@ -373,9 +400,220 @@ DEMO_CAST_MAP_SPAWNS = (
     ),
 )
 
+QUEST_CONTACT_MAP_SPAWNS = (
+    MapSpawn(
+        label="quest_contact_tsukauchi",
+        character=MAP_CHARACTERS[5009],
+        uid=20100,
+        x=4041,
+        y=19741,
+        face=0,
+    ),
+    MapSpawn(
+        label="quest_contact_high_ponytail_student",
+        character=MAP_CHARACTERS[6669],
+        uid=20101,
+        x=4141,
+        y=19741,
+        face=0,
+    ),
+    MapSpawn(
+        label="quest_contact_all_might_primary",
+        character=MAP_CHARACTERS[5037],
+        uid=20102,
+        x=4241,
+        y=19741,
+        face=180,
+    ),
+    MapSpawn(
+        label="quest_contact_all_might_secondary",
+        character=MAP_CHARACTERS[5038],
+        uid=20103,
+        x=4341,
+        y=19741,
+        face=180,
+    ),
+    MapSpawn(
+        label="quest_contact_recovery_girl",
+        character=MAP_CHARACTERS[5006],
+        uid=20104,
+        x=4441,
+        y=19741,
+        face=180,
+    ),
+    MapSpawn(
+        label="quest_contact_midnight_primary",
+        character=MAP_CHARACTERS[5031],
+        uid=20105,
+        x=4541,
+        y=19741,
+        face=180,
+    ),
+    MapSpawn(
+        label="quest_contact_midnight_secondary",
+        character=MAP_CHARACTERS[5043],
+        uid=20106,
+        x=4641,
+        y=19741,
+        face=180,
+    ),
+    MapSpawn(
+        label="quest_contact_young_man",
+        character=MAP_CHARACTERS[6682],
+        uid=20107,
+        x=4041,
+        y=19841,
+        face=90,
+    ),
+    MapSpawn(
+        label="quest_contact_bank_president",
+        character=MAP_CHARACTERS[6678],
+        uid=20108,
+        x=4141,
+        y=19841,
+        face=90,
+    ),
+    MapSpawn(
+        label="quest_contact_fourth_kind_primary",
+        character=MAP_CHARACTERS[6675],
+        uid=20109,
+        x=4241,
+        y=19841,
+        face=90,
+    ),
+    MapSpawn(
+        label="quest_contact_fourth_kind_secondary",
+        character=MAP_CHARACTERS[6676],
+        uid=20110,
+        x=4341,
+        y=19841,
+        face=90,
+    ),
+    MapSpawn(
+        label="quest_contact_female_engineer",
+        character=MAP_CHARACTERS[6683],
+        uid=20111,
+        x=4441,
+        y=19841,
+        face=90,
+    ),
+    MapSpawn(
+        label="quest_contact_arson_police_primary",
+        character=MAP_CHARACTERS[5049],
+        uid=20112,
+        x=4541,
+        y=19841,
+        face=90,
+    ),
+    MapSpawn(
+        label="quest_contact_arson_police_secondary",
+        character=MAP_CHARACTERS[6611],
+        uid=20113,
+        x=4641,
+        y=19841,
+        face=90,
+    ),
+    MapSpawn(
+        label="quest_contact_arson_police_tertiary",
+        character=MAP_CHARACTERS[6612],
+        uid=20114,
+        x=4041,
+        y=19941,
+        face=270,
+    ),
+    MapSpawn(
+        label="quest_contact_store_owner",
+        character=MAP_CHARACTERS[6716],
+        uid=20115,
+        x=4141,
+        y=19941,
+        face=270,
+    ),
+    MapSpawn(
+        label="quest_contact_power_outage_contact",
+        character=MAP_CHARACTERS[6819],
+        uid=20116,
+        x=4241,
+        y=19941,
+        face=270,
+    ),
+    MapSpawn(
+        label="quest_contact_responding_police",
+        character=MAP_CHARACTERS[6706],
+        uid=20117,
+        x=4341,
+        y=19941,
+        face=270,
+    ),
+    MapSpawn(
+        label="quest_contact_all_might_act1130",
+        character=MAP_CHARACTERS[5000],
+        uid=20118,
+        x=4441,
+        y=19941,
+        face=270,
+    ),
+    MapSpawn(
+        label="quest_contact_principal_training",
+        character=MAP_CHARACTERS[5005],
+        uid=20119,
+        x=4541,
+        y=19941,
+        face=270,
+    ),
+    MapSpawn(
+        label="quest_contact_base_station",
+        character=MAP_CHARACTERS[5012],
+        uid=20120,
+        x=4641,
+        y=19941,
+        face=270,
+    ),
+    MapSpawn(
+        label="quest_contact_uwabami",
+        character=MAP_CHARACTERS[5016],
+        uid=20121,
+        x=4041,
+        y=20041,
+        face=0,
+    ),
+    MapSpawn(
+        label="quest_contact_training_contact",
+        character=MAP_CHARACTERS[5034],
+        uid=20122,
+        x=4141,
+        y=20041,
+        face=0,
+    ),
+    MapSpawn(
+        label="quest_contact_midnight_act",
+        character=MAP_CHARACTERS[6000],
+        uid=20123,
+        x=4241,
+        y=20041,
+        face=0,
+    ),
+    MapSpawn(
+        label="quest_contact_fourth_kind_tertiary",
+        character=MAP_CHARACTERS[6677],
+        uid=20124,
+        x=4341,
+        y=20041,
+        face=0,
+    ),
+    MapSpawn(
+        label="quest_contact_fourth_kind_dialog",
+        character=MAP_CHARACTERS[6680],
+        uid=20125,
+        x=4441,
+        y=20041,
+        face=0,
+    ),
+)
+
 QUEST_CONTACT_MAP_SPAWN_BY_NPC_ID = {
     int(spawn.character.npc_id): spawn
-    for spawn in DEMO_CAST_MAP_SPAWNS
+    for spawn in QUEST_CONTACT_MAP_SPAWNS
     if spawn.character.npc_id is not None
 }
 
@@ -392,10 +630,12 @@ def map_spawns(mode: str | None = None) -> tuple[MapSpawn, ...]:
         return TUTORIAL_MAP_SPAWNS
     if normalized in {"demo_cast", "demo-cast", "validation", "lab"}:
         return DEMO_CAST_MAP_SPAWNS
+    if normalized in {"quest_contacts", "quest-contacts", "contacts"}:
+        return QUEST_CONTACT_MAP_SPAWNS
     if normalized in {"none", "off", "disabled"}:
         return ()
     raise ValueError(
-        f"unknown map spawn mode {mode!r}; expected starter, demo_cast, or none"
+        f"unknown map spawn mode {mode!r}; expected starter, demo_cast, quest_contacts, or none"
     )
 
 

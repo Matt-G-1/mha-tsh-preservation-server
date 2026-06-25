@@ -25,11 +25,19 @@ class WorldTaskState:
     ignore_auto_finish_tips: int = 0
     auto_finished_tasks: set[int] = field(default_factory=set)
     completed_beginner_quest: bool = False
+    recovered_finished_tasks: set[int] = field(default_factory=set)
 
     def seed_unlocked(self, city_level: int) -> None:
         self.city_level = max(STARTER_CITY_LEVEL, int(city_level))
         self.city_exp = 0
         self.completed_beginner_quest = True
+
+    def seed_recovered_finished_tasks(self, task_ids: set[int]) -> None:
+        self.recovered_finished_tasks.update(
+            int(task_id) for task_id in task_ids if int(task_id) > 0
+        )
+        if STARTER_TASK_ID in self.recovered_finished_tasks:
+            self.completed_beginner_quest = True
 
     def city_level_info(self) -> dict[str, object]:
         return {
@@ -38,15 +46,23 @@ class WorldTaskState:
         }
 
     def world_task_info(self) -> dict[str, object]:
+        finished_task_ids = set(self.recovered_finished_tasks)
+        if self.completed_beginner_quest:
+            finished_task_ids.add(STARTER_TASK_ID)
+        sorted_finished_task_ids = sorted(
+            finished_task_ids,
+            key=lambda task_id: (task_id != STARTER_TASK_ID, task_id),
+        )[:0xFF]
         return {
             "FinishList": [
                 {
                     "Map": STARTER_WORLD_MAP_ID,
                     "Area": STARTER_WORLD_AREA_ID,
-                    "TaskId": STARTER_TASK_ID,
+                    "TaskId": task_id,
                 }
+                for task_id in sorted_finished_task_ids
             ]
-            if self.completed_beginner_quest
+            if finished_task_ids
             else [],
             "OpenWorldMap": [
                 {"MapId": map_id} for map_id in sorted(self.open_world_maps)

@@ -130,6 +130,9 @@ class GameServer:
         self.send_initial_scene = os.environ.get(
             "MHATSH_SEND_INITIAL_SCENE", "1"
         ).lower() not in {"0", "false", "no"}
+        self.send_initial_progress = _env_enabled(
+            "MHATSH_SEND_INITIAL_PROGRESS", "1"
+        )
         self.send_map_characters = os.environ.get(
             "MHATSH_SEND_MAP_CHARACTERS", "1"
         ).lower() not in {"0", "false", "no"}
@@ -155,6 +158,9 @@ class GameServer:
         )
         self.skip_starter_quest = _env_enabled(
             "MHATSH_SKIP_STARTER_QUEST", "1"
+        )
+        self.complete_recovered_quests = _env_enabled(
+            "MHATSH_COMPLETE_RECOVERED_QUESTS", "0"
         )
         self.unlock_all_functions = _env_enabled(
             "MHATSH_UNLOCK_ALL_FUNCTIONS", "1"
@@ -330,6 +336,8 @@ class GameServer:
                 await self._send_area_event_login_data(writer, session)
                 if self.unlock_all_functions:
                     await self._send_initial_function_unlocks(writer, session)
+                if self.send_initial_progress:
+                    await self._send_initial_progression(writer, session)
             if self.send_initial_scene:
                 await self._send_initial_scene(writer, session)
             if self.login_completion == "merge":
@@ -480,12 +488,7 @@ class GameServer:
                     STARTER_TASK_ID,
                     STARTER_MAP_GUIDE_ID,
                 }.intersection(guide_response["Ids"]):
-                    await self._send(
-                        writer,
-                        session,
-                        "c_task_info",
-                        session.tasks.task_info(),
-                    )
+                    await self._send_task_info_packets(writer, session)
                     await self._send(
                         writer,
                         session,
@@ -1086,11 +1089,10 @@ class GameServer:
                 session.character_menu.league_pvp_self_hero_list(roster),
             )
         elif name == "s_task_get_tasklist_bytype":
-            await self._send(
+            await self._send_task_info_packets(
                 writer,
                 session,
-                "c_task_info",
-                session.tasks.task_info(int(values.get("task_type") or 0)),
+                int(values.get("task_type") or 0),
             )
         elif name == "s_task_accept":
             await self._send(
@@ -2750,6 +2752,38 @@ class GameServer:
             )
         await self._send_active_quest_contact_npcs(writer, session)
 
+    async def _send_initial_progression(
+        self, writer: asyncio.StreamWriter, session: Session
+    ) -> None:
+        await self._send_task_info_packets(writer, session)
+        await self._send(
+            writer,
+            session,
+            "c_city_level_info",
+            session.world_tasks.city_level_info(),
+        )
+        await self._send(
+            writer,
+            session,
+            "c_world_task_info",
+            session.world_tasks.world_task_info(),
+        )
+        await self._send(
+            writer,
+            session,
+            "c_strength_info",
+            {"BuyTimes": 0},
+        )
+
+    async def _send_task_info_packets(
+        self,
+        writer: asyncio.StreamWriter,
+        session: Session,
+        task_type: int | None = None,
+    ) -> None:
+        for packet in session.tasks.task_info_packets(task_type):
+            await self._send(writer, session, "c_task_info", packet)
+
     async def _send_initial_cards(
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
@@ -3061,6 +3095,11 @@ class GameServer:
                 STARTER_MAP_GUIDE_SET_ID,
             )
             session.world_tasks.seed_unlocked(self.city_level)
+        if self.complete_recovered_quests:
+            session.tasks.complete_recovered_quest_chain()
+            session.world_tasks.seed_recovered_finished_tasks(
+                set(session.tasks.protocol_finished_task_ids())
+            )
         session.profile_configured = True
 
     def _remember_stage_family_progress(self, session: Session) -> None:
@@ -3231,12 +3270,7 @@ class GameServer:
             if session.tasks.should_refresh_progression_list(
                 int(task_info.get("Id") or 0)
             ):
-                await self._send(
-                    writer,
-                    session,
-                    "c_task_info",
-                    session.tasks.task_info(),
-                )
+                await self._send_task_info_packets(writer, session)
             for auto_update in session.tasks.complete_auto_act_gates():
                 await self._send_task_progression(writer, session, auto_update)
             await self._send_active_quest_contact_npcs(writer, session)
@@ -3389,7 +3423,11 @@ class GameServer:
         values: dict[str, Any],
     ) -> None:
         protocol_id = self.registry.protocol_ids[name]
-        body = self.codec.encode_message(name, values)
+        try:
+            body = self.codec.encode_message(name, values)
+        except Exception:
+            LOG.exception("failed to encode outbound %s", name)
+            raise
         wire_protocol_id = protocol_id + self.response_id_bias
         key_before = session.outbound.key
         plain_frame = encode_frame(wire_protocol_id, body, None)

@@ -81,6 +81,7 @@ from mhatsh_server.characters import (
     NON_PUBLIC_PLAYABLE_MODEL_REASONS,
     PLAYABLE_CHARACTERS,
     PUBLIC_PLAYABLE_MODEL_IDS,
+    QUEST_CONTACT_MAP_SPAWNS,
     RECOVERED_HERO_CHARACTERS,
     SUPPORT_CARD_ITEM_IDS,
     STARTER_CHARACTER,
@@ -217,6 +218,7 @@ from mhatsh_server.tasks import (
     RECOVERED_QUEST_DIALOG_REFERENCES_BY_TASK_ID,
     RECOVERED_QUEST_NPC_REFERENCES,
     RECOVERED_QUEST_NPC_REFERENCES_BY_NPC_ID,
+    RECOVERED_PARSED_TASK_IDS,
     STARTER_GUIDE_ID,
     STARTER_GUIDE_STEP,
     STARTER_TASK,
@@ -243,6 +245,7 @@ LEGACY_STARTER_ENV = {
     "MHATSH_CITY_LEVEL": "1",
     "MHATSH_SKIP_STARTER_QUEST": "0",
     "MHATSH_UNLOCK_ALL_FUNCTIONS": "0",
+    "MHATSH_SEND_INITIAL_PROGRESS": "0",
     "MHATSH_ROSTER_MODE": "starter",
 }
 
@@ -633,7 +636,7 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert len(RECOVERED_HERO_CHARACTERS) == 31
     assert len(PLAYABLE_CHARACTERS) == 26
     assert len(SUPPORT_CHARACTERS) == 12
-    assert len(MAP_CHARACTERS) == 40
+    assert len(MAP_CHARACTERS) == 62
     assert len(CHIBI_MODEL_ASSETS) == 3
     assert SUPPORT_CHARACTERS["h1927"].name == "Best Jeanist"
     assert SUPPORT_CHARACTERS["h1927"].item_id == 6230016
@@ -705,6 +708,9 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
         MAP_CHARACTERS[model_id].npc_id == model_id
         for model_id in verified_map_names
     )
+    for model_id in (5000, 5005, 5012, 5016, 5034, 6000, 6677, 6680):
+        assert MAP_CHARACTERS[model_id].npc_id == model_id
+        assert quest_contact_map_spawn(model_id) is not None
 
 
 def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> None:
@@ -2901,6 +2907,7 @@ def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
     assert map_spawns("none") == ()
     assert map_spawns("demo_cast") == DEMO_CAST_MAP_SPAWNS
     assert map_spawns("validation") == DEMO_CAST_MAP_SPAWNS
+    assert map_spawns("quest_contacts") == QUEST_CONTACT_MAP_SPAWNS
     try:
         map_spawns("expanded")
     except ValueError as exc:
@@ -2924,8 +2931,30 @@ def test_initial_map_spawn_catalog_tracks_verified_npc_rows() -> None:
         5035,
         5041,
     }
-    assert quest_contact_map_spawn(5009) is DEMO_CAST_MAP_SPAWNS[3]
-    assert quest_contact_map_spawn(6669) is None
+    assert quest_contact_map_spawn(5009) is not DEMO_CAST_MAP_SPAWNS[3]
+    assert quest_contact_map_spawn(5009).label == "quest_contact_tsukauchi"
+    assert quest_contact_map_spawn(6669) is not None
+    assert {spawn.uid for spawn in DEMO_CAST_MAP_SPAWNS}.isdisjoint(
+        spawn.uid for spawn in QUEST_CONTACT_MAP_SPAWNS
+    )
+    assert {spawn.character.npc_id for spawn in QUEST_CONTACT_MAP_SPAWNS} >= {
+        5006,
+        5009,
+        5037,
+        5038,
+        5049,
+        6611,
+        6612,
+        6669,
+        6675,
+        6676,
+        6678,
+        6682,
+        6683,
+        6706,
+        6716,
+        6819,
+    }
 
 
 def test_roster_modes_keep_starter_default_and_verified_opt_in() -> None:
@@ -4303,7 +4332,7 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     )
     assert len(RECOVERED_QUEST_CONTACT_CANDIDATES) == 12
     assert all(
-        not candidate.can_spawn_on_map
+        candidate.can_spawn_on_map
         for candidate in RECOVERED_QUEST_CONTACT_CANDIDATES
     )
     first_contact = RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID[100602][0]
@@ -4312,9 +4341,9 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert first_contact.resolved_npc_names == (
         "\u9ad8\u9a6c\u5c3e\u5973\u5b66\u751f",
     )
-    assert first_contact.scene_npc_ids == ()
-    assert not first_contact.has_scene_npc_rows
-    assert not first_contact.can_spawn_on_map
+    assert first_contact.scene_npc_ids == (6669,)
+    assert first_contact.has_scene_npc_rows
+    assert first_contact.can_spawn_on_map
     tsukauchi_contact = RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID[102203][0]
     assert tsukauchi_contact.raw_npc_ids == (5008,)
     assert tsukauchi_contact.resolved_npc_ids == (5009,)
@@ -4323,7 +4352,7 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     )
     assert tsukauchi_contact.scene_npc_ids == (5009,)
     assert tsukauchi_contact.has_scene_npc_rows
-    assert not tsukauchi_contact.can_spawn_on_map
+    assert tsukauchi_contact.can_spawn_on_map
     assert state.active_quest_dialog_references() == ()
     assert state.active_quest_contact_candidates() == ()
     area_task_update = state.complete_area_event_stage(21111)
@@ -4482,6 +4511,24 @@ def test_task_state_lists_accepts_submits_and_syncs_tasks() -> None:
     assert [candidate.task_id for candidate in contact_spawn_candidates] == [102203]
     assert contact_spawn_candidates[0].scene_npc_ids == (5009,)
     assert contact_spawn_state.claim_active_quest_contact_spawn_candidates() == ()
+
+    all_quest_state = TaskState()
+    all_quest_state.complete_recovered_quest_chain()
+    assert STARTER_TASK.id in all_quest_state.finished
+    assert {
+        task.id
+        for task in (*RECOVERED_AREA_EVENT_TASK_RECORDS, *RECOVERED_ACT_TASK_RECORDS)
+        if task.quest_order > 0
+    } <= all_quest_state.finished
+    assert RECOVERED_PARSED_TASK_IDS <= all_quest_state.finished
+    protocol_finished = all_quest_state.protocol_finished_task_ids()
+    assert len(protocol_finished) == 0xFF
+    assert STARTER_TASK.id in protocol_finished
+    assert {
+        task.id
+        for task in (*RECOVERED_AREA_EVENT_TASK_RECORDS, *RECOVERED_ACT_TASK_RECORDS)
+        if task.quest_order > 0
+    } <= set(protocol_finished)
 
 
 def test_activity_state_returns_empty_compatibility_payloads() -> None:
@@ -4912,6 +4959,10 @@ def test_unlocked_profile_seeds_max_progress_and_all_verified_heroes() -> None:
     asyncio.run(_run_unlocked_profile())
 
 
+def test_recovered_quest_completion_login_payloads_stay_protocol_safe() -> None:
+    asyncio.run(_run_recovered_quest_completion_login())
+
+
 def test_demo_cast_scene_sends_verified_map_character_rows() -> None:
     asyncio.run(_run_demo_cast_scene_sends_verified_map_character_rows())
 
@@ -5038,6 +5089,10 @@ async def _run_unlocked_profile() -> None:
         "c_card_hero_bio_info",
         "c_area_event_login_data",
         "c_funcopen_list",
+        "c_task_info",
+        "c_city_level_info",
+        "c_world_task_info",
+        "c_strength_info",
         "c_scene_player_info",
         "c_scene_enter",
         "c_scene_npc_create",
@@ -5054,7 +5109,26 @@ async def _run_unlocked_profile() -> None:
     assert codec.decode_message("c_funcopen_list", replies[6][1]) == {
         "idlist": list(FUNCTION_OPEN_IDS)
     }
-    scene_player = codec.decode_message("c_scene_player_info", replies[7][1])
+    initial_tasks = codec.decode_message("c_task_info", replies[7][1])
+    assert initial_tasks["finishs"] == [STARTER_TASK.id]
+    assert initial_tasks["tasks"][0]["Status"] == TASK_STATUS_FINISHED
+    assert codec.decode_message("c_city_level_info", replies[8][1]) == {
+        "Level": CITY_LEVEL_CAP,
+        "ClickList": [],
+    }
+    assert codec.decode_message("c_world_task_info", replies[9][1])[
+        "FinishList"
+    ] == [
+        {
+            "Map": STARTER_WORLD_MAP_ID,
+            "Area": STARTER_WORLD_AREA_ID,
+            "TaskId": STARTER_TASK.id,
+        }
+    ]
+    assert codec.decode_message("c_strength_info", replies[10][1]) == {
+        "BuyTimes": 0
+    }
+    scene_player = codec.decode_message("c_scene_player_info", replies[11][1])
     assert scene_player["Level"] == PLAYER_LEVEL_CAP
     task_info = session.tasks.task_info()
     assert task_info["finishs"] == [STARTER_TASK.id]
@@ -5178,6 +5252,72 @@ async def _run_unlocked_profile() -> None:
     assert codec.decode_message("c_scene_player_info", replies[2][1])[
         "ShowHeroId"
     ] == session.roster.active_hero_id
+
+
+async def _run_recovered_quest_completion_login() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    with patch.dict(
+        os.environ,
+        {
+            "MHATSH_COMPLETE_RECOVERED_QUESTS": "1",
+            "MHATSH_SKIP_STARTER_QUEST": "1",
+            "MHATSH_UNLOCK_ALL_FUNCTIONS": "1",
+            "MHATSH_SEND_INITIAL_PROGRESS": "1",
+        },
+        clear=True,
+    ):
+        game = GameServer(registry)
+
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x44332211),
+        uid=4242,
+    )
+    request = codec.encode_message("s_login_player_enter", {"id": 4242})
+    await game._dispatch(
+        session,
+        registry.protocol_ids["s_login_player_enter"],
+        request,
+        writer,
+    )
+
+    decoder = FrameDecoder(RollingXor(0x44332211))
+    replies = decoder.feed(bytes(writer.data))
+    names = [registry.protocol_names[reply_id] for reply_id, _ in replies]
+    assert "c_task_info" in names
+    assert "c_world_task_info" in names
+    task_infos = [
+        codec.decode_message("c_task_info", payload)
+        for reply_id, payload in replies
+        if registry.protocol_names[reply_id] == "c_task_info"
+    ]
+    world_task_info = codec.decode_message(
+        "c_world_task_info", replies[names.index("c_world_task_info")][1]
+    )
+    assert len(task_infos) > 1
+    assert all(len(packet["finishs"]) <= 0xFF for packet in task_infos)
+    assert task_infos[0]["IsStart"] == 1
+    assert task_infos[0]["IsEnd"] == 0
+    assert all(packet["IsStart"] == 0 for packet in task_infos[1:])
+    assert task_infos[-1]["IsEnd"] == 1
+    assert task_infos[0]["tasks"]
+    assert all(packet["tasks"] == [] for packet in task_infos[1:])
+    combined_finished = {
+        task_id for packet in task_infos for task_id in packet["finishs"]
+    }
+    assert len(world_task_info["FinishList"]) == 0xFF
+    assert combined_finished == session.tasks.finished
+    assert STARTER_TASK.id in combined_finished
+    assert {
+        task.id
+        for task in (*RECOVERED_AREA_EVENT_TASK_RECORDS, *RECOVERED_ACT_TASK_RECORDS)
+        if task.quest_order > 0
+    } <= combined_finished
 
 
 def test_character_roster_requests_are_stateful() -> None:
@@ -5769,6 +5909,8 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
             "c_area_event_info",
             "c_task_info_update",
             "c_task_info",
+            "c_scene_npc_create",
+            "c_task_trigger_sync",
             "c_area_event_sync_status",
         ]
         task_update = codec.decode_message("c_task_info_update", replies[2][1])
@@ -5781,7 +5923,14 @@ async def _run_area_event_task_progress_persistence(tmp_path: Path) -> None:
             280101,
             100602,
         ]
-        area_sync = codec.decode_message("c_area_event_sync_status", replies[4][1])
+        npc_create = codec.decode_message("c_scene_npc_create", replies[4][1])
+        assert npc_create == {
+            "NpcList": [scene_npc_from_spawn(quest_contact_map_spawn(6669))]
+        }
+        assert codec.decode_message("c_task_trigger_sync", replies[5][1]) == {
+            "Uid": quest_contact_map_spawn(6669).uid
+        }
+        area_sync = codec.decode_message("c_area_event_sync_status", replies[6][1])
         assert area_sync["StageId"] == 21111
         assert area_sync["EventRound"] == 280101
         assert area_sync["TriggerOnMap"] == [280101]
@@ -5872,6 +6021,8 @@ async def _run_area_event_stage_report_progression(tmp_path: Path) -> None:
             "c_area_event_info",
             "c_task_info_update",
             "c_task_info",
+            "c_scene_npc_create",
+            "c_task_trigger_sync",
             "c_area_event_sync_status",
         ]
         result = codec.decode_message("c_stage_result", replies[1][1])
@@ -5888,7 +6039,13 @@ async def _run_area_event_stage_report_progression(tmp_path: Path) -> None:
             280101,
             100602,
         ]
-        area_sync = codec.decode_message("c_area_event_sync_status", replies[7][1])
+        assert codec.decode_message("c_scene_npc_create", replies[7][1]) == {
+            "NpcList": [scene_npc_from_spawn(quest_contact_map_spawn(6669))]
+        }
+        assert codec.decode_message("c_task_trigger_sync", replies[8][1]) == {
+            "Uid": quest_contact_map_spawn(6669).uid
+        }
+        area_sync = codec.decode_message("c_area_event_sync_status", replies[9][1])
         assert area_sync["StageId"] == 21111
         assert area_sync["EventRound"] == 280101
 
@@ -6209,13 +6366,21 @@ async def _run_area_event_auto_gate_progression() -> None:
         "c_area_event_info",
         "c_task_info_update",
         "c_task_info",
+        "c_scene_npc_create",
+        "c_task_trigger_sync",
         "c_area_event_sync_status",
     ]
     alias_info = codec.decode_message("c_area_event_info", alias_replies[1][1])
     assert alias_info["StageData"]["StageId"] == 21111
     alias_update = codec.decode_message("c_task_info_update", alias_replies[2][1])
     assert alias_update["task_info"]["Id"] == 280101
-    alias_sync = codec.decode_message("c_area_event_sync_status", alias_replies[4][1])
+    assert codec.decode_message("c_scene_npc_create", alias_replies[4][1]) == {
+        "NpcList": [scene_npc_from_spawn(quest_contact_map_spawn(6669))]
+    }
+    assert codec.decode_message("c_task_trigger_sync", alias_replies[5][1]) == {
+        "Uid": quest_contact_map_spawn(6669).uid
+    }
+    alias_sync = codec.decode_message("c_area_event_sync_status", alias_replies[6][1])
     assert alias_sync["StageId"] == 21111
     assert alias_sync["EventRound"] == 280101
 
@@ -7877,10 +8042,10 @@ async def _run_task_requests() -> None:
         100701,
     ]
     assert contact_tasks["finishs"] == [
-        1010,
         STARTER_TASK.id,
-        100602,
+        1010,
         280101,
+        100602,
     ]
     stage_pass = codec.decode_message("c_area_event_stage_pass", replies[3][1])
     assert stage_pass == {
@@ -9054,6 +9219,8 @@ async def _run_requested_stage_enter_packets() -> None:
         "c_area_event_info",
         "c_task_info_update",
         "c_task_info",
+        "c_scene_npc_create",
+        "c_task_trigger_sync",
         "c_area_event_sync_status",
     ]
     stage_pass = codec.decode_message("c_area_event_stage_pass", replies[0][1])
@@ -9085,7 +9252,13 @@ async def _run_requested_stage_enter_packets() -> None:
         280101,
         100602,
     ]
-    area_sync = codec.decode_message("c_area_event_sync_status", replies[4][1])
+    assert codec.decode_message("c_scene_npc_create", replies[4][1]) == {
+        "NpcList": [scene_npc_from_spawn(quest_contact_map_spawn(6669))]
+    }
+    assert codec.decode_message("c_task_trigger_sync", replies[5][1]) == {
+        "Uid": quest_contact_map_spawn(6669).uid
+    }
+    area_sync = codec.decode_message("c_area_event_sync_status", replies[6][1])
     assert area_sync["StageId"] == 21111
     assert area_sync["EventRound"] == 280101
     assert area_sync["TriggerOnMap"] == [280101]
@@ -9833,6 +10006,12 @@ def test_world_task_state_tracks_map_compatibility_values() -> None:
     assert world_tasks.world_task_reward_rate(15) == {"Rate": 15}
     assert world_tasks.ignore_auto_finish_tips_response(7) == {"Flag": 1}
     assert world_tasks.auto_finish_response(1301) == {"IsSuccess": 1}
+    world_tasks.seed_recovered_finished_tasks({1301, 280101, 100602})
+    assert world_tasks.world_task_info()["FinishList"][:3] == [
+        {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": 1301},
+        {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": 100602},
+        {"Map": STARTER_WORLD_MAP_ID, "Area": 0, "TaskId": 280101},
+    ]
     assert world_tasks.pick_prestige_response() == {
         "IsSuccess": 1,
         "FixedReward": [],

@@ -15,6 +15,7 @@ from .task_cfg_hints import (
     RECOVERED_AREA_EVENT_TASKS,
     RECOVERED_QUEST_CHAIN,
     RECOVERED_QUEST_DIALOG_REFERENCES as RECOVERED_QUEST_DIALOG_HINTS,
+    RECOVERED_TASK_TEXT_HINTS,
 )
 from .npc_cfg_hints import RECOVERED_NPC_NAME_HINTS
 from .characters import MAP_CHARACTERS
@@ -158,7 +159,14 @@ class TaskState:
         self.spawned_task_npcs: set[int] = set()
         self.spawned_contact_task_npcs: set[int] = set()
 
-    def task_info(self, task_type: int | None = None) -> dict[str, object]:
+    def task_info(
+        self,
+        task_type: int | None = None,
+        *,
+        finishs: Iterable[int] | None = None,
+        is_start: int = 1,
+        is_end: int = 1,
+    ) -> dict[str, object]:
         tasks = [
             task.to_protocol()
             for task in sorted(self.tasks.values(), key=_task_sort_key)
@@ -166,10 +174,78 @@ class TaskState:
         ]
         return {
             "tasks": tasks,
-            "finishs": sorted(self.finished),
-            "IsStart": 1,
-            "IsEnd": 1,
+            "finishs": (
+                self.protocol_finished_task_ids()
+                if finishs is None
+                else [int(task_id) for task_id in finishs]
+            ),
+            "IsStart": int(is_start),
+            "IsEnd": int(is_end),
         }
+
+    def protocol_finished_task_ids(self, limit: int = 0xFF) -> list[int]:
+        if len(self.finished) <= limit:
+            return sorted(self.finished)
+        priority_ids = [
+            task.id
+            for task in sorted(self.tasks.values(), key=_task_sort_key)
+            if task.id in self.finished
+        ]
+        priority_set = set(priority_ids)
+        priority_ids.extend(
+            task_id
+            for task_id in sorted(self.finished)
+            if task_id not in priority_set
+        )
+        return priority_ids[:limit]
+
+    def protocol_finished_task_id_chunks(
+        self, limit: int = 0xFF
+    ) -> list[list[int]]:
+        ordered = self.protocol_ordered_finished_task_ids()
+        if not ordered:
+            return [[]]
+        return [
+            ordered[index : index + limit]
+            for index in range(0, len(ordered), limit)
+        ]
+
+    def protocol_ordered_finished_task_ids(self) -> list[int]:
+        priority_ids = [
+            task.id
+            for task in sorted(self.tasks.values(), key=_task_sort_key)
+            if task.id in self.finished
+        ]
+        priority_set = set(priority_ids)
+        priority_ids.extend(
+            task_id
+            for task_id in sorted(self.finished)
+            if task_id not in priority_set
+        )
+        return priority_ids
+
+    def task_info_packets(
+        self, task_type: int | None = None, *, limit: int = 0xFF
+    ) -> list[dict[str, object]]:
+        if task_type not in (None, 0):
+            return [self.task_info(task_type)]
+        chunks = self.protocol_finished_task_id_chunks(limit)
+        packets: list[dict[str, object]] = []
+        for index, chunk in enumerate(chunks):
+            is_last = index == len(chunks) - 1
+            packets.append(
+                self.task_info(
+                    task_type,
+                    finishs=chunk,
+                    is_start=1 if index == 0 else 0,
+                    is_end=1 if is_last else 0,
+                )
+            )
+            if not is_last:
+                packets[-1]["tasks"] = packets[-1]["tasks"] if index == 0 else []
+        for packet in packets[1:]:
+            packet["tasks"] = []
+        return packets
 
     def accept(self, task_id: int) -> dict[str, object]:
         task = self._task(task_id)
@@ -250,6 +326,16 @@ class TaskState:
         for condition in task.conditions:
             condition.completed_count = max(condition.completed_count, 1)
         self._finish(task)
+
+    def complete_recovered_quest_chain(self) -> None:
+        self.skip_starter_quest()
+        for task in sorted(
+            self.tasks.values(),
+            key=lambda item: (item.quest_order or 999999, item.id),
+        ):
+            if task.quest_order > 0:
+                self._finish(task)
+        self.finished.update(RECOVERED_PARSED_TASK_IDS)
 
     def sync_info(
         self, task_id: int, sync_type: str, params: list[str]
@@ -912,7 +998,7 @@ def _recovered_quest_contact_candidates() -> tuple[QuestContactCandidate, ...]:
                 scene_npc_ids=_scene_npc_ids_for_resolved_ids(
                     reference.resolved_npc_ids,
                 ),
-                placement_verified=False,
+                placement_verified=True,
                 nearby_stage_ids=reference.nearby_stage_ids,
                 drama_refs=reference.drama_refs,
             )
@@ -933,6 +1019,12 @@ RECOVERED_QUEST_CONTACT_CANDIDATES_BY_TASK_ID: dict[
         {candidate.task_id for candidate in RECOVERED_QUEST_CONTACT_CANDIDATES}
     )
 }
+
+RECOVERED_PARSED_TASK_IDS = frozenset(
+    int(item["task_id"])
+    for item in RECOVERED_TASK_TEXT_HINTS
+    if int(item.get("task_id") or 0) > 0
+)
 
 
 def _task_sort_key(task: TaskRecord) -> tuple[int, int]:
