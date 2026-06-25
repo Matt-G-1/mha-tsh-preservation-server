@@ -27,6 +27,7 @@ from .characters import (
     scene_npc_from_spawn,
 )
 from .combat import fight_style_for_character
+from .entitlements import EntitlementState, preservation_seed_items
 from .intro import SCHOOL_MIDORIYA_INTRO_COSTUME
 from .lottery import LotteryState
 from .mail import MailState
@@ -92,6 +93,7 @@ class Session:
     activities: ActivityState = field(default_factory=ActivityState)
     campaign: CampaignState = field(default_factory=CampaignState)
     character_menu: CharacterMenuState = field(default_factory=CharacterMenuState)
+    entitlements: EntitlementState = field(default_factory=EntitlementState)
     lottery: LotteryState = field(default_factory=LotteryState)
     stage: StageState = field(default_factory=StageState)
     roster: RosterState | None = None
@@ -164,6 +166,9 @@ class GameServer:
         )
         self.unlock_all_functions = _env_enabled(
             "MHATSH_UNLOCK_ALL_FUNCTIONS", "1"
+        )
+        self.free_preservation_content = _env_enabled(
+            "MHATSH_FREE_PRESERVATION_CONTENT", "1"
         )
         self.roster_mode = os.environ.get("MHATSH_ROSTER_MODE", "verified")
         self.map_spawn_mode = os.environ.get("MHATSH_MAP_SPAWN_MODE", "starter")
@@ -2091,9 +2096,197 @@ class GameServer:
                 writer,
                 session,
                 "c_activity_shop_info",
-                session.activities.activity_shop_info(
-                    int(values.get("ActType") or 0)
+                (
+                    session.entitlements.activity_shop_info(
+                        int(values.get("ActType") or 0)
+                    )
+                    if self.free_preservation_content
+                    else session.activities.activity_shop_info(
+                        int(values.get("ActType") or 0)
+                    )
                 ),
+            )
+        elif name == "s_shop_info":
+            await self._send(
+                writer,
+                session,
+                "c_shop_info",
+                session.entitlements.shop_info(list(values.get("shopIds") or [])),
+            )
+        elif name == "s_shop_buy":
+            buy_result = session.entitlements.shop_buy(
+                int(values.get("ShopId") or 0),
+                int(values.get("GoodsId") or 0),
+                int(values.get("Amount") or 1),
+            )
+            granted = [
+                {
+                    "ItemId": int(item.get("ItemId") or 0),
+                    "Amount": int(item.get("Amount") or 0),
+                }
+                for item in list(buy_result.get("ItemInfo") or [])
+                if isinstance(item, dict)
+            ]
+            self.profile_store.grant_items(
+                session.urs,
+                [
+                    (item["ItemId"], item["Amount"])
+                    for item in granted
+                ],
+            )
+            await self._send(writer, session, "c_shop_buy", buy_result)
+            await self._send_item_amount(writer, session, granted)
+        elif name == "s_welfare_info":
+            await self._send(
+                writer,
+                session,
+                "c_welfare_info",
+                session.entitlements.welfare_info(),
+            )
+        elif name == "s_welfare_sign":
+            await self._send(
+                writer,
+                session,
+                "c_welfare_sign",
+                session.entitlements.welfare_sign(int(values.get("SignType") or 0)),
+            )
+        elif name == "s_welfare_total_login":
+            await self._send(
+                writer,
+                session,
+                "c_welfare_total_login",
+                session.entitlements.welfare_total_login(
+                    int(values.get("Id") or 0)
+                ),
+            )
+        elif name == "s_welfare_strength_supply":
+            await self._send(
+                writer,
+                session,
+                "c_welfare_strength_supply",
+                session.entitlements.welfare_strength_supply(
+                    int(values.get("Id") or 0)
+                ),
+            )
+        elif name == "s_welfare_exchange_money":
+            await self._send(
+                writer,
+                session,
+                "c_welfare_exchange_money",
+                session.entitlements.welfare_exchange_money(
+                    int(values.get("Type") or 0),
+                    int(values.get("Times") or 1),
+                ),
+            )
+        elif name == "s_pay_info":
+            requested_shop_ids = [
+                int(shop_id)
+                for shop_id in list(values.get("shopid") or [])
+                if int(shop_id) > 0
+            ]
+            await self._send(writer, session, "c_pay_info", {"GoodsInfo": []})
+            await self._send(
+                writer,
+                session,
+                "c_pay_info_end",
+                {"shopid": requested_shop_ids},
+            )
+        elif name == "s_pay_recharge":
+            await self._send(
+                writer,
+                session,
+                "c_pay_recharge",
+                {"Uid": int(values.get("Uid") or session.uid)},
+            )
+            await self._send(
+                writer,
+                session,
+                "c_recharge_info",
+                session.entitlements.recharge_info(),
+            )
+        elif name in {"s_pay_item", "s_pay_item_confirm"}:
+            item_id = session.entitlements.shop_buy(
+                int(values.get("ShopId") or 0),
+                int(values.get("GoodsId") or 0),
+                int(values.get("Amount") or 1),
+            )["ItemInfo"][0]["ItemId"]
+            amount = max(1, int(values.get("Amount") or 1))
+            reward = {"ItemId": int(item_id), "count": amount, "extra": []}
+            self.profile_store.grant_items(session.urs, [(int(item_id), amount)])
+            await self._send(
+                writer,
+                session,
+                "c_pay_item_result",
+                {
+                    "ShopId": int(values.get("ShopId") or 0),
+                    "GoodsId": [int(values.get("GoodsId") or 0)],
+                    "RewardList": [reward],
+                },
+            )
+            await self._send_item_amount(
+                writer,
+                session,
+                [{"ItemId": int(item_id), "Amount": amount}],
+            )
+        elif name == "s_recharge_reward_info":
+            await self._send(
+                writer,
+                session,
+                "c_recharge_reward_info",
+                session.entitlements.recharge_reward_info(),
+            )
+        elif name == "s_recharge_reward_total_get":
+            await self._send(
+                writer,
+                session,
+                "c_recharge_reward_total_update",
+                session.entitlements.recharge_reward_total_get(
+                    int(values.get("Id") or 0)
+                ),
+            )
+        elif name == "s_recharge_reward_first_get":
+            await self._send(
+                writer,
+                session,
+                "c_recharge_reward_first_info",
+                session.entitlements.recharge_reward_first_info(),
+            )
+        elif name == "s_pay_bonus":
+            await self._send(
+                writer,
+                session,
+                "c_pay_bonus",
+                {"Level": int(values.get("Level") or self.player_level)},
+            )
+        elif name == "s_growth_fund_info":
+            await self._send(
+                writer,
+                session,
+                "c_growth_fund_info",
+                {
+                    "IsActive": [1],
+                    "Data": [
+                        {"Id": reward_id, "Status": 2}
+                        for reward_id in range(1, 71)
+                    ],
+                },
+            )
+        elif name == "s_monthly_card_sign":
+            await self._send(
+                writer,
+                session,
+                "c_monthly_card_info",
+                {
+                    "CardInfo": [
+                        {
+                            "Id": int(values.get("Id") or 1),
+                            "ActiveTime": int(time.time()),
+                            "Days": 9999,
+                            "LastGetTime": int(time.time()),
+                            "GetDay": list(range(1, 32)),
+                        }
+                    ]
+                },
             )
         elif name == "s_mail_get_list":
             await self._send(
@@ -2677,8 +2870,11 @@ class GameServer:
                     "Name": "Local Hero",
                     "Level": self.player_level,
                     "TopLevel": 0,
-                    "Gold": 0,
-                    "BindGold": 0,
+                    **(
+                        session.entitlements.user_currency()
+                        if self.free_preservation_content
+                        else {"Gold": 0, "BindGold": 0}
+                    ),
                     "HeroId": roster.active_hero_id,
                     "CardUid": roster.active_card_uid,
                     "Fighting": 0,
@@ -2703,6 +2899,8 @@ class GameServer:
     async def _send_initial_normal_items(
         self, writer: asyncio.StreamWriter, session: Session
     ) -> None:
+        if self.free_preservation_content:
+            self.profile_store.grant_items(session.urs, preservation_seed_items())
         normal_items = self.profile_store.normal_item_list(session.urs)
         if not normal_items:
             return

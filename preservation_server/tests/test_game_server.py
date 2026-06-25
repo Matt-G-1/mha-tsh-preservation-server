@@ -114,6 +114,15 @@ from mhatsh_server.combat_action_hints import RECOVERED_HERO_ACTION_HINTS_BY_MOD
 from mhatsh_server.combat_internal_action_hints import (
     RECOVERED_INTERNAL_ACTION_HINTS_BY_MODEL,
 )
+from mhatsh_server.entitlements import (
+    PRESERVATION_CURRENCY_AMOUNT,
+    PRESERVATION_LEVEL_REWARDS,
+    PRESERVATION_RECHARGE_REWARD_IDS,
+    PRESERVATION_SHOP_ITEM_AMOUNT,
+    PRESERVATION_SHOP_ITEMS,
+    PRESERVATION_STRENGTH_SUPPLIES,
+    PRESERVATION_TOTAL_LOGIN_REWARDS,
+)
 from mhatsh_server.drama_family_stages import (
     DRAMA_FAMILY_STAGE_BY_KEY,
     DRAMA_FAMILY_STAGE_SOURCE,
@@ -247,6 +256,7 @@ LEGACY_STARTER_ENV = {
     "MHATSH_UNLOCK_ALL_FUNCTIONS": "0",
     "MHATSH_SEND_INITIAL_PROGRESS": "0",
     "MHATSH_ROSTER_MODE": "starter",
+    "MHATSH_FREE_PRESERVATION_CONTENT": "0",
 }
 
 
@@ -4916,7 +4926,10 @@ async def _run_initial_user_normal_items() -> None:
         ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
     )
     codec = ProtocolCodec(registry)
-    game = GameServer(registry)
+    with patch.dict(
+        os.environ, {"MHATSH_FREE_PRESERVATION_CONTENT": "0"}, clear=False
+    ):
+        game = GameServer(registry)
     game.profile_store.grant_items(
         "item-user",
         [
@@ -5084,6 +5097,7 @@ async def _run_unlocked_profile() -> None:
     assert names == [
         "c_login_checkstr",
         "c_user_create",
+        "c_item_normal_list",
         "c_card_seeinfo",
         "c_card_show_info",
         "c_card_hero_bio_info",
@@ -5100,23 +5114,32 @@ async def _run_unlocked_profile() -> None:
     ]
     user = codec.decode_message("c_user_create", replies[1][1])
     assert user["user"]["Level"] == PLAYER_LEVEL_CAP
-    cards = codec.decode_message("c_card_seeinfo", replies[2][1])["CardInfo"]
+    assert user["user"]["Gold"] == PRESERVATION_CURRENCY_AMOUNT
+    assert user["user"]["BindGold"] == PRESERVATION_CURRENCY_AMOUNT
+    seeded_items = codec.decode_message("c_item_normal_list", replies[2][1])["item"]
+    seeded_item_ids = {int(item["ItemId"]) for item in seeded_items}
+    assert set(PRESERVATION_SHOP_ITEMS).issubset(seeded_item_ids)
+    assert SUPPORT_CARD_ITEM_IDS.issubset(seeded_item_ids)
+    assert {int(item["Amount"]) for item in seeded_items} == {
+        PRESERVATION_SHOP_ITEM_AMOUNT
+    }
+    cards = codec.decode_message("c_card_seeinfo", replies[3][1])["CardInfo"]
     assert len(cards) == len(VERIFIED_PLAYABLE_ROSTER) == 26
     assert {card["Lv"] for card in cards} == {PLAYER_LEVEL_CAP}
-    area_event_login = codec.decode_message("c_area_event_login_data", replies[5][1])
+    area_event_login = codec.decode_message("c_area_event_login_data", replies[6][1])
     assert len(area_event_login["StageData"]) == len(AREA_EVENT_STAGES)
     assert area_event_login["NormalLineup"] == [STARTER_CARD_UID]
-    assert codec.decode_message("c_funcopen_list", replies[6][1]) == {
+    assert codec.decode_message("c_funcopen_list", replies[7][1]) == {
         "idlist": list(FUNCTION_OPEN_IDS)
     }
-    initial_tasks = codec.decode_message("c_task_info", replies[7][1])
+    initial_tasks = codec.decode_message("c_task_info", replies[8][1])
     assert initial_tasks["finishs"] == [STARTER_TASK.id]
     assert initial_tasks["tasks"][0]["Status"] == TASK_STATUS_FINISHED
-    assert codec.decode_message("c_city_level_info", replies[8][1]) == {
+    assert codec.decode_message("c_city_level_info", replies[9][1]) == {
         "Level": CITY_LEVEL_CAP,
         "ClickList": [],
     }
-    assert codec.decode_message("c_world_task_info", replies[9][1])[
+    assert codec.decode_message("c_world_task_info", replies[10][1])[
         "FinishList"
     ] == [
         {
@@ -5125,10 +5148,10 @@ async def _run_unlocked_profile() -> None:
             "TaskId": STARTER_TASK.id,
         }
     ]
-    assert codec.decode_message("c_strength_info", replies[10][1]) == {
+    assert codec.decode_message("c_strength_info", replies[11][1]) == {
         "BuyTimes": 0
     }
-    scene_player = codec.decode_message("c_scene_player_info", replies[11][1])
+    scene_player = codec.decode_message("c_scene_player_info", replies[12][1])
     assert scene_player["Level"] == PLAYER_LEVEL_CAP
     task_info = session.tasks.task_info()
     assert task_info["finishs"] == [STARTER_TASK.id]
@@ -10107,8 +10130,12 @@ async def _run_world_map_task_requests() -> None:
     assert refreshed_tasks["tasks"][2]["Id"] == 280101
 
 
-def test_activity_and_side_task_requests_receive_empty_state_replies() -> None:
+def test_activity_and_side_task_requests_receive_compatibility_replies() -> None:
     asyncio.run(_run_activity_and_side_task_requests())
+
+
+def test_free_preservation_entitlement_packets_are_protocol_safe() -> None:
+    asyncio.run(_run_free_preservation_entitlement_packets())
 
 
 def test_campaign_requests_receive_stateful_compatibility_replies() -> None:
@@ -10489,9 +10516,14 @@ async def _run_activity_and_side_task_requests() -> None:
     assert codec.decode_message("c_relax_stage_sync_cond", replies[4][1]) == {
         "NewData": [{"Type": 1, "Id": 400301, "Status": 0, "Reward": 0}]
     }
-    assert codec.decode_message("c_activity_shop_info", replies[5][1]) == {
-        "BuyInfo": []
-    }
+    activity_shop = codec.decode_message("c_activity_shop_info", replies[5][1])
+    assert [item["GoodsId"] for item in activity_shop["BuyInfo"]] == [
+        17001,
+        17002,
+        17003,
+        17004,
+    ]
+    assert {item["BuyTimes"] for item in activity_shop["BuyInfo"]} == {0}
     assert codec.decode_message("c_mail_get_list", replies[6][1]) == {
         "iVersion": 1,
         "arrMailSimpleInfos": [],
@@ -10556,8 +10588,194 @@ async def _run_activity_and_side_task_requests() -> None:
         "newStageInfo": [{"Id": 880101, "Status": 1}],
     }
     assert session.stage.allsvr_level_counts[880101] == 1
-    assert session.activities.requested_activity_types == [17]
+    assert session.activities.requested_activity_types == []
     assert session.activities.requested_group_maps == 1
+
+
+async def _run_free_preservation_entitlement_packets() -> None:
+    registry = SchemaRegistry.from_files(
+        ROOT / "allproto_readable.lua", ROOT / "analysis" / "protocol_ids.csv"
+    )
+    codec = ProtocolCodec(registry)
+    game = GameServer(registry)
+    writer = BufferWriter()
+    session = Session(
+        seed=1,
+        decoder=FrameDecoder(None),
+        outbound=RollingXor(0x31337F00),
+        urs="free-entitlement-user",
+        uid=4242,
+    )
+
+    request_cases = [
+        ("s_shop_info", {"shopIds": [1, 7]}),
+        (
+            "s_shop_buy",
+            {
+                "ShopId": 1,
+                "GoodsId": 1001,
+                "Amount": 2,
+                "TotalPrice": 999,
+                "CurrencyAmount": 1,
+            },
+        ),
+        ("s_welfare_info", {}),
+        ("s_welfare_sign", {"SignType": 1}),
+        ("s_welfare_total_login", {"Id": 1}),
+        ("s_welfare_strength_supply", {"Id": 2}),
+        ("s_welfare_exchange_money", {"Type": 1, "Times": 9}),
+        ("s_pay_info", {"shopid": [1, 2]}),
+        ("s_pay_recharge", {"Uid": 4242}),
+        ("s_pay_item", {"ShopId": 1, "GoodsId": 1002, "Price": 888, "Amount": 3}),
+        ("s_recharge_reward_info", {}),
+        ("s_recharge_reward_total_get", {"Id": 3}),
+        ("s_recharge_reward_first_get", {"Round": 1, "Day": 1}),
+        ("s_pay_bonus", {"Level": 70}),
+        ("s_growth_fund_info", {}),
+        ("s_monthly_card_sign", {"Id": 1}),
+    ]
+
+    for request_name, request_values in request_cases:
+        await game._dispatch(
+            session,
+            registry.protocol_ids[request_name],
+            codec.encode_message(request_name, request_values),
+            writer,
+        )
+
+    decoder = FrameDecoder(RollingXor(0x31337F00))
+    replies = decoder.feed(bytes(writer.data))
+    assert [registry.protocol_names[reply_id] for reply_id, _ in replies] == [
+        "c_shop_info",
+        "c_shop_buy",
+        "c_item_amount",
+        "c_welfare_info",
+        "c_welfare_sign",
+        "c_welfare_total_login",
+        "c_welfare_strength_supply",
+        "c_welfare_exchange_money",
+        "c_pay_info",
+        "c_pay_info_end",
+        "c_pay_recharge",
+        "c_recharge_info",
+        "c_pay_item_result",
+        "c_item_amount",
+        "c_recharge_reward_info",
+        "c_recharge_reward_total_update",
+        "c_recharge_reward_first_info",
+        "c_pay_bonus",
+        "c_growth_fund_info",
+        "c_monthly_card_info",
+    ]
+
+    shop_info = codec.decode_message("c_shop_info", replies[0][1])
+    assert [shop["ShopId"] for shop in shop_info["shopinfo"]] == [1, 7]
+    first_shop_goods = shop_info["shopinfo"][0]["Goods"]
+    assert [goods["ItemId"] for goods in first_shop_goods] == list(
+        PRESERVATION_SHOP_ITEMS
+    )
+    assert {goods["Price"][0] for goods in first_shop_goods} == {0}
+    assert {goods["PriceType"] for goods in first_shop_goods} == {0}
+    assert {goods["Amount"] for goods in first_shop_goods} == {
+        PRESERVATION_SHOP_ITEM_AMOUNT
+    }
+
+    shop_buy = codec.decode_message("c_shop_buy", replies[1][1])
+    assert shop_buy == {
+        "IsReturn": 1,
+        "ItemInfo": [
+            {
+                "ItemId": PRESERVATION_SHOP_ITEMS[0],
+                "Amount": PRESERVATION_SHOP_ITEM_AMOUNT * 2,
+                "Uid": 0,
+            }
+        ],
+        "ShopId": 1,
+        "GoodsId": 1001,
+        "BuyTimes": 2,
+    }
+    assert codec.decode_message("c_item_amount", replies[2][1]) == {
+        "ItemList": [
+            {
+                "ItemId": PRESERVATION_SHOP_ITEMS[0],
+                "Amount": PRESERVATION_SHOP_ITEM_AMOUNT * 2,
+            }
+        ]
+    }
+
+    welfare_info = codec.decode_message("c_welfare_info", replies[3][1])
+    assert welfare_info["Exchange"] == PRESERVATION_CURRENCY_AMOUNT
+    assert welfare_info["SignList"] == list(range(1, 32))
+    assert welfare_info["TotalLogin"] == list(PRESERVATION_TOTAL_LOGIN_REWARDS)
+    assert welfare_info["Strength"] == list(PRESERVATION_STRENGTH_SUPPLIES)
+    assert welfare_info["LevelRewards"] == list(PRESERVATION_LEVEL_REWARDS)
+    assert codec.decode_message("c_welfare_sign", replies[4][1]) == {
+        "SignType": 1,
+        "FixDay": 31,
+        "SignList": list(range(1, 32)),
+    }
+    assert codec.decode_message("c_welfare_total_login", replies[5][1]) == {
+        "Id": 1,
+        "TotalLogin": list(PRESERVATION_TOTAL_LOGIN_REWARDS),
+    }
+    assert codec.decode_message("c_welfare_strength_supply", replies[6][1]) == {
+        "Id": 2,
+        "List": list(PRESERVATION_STRENGTH_SUPPLIES),
+    }
+    assert codec.decode_message("c_welfare_exchange_money", replies[7][1]) == {
+        "Type": 1,
+        "Count": 9,
+        "Exchange": PRESERVATION_CURRENCY_AMOUNT,
+        "TypeCount": PRESERVATION_CURRENCY_AMOUNT,
+        "BoneCount": PRESERVATION_CURRENCY_AMOUNT,
+    }
+
+    assert codec.decode_message("c_pay_info", replies[8][1]) == {
+        "GoodsInfo": [],
+        "CurPage": 0,
+        "MaxPage": 0,
+    }
+    assert codec.decode_message("c_pay_info_end", replies[9][1]) == {
+        "shopid": [1, 2]
+    }
+    assert codec.decode_message("c_pay_recharge", replies[10][1]) == {
+        "Uid": 4242
+    }
+    assert codec.decode_message("c_recharge_info", replies[11][1])[
+        "RechargeGold"
+    ] == PRESERVATION_CURRENCY_AMOUNT
+    assert codec.decode_message("c_pay_item_result", replies[12][1]) == {
+        "ShopId": 1,
+        "GoodsId": [1002],
+        "RewardList": [
+            {"ItemId": PRESERVATION_SHOP_ITEMS[1], "count": 3, "extra": []}
+        ],
+    }
+    assert codec.decode_message("c_recharge_reward_info", replies[14][1]) == {
+        "Once": [
+            {"Id": reward_id, "State": 1}
+            for reward_id in PRESERVATION_RECHARGE_REWARD_IDS
+        ],
+        "Total": [
+            {"Id": reward_id, "State": 1}
+            for reward_id in PRESERVATION_RECHARGE_REWARD_IDS
+        ],
+    }
+    assert codec.decode_message("c_recharge_reward_total_update", replies[15][1]) == {
+        "List": [{"Id": 3, "State": 2}]
+    }
+    assert codec.decode_message("c_recharge_reward_first_info", replies[16][1])[
+        "Round"
+    ][0]["State"] == [2, 2, 2, 2, 2, 2, 2]
+    assert codec.decode_message("c_pay_bonus", replies[17][1]) == {"Level": 70}
+    growth_fund = codec.decode_message("c_growth_fund_info", replies[18][1])
+    assert growth_fund["IsActive"] == [1]
+    assert growth_fund["Data"][0] == {"Id": 1, "Status": 2}
+    assert growth_fund["Data"][-1] == {"Id": 70, "Status": 2}
+    monthly_card = codec.decode_message("c_monthly_card_info", replies[19][1])
+    assert monthly_card["CardInfo"][0]["Id"] == 1
+    assert monthly_card["CardInfo"][0]["Days"] == 9999
+    assert monthly_card["CardInfo"][0]["GetDay"] == list(range(1, 32))
 
 
 async def _run_lottery_requests() -> None:
