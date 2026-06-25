@@ -124,6 +124,7 @@ from mhatsh_server.combat_internal_action_hints import (
 from mhatsh_server.entitlements import (
     PRESERVATION_CURRENCY_AMOUNT,
     PRESERVATION_LEVEL_REWARDS,
+    PRESERVATION_RECHARGE_VALUE,
     PRESERVATION_RECHARGE_REWARD_IDS,
     PRESERVATION_SHOP_ITEM_AMOUNT,
     PRESERVATION_SHOP_ITEMS,
@@ -10718,6 +10719,7 @@ async def _run_free_preservation_entitlement_packets() -> None:
         ("s_welfare_strength_supply", {"Id": 2}),
         ("s_welfare_exchange_money", {"Type": 1, "Times": 9}),
         ("s_pay_info", {"shopid": [1, 2]}),
+        ("s_pay_check", {"ShopId": 1, "GoodsId": 1001, "Price": 0, "Amount": 1}),
         ("s_pay_recharge", {"Uid": 4242}),
         ("s_pay_item", {"ShopId": 1, "GoodsId": 1002, "Price": 888, "Amount": 3}),
         ("s_recharge_reward_info", {}),
@@ -10749,11 +10751,17 @@ async def _run_free_preservation_entitlement_packets() -> None:
         "c_welfare_exchange_money",
         "c_pay_info",
         "c_pay_info_end",
+        "c_pay_check",
         "c_pay_recharge",
         "c_recharge_info",
         "c_pay_item_result",
         "c_item_amount",
         "c_recharge_reward_info",
+        "c_recharge_reward_first_info",
+        "c_recharge_info",
+        "c_once_recharge_info",
+        "c_total_recharge_info",
+        "c_daily_recharge_info",
         "c_recharge_reward_total_update",
         "c_recharge_reward_first_info",
         "c_pay_bonus",
@@ -10823,28 +10831,38 @@ async def _run_free_preservation_entitlement_packets() -> None:
         "BoneCount": PRESERVATION_CURRENCY_AMOUNT,
     }
 
-    assert codec.decode_message("c_pay_info", replies[8][1]) == {
-        "GoodsInfo": [],
-        "CurPage": 0,
-        "MaxPage": 0,
-    }
+    pay_info = codec.decode_message("c_pay_info", replies[8][1])
+    assert pay_info["CurPage"] == 1
+    assert pay_info["MaxPage"] == 2
+    assert len(pay_info["GoodsInfo"]) == 6
+    assert {goods["ShopId"] for goods in pay_info["GoodsInfo"]} == {1, 2}
+    assert {goods["Price"] for goods in pay_info["GoodsInfo"]} == {0}
+    assert {goods["ShowPrice"] for goods in pay_info["GoodsInfo"]} == {0}
+    assert {goods["IsFirstPay"] for goods in pay_info["GoodsInfo"]} == {1}
     assert codec.decode_message("c_pay_info_end", replies[9][1]) == {
         "shopid": [1, 2]
     }
-    assert codec.decode_message("c_pay_recharge", replies[10][1]) == {
+    assert codec.decode_message("c_pay_check", replies[10][1]) == {
+        "ShopId": 1,
+        "GoodsId": 1001,
+        "OrderId": "local-1-1001",
+        "CBUrl": "local://mhatsh-preservation/pay",
+        "Extra": [],
+    }
+    assert codec.decode_message("c_pay_recharge", replies[11][1]) == {
         "Uid": 4242
     }
-    assert codec.decode_message("c_recharge_info", replies[11][1])[
+    assert codec.decode_message("c_recharge_info", replies[12][1])[
         "RechargeGold"
     ] == PRESERVATION_CURRENCY_AMOUNT
-    assert codec.decode_message("c_pay_item_result", replies[12][1]) == {
+    assert codec.decode_message("c_pay_item_result", replies[13][1]) == {
         "ShopId": 1,
         "GoodsId": [1002],
         "RewardList": [
             {"ItemId": PRESERVATION_SHOP_ITEMS[1], "count": 3, "extra": []}
         ],
     }
-    assert codec.decode_message("c_recharge_reward_info", replies[14][1]) == {
+    assert codec.decode_message("c_recharge_reward_info", replies[15][1]) == {
         "Once": [
             {"Id": reward_id, "State": 1}
             for reward_id in PRESERVATION_RECHARGE_REWARD_IDS
@@ -10854,18 +10872,35 @@ async def _run_free_preservation_entitlement_packets() -> None:
             for reward_id in PRESERVATION_RECHARGE_REWARD_IDS
         ],
     }
-    assert codec.decode_message("c_recharge_reward_total_update", replies[15][1]) == {
-        "List": [{"Id": 3, "State": 2}]
-    }
     assert codec.decode_message("c_recharge_reward_first_info", replies[16][1])[
         "Round"
     ][0]["State"] == [2, 2, 2, 2, 2, 2, 2]
-    assert codec.decode_message("c_pay_bonus", replies[17][1]) == {"Level": 70}
-    growth_fund = codec.decode_message("c_growth_fund_info", replies[18][1])
+    assert codec.decode_message("c_recharge_info", replies[17][1])[
+        "RechargeValue"
+    ] == PRESERVATION_RECHARGE_VALUE
+    assert codec.decode_message("c_once_recharge_info", replies[18][1]) == {
+        "Id": 1,
+        "RechargeCount": PRESERVATION_RECHARGE_VALUE,
+        "GetCount": PRESERVATION_RECHARGE_VALUE,
+    }
+    total_recharge = codec.decode_message("c_total_recharge_info", replies[19][1])
+    assert total_recharge["Total"] == PRESERVATION_RECHARGE_VALUE
+    assert total_recharge["List"][0] == {"Id": 1, "State": 2}
+    daily_recharge = codec.decode_message("c_daily_recharge_info", replies[20][1])
+    assert daily_recharge["Total"] == PRESERVATION_RECHARGE_VALUE
+    assert daily_recharge["List"][0]["State"] == [2, 2, 2, 2, 2, 2, 2]
+    assert codec.decode_message("c_recharge_reward_total_update", replies[21][1]) == {
+        "List": [{"Id": 3, "State": 2}]
+    }
+    assert codec.decode_message("c_recharge_reward_first_info", replies[22][1])[
+        "Round"
+    ][0]["State"] == [2, 2, 2, 2, 2, 2, 2]
+    assert codec.decode_message("c_pay_bonus", replies[23][1]) == {"Level": 70}
+    growth_fund = codec.decode_message("c_growth_fund_info", replies[24][1])
     assert growth_fund["IsActive"] == [1]
     assert growth_fund["Data"][0] == {"Id": 1, "Status": 2}
     assert growth_fund["Data"][-1] == {"Id": 70, "Status": 2}
-    monthly_card = codec.decode_message("c_monthly_card_info", replies[19][1])
+    monthly_card = codec.decode_message("c_monthly_card_info", replies[25][1])
     assert monthly_card["CardInfo"][0]["Id"] == 1
     assert monthly_card["CardInfo"][0]["Days"] == 9999
     assert monthly_card["CardInfo"][0]["GetDay"] == list(range(1, 32))

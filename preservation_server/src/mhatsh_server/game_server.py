@@ -2184,12 +2184,27 @@ class GameServer:
                 for shop_id in list(values.get("shopid") or [])
                 if int(shop_id) > 0
             ]
-            await self._send(writer, session, "c_pay_info", {"GoodsInfo": []})
+            await self._send(
+                writer,
+                session,
+                "c_pay_info",
+                session.entitlements.pay_info(requested_shop_ids),
+            )
             await self._send(
                 writer,
                 session,
                 "c_pay_info_end",
                 {"shopid": requested_shop_ids},
+            )
+        elif name == "s_pay_check":
+            await self._send(
+                writer,
+                session,
+                "c_pay_check",
+                session.entitlements.pay_check(
+                    int(values.get("ShopId") or 0),
+                    int(values.get("GoodsId") or 0),
+                ),
             )
         elif name == "s_pay_recharge":
             await self._send(
@@ -2234,6 +2249,36 @@ class GameServer:
                 session,
                 "c_recharge_reward_info",
                 session.entitlements.recharge_reward_info(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_recharge_reward_first_info",
+                session.entitlements.recharge_reward_first_info(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_recharge_info",
+                session.entitlements.recharge_info(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_once_recharge_info",
+                session.entitlements.once_recharge_info(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_total_recharge_info",
+                session.entitlements.total_recharge_info(),
+            )
+            await self._send(
+                writer,
+                session,
+                "c_daily_recharge_info",
+                session.entitlements.daily_recharge_info(),
             )
         elif name == "s_recharge_reward_total_get":
             await self._send(

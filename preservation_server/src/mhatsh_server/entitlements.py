@@ -27,6 +27,7 @@ PRESERVATION_TOTAL_LOGIN_REWARDS = tuple(range(1, 31))
 PRESERVATION_STRENGTH_SUPPLIES = (1, 2, 3)
 PRESERVATION_LEVEL_REWARDS = tuple(range(1, 71))
 PRESERVATION_RECHARGE_REWARD_IDS = tuple(range(1, 21))
+PRESERVATION_PAY_GOODS_PER_SHOP = 3
 
 
 def preservation_seed_items() -> tuple[tuple[int, int], ...]:
@@ -182,6 +183,31 @@ class EntitlementState:
             "RechargeGold": PRESERVATION_CURRENCY_AMOUNT,
         }
 
+    def pay_info(self, shop_ids: list[int]) -> dict[str, object]:
+        requested = [int(shop_id) for shop_id in shop_ids if int(shop_id) > 0]
+        if not requested:
+            requested = [1]
+        return {
+            "GoodsInfo": [
+                self._pay_goods(shop_id, index)
+                for shop_id in requested
+                for index in range(1, PRESERVATION_PAY_GOODS_PER_SHOP + 1)
+            ],
+            "CurPage": 1,
+            "MaxPage": len(requested),
+        }
+
+    def pay_check(self, shop_id: int, goods_id: int) -> dict[str, object]:
+        normalized_shop_id = int(shop_id)
+        normalized_goods_id = int(goods_id)
+        return {
+            "ShopId": normalized_shop_id,
+            "GoodsId": normalized_goods_id,
+            "OrderId": f"local-{normalized_shop_id}-{normalized_goods_id}",
+            "CBUrl": "local://mhatsh-preservation/pay",
+            "Extra": [],
+        }
+
     def recharge_reward_info(self) -> dict[str, object]:
         return {
             "Once": [
@@ -191,6 +217,31 @@ class EntitlementState:
             "Total": [
                 {"Id": reward_id, "State": 1}
                 for reward_id in PRESERVATION_RECHARGE_REWARD_IDS
+            ],
+        }
+
+    def once_recharge_info(self, reward_id: int = 1) -> dict[str, int]:
+        return {
+            "Id": max(1, int(reward_id)),
+            "RechargeCount": PRESERVATION_RECHARGE_VALUE,
+            "GetCount": PRESERVATION_RECHARGE_VALUE,
+        }
+
+    def total_recharge_info(self) -> dict[str, object]:
+        return {
+            "Total": PRESERVATION_RECHARGE_VALUE,
+            "List": [
+                {"Id": reward_id, "State": 2}
+                for reward_id in PRESERVATION_RECHARGE_REWARD_IDS
+            ],
+        }
+
+    def daily_recharge_info(self) -> dict[str, object]:
+        return {
+            "Total": PRESERVATION_RECHARGE_VALUE,
+            "List": [
+                {"SubId": reward_id, "Day": 1, "State": [2, 2, 2, 2, 2, 2, 2]}
+                for reward_id in range(1, 4)
             ],
         }
 
@@ -221,6 +272,35 @@ class EntitlementState:
     @staticmethod
     def _goods_id(shop_id: int, index: int) -> int:
         return int(shop_id) * 1000 + int(index)
+
+    @staticmethod
+    def _pay_goods(shop_id: int, index: int) -> dict[str, object]:
+        goods_id = int(shop_id) * 1000 + int(index)
+        return {
+            "GoodsId": goods_id,
+            "ShopId": int(shop_id),
+            "GoodsName": f"Preservation Top-up {index}",
+            "GoodsIcon": "",
+            "GoodsBg": "",
+            "Sequence": int(index),
+            "BuyCond": "",
+            "LimitTimes": 0,
+            "PriceType": "",
+            "Price": 0,
+            "ProductId": f"local_preservation_{int(shop_id)}_{int(index)}",
+            "LeftTimes": 999999,
+            "GiftBag": PRESERVATION_SHOP_ITEMS[
+                (int(index) - 1) % len(PRESERVATION_SHOP_ITEMS)
+            ],
+            "BagAmount": PRESERVATION_SHOP_ITEM_AMOUNT,
+            "EndTime": PRESERVATION_PERMANENT_END_TIME,
+            "PageId": int(shop_id),
+            "ShowPriceType": "",
+            "ShowPrice": 0,
+            "IsFirstPay": 1,
+            "ViewConf": "",
+            "PreToken": [],
+        }
 
     @staticmethod
     def _item_id_for_goods(shop_id: int, goods_id: int) -> int:
