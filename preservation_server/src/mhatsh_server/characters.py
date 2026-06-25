@@ -6,7 +6,8 @@ from .beginner_quest import BEGINNER_QUEST_DEATH_ARMS_UID
 
 
 CATALOG_SOURCE = (
-    "User-supplied AXMD raw-rip list plus en_hero_cfg evidence, 2026-06-15"
+    "User-supplied AXMD raw-rip list, en_hero_cfg evidence, and Fandom "
+    "public roster cross-check, 2026-06-25"
 )
 
 # hero_cfg VmInfo.TrainCardList is only small level-60 internal test data with
@@ -25,6 +26,9 @@ class PlayableCharacter:
     model_asset_id: str
     hero_id: int | None = None
     shape_id: int | None = None
+    quirk: str = ""
+    battle_type: str = ""
+    public_rank: str = ""
 
     @property
     def is_protocol_verified(self) -> bool:
@@ -143,6 +147,35 @@ NON_PUBLIC_PLAYABLE_MODEL_REASONS = {
     "h1998": "All Might art-test variant, not a normal roster card",
 }
 
+PUBLIC_PLAYABLE_METADATA = {
+    "h1001": ("One For All", "Speed", "B"),
+    "h1002": ("Explosion", "Power", "S"),
+    "h1003": ("One For All", "Power", "S"),
+    "h1006": ("Engine", "Speed", "A"),
+    "h1007": ("Zero Gravity", "Power", "A"),
+    "h1008": ("Half-Cold Half-Hot", "Technical", "S"),
+    "h1009": ("Creation", "Technical", "S"),
+    "h1010": ("Electrification", "Technical", "B"),
+    "h1012": ("Unknown", "Technical", "S"),
+    "h1013": ("Hardening", "Power", "B"),
+    "h1014": ("Frog", "Speed", "A"),
+    "h1015": ("Erasure", "Speed", "S"),
+    "h1016": ("Tail", "Power", "A"),
+    "h1017": ("Acid", "Technical", "A"),
+    "h1019": ("Decay", "Technical", "S"),
+    "h1020": ("Pop Off", "Technical", "A"),
+    "h1021": ("Hellflame", "Technical", "S"),
+    "h1022": ("Dark Shadow", "Speed", "S"),
+    "h1026": ("Fierce Wings", "Speed", "S"),
+    "h1027": ("One For All", "Speed", "S"),
+    "h1028": ("Explosion", "Power", "S"),
+    "h1029": ("Half-Cold Half-Hot", "Technical", "S"),
+    "h1030": ("Wave Motion", "Power", "S"),
+    "h1031": ("Manifest", "Technical", "S"),
+    "h1032": ("Permeation", "Power", "S"),
+    "h1110": ("Bloodcurdle", "Speed", "S"),
+}
+
 # hero_cfg verifies the hero rows and ShapeId values; shape_info independently
 # maps each ShapeId to the listed AXMD model path.
 for model_id, name, hero_id, shape_id in (
@@ -177,11 +210,17 @@ for model_id, name, hero_id, shape_id in (
     ("h1110", "Stain", 1111, 1011),
     ("h1998", "All Might (Art Test Variant)", 1981, 9051),
 ):
+    quirk, battle_type, public_rank = PUBLIC_PLAYABLE_METADATA.get(
+        model_id, ("", "", "")
+    )
     RECOVERED_HERO_CHARACTERS[model_id] = PlayableCharacter(
         name=name,
         model_asset_id=model_id,
         hero_id=hero_id,
         shape_id=shape_id,
+        quirk=quirk,
+        battle_type=battle_type,
+        public_rank=public_rank,
     )
 
 PUBLIC_PLAYABLE_MODEL_IDS = (

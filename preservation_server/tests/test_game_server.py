@@ -80,6 +80,7 @@ from mhatsh_server.characters import (
     MAP_CHARACTERS,
     NON_PUBLIC_PLAYABLE_MODEL_REASONS,
     PLAYABLE_CHARACTERS,
+    PUBLIC_PLAYABLE_METADATA,
     PUBLIC_PLAYABLE_MODEL_IDS,
     QUEST_CONTACT_MAP_SPAWNS,
     RECOVERED_HERO_CHARACTERS,
@@ -648,6 +649,8 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     assert len(SUPPORT_CHARACTERS) == 12
     assert len(MAP_CHARACTERS) == 62
     assert len(CHIBI_MODEL_ASSETS) == 3
+    assert "Fandom public roster cross-check" in CATALOG_SOURCE
+    assert set(PUBLIC_PLAYABLE_METADATA) == set(PUBLIC_PLAYABLE_MODEL_IDS)
     assert SUPPORT_CHARACTERS["h1927"].name == "Best Jeanist"
     assert SUPPORT_CHARACTERS["h1927"].item_id == 6230016
     assert SUPPORT_CHARACTERS["h1927"].shape_id == 1927
@@ -679,11 +682,22 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
         character.model_asset_id != "h1018"
         for character in VERIFIED_PLAYABLE_ROSTER
     )
+    assert all(character.public_rank for character in VERIFIED_PLAYABLE_ROSTER)
+    assert all(character.battle_type for character in VERIFIED_PLAYABLE_ROSTER)
+    assert all(character.quirk for character in VERIFIED_PLAYABLE_ROSTER)
+    assert PLAYABLE_CHARACTERS["h1001"].public_rank == "B"
+    assert PLAYABLE_CHARACTERS["h1001"].battle_type == "Speed"
+    assert PLAYABLE_CHARACTERS["h1002"].public_rank == "S"
+    assert PLAYABLE_CHARACTERS["h1002"].battle_type == "Power"
     assert PLAYABLE_CHARACTERS["h1031"].name == "Tamaki Amajiki"
     assert PLAYABLE_CHARACTERS["h1031"].hero_id == 1311
     assert PLAYABLE_CHARACTERS["h1031"].shape_id == 1031
+    assert PLAYABLE_CHARACTERS["h1031"].quirk == "Manifest"
+    assert PLAYABLE_CHARACTERS["h1031"].battle_type == "Technical"
     assert PLAYABLE_CHARACTERS["h1032"].name == "Mirio Togata"
     assert PLAYABLE_CHARACTERS["h1032"].hero_id == 1321
+    assert PLAYABLE_CHARACTERS["h1032"].quirk == "Permeation"
+    assert PLAYABLE_CHARACTERS["h1032"].battle_type == "Power"
     assert PLAYABLE_CHARACTERS["h1110"].shape_id == 1011
     assert RECOVERED_HERO_CHARACTERS["h1998"].name == "All Might (Art Test Variant)"
     assert RECOVERED_HERO_CHARACTERS["h1998"].shape_id == 9051
