@@ -97,6 +97,12 @@ from mhatsh_server.characters import (
     scene_npc_from_spawn,
     support_card_book_entries,
 )
+from mhatsh_server.character_archive import (
+    CHARACTER_ARCHIVE_BY_MODEL,
+    CHARACTER_ARCHIVE_SOURCE,
+    archive_entry_for_character,
+    archive_entry_for_model,
+)
 from mhatsh_server.combat import (
     COMBAT_CATALOG_SOURCE,
     DEFAULT_MOVES,
@@ -754,6 +760,60 @@ def test_axmd_catalog_keeps_asset_ids_separate_from_protocol_ids() -> None:
     for model_id in (5000, 5005, 5012, 5016, 5034, 6000, 6677, 6680):
         assert MAP_CHARACTERS[model_id].npc_id == model_id
         assert quest_contact_map_spawn(model_id) is not None
+
+
+def test_deep_research_character_archive_covers_public_playable_roster() -> None:
+    assert "Playable Character Archive.docx" in CHARACTER_ARCHIVE_SOURCE
+    assert set(CHARACTER_ARCHIVE_BY_MODEL) == set(PUBLIC_PLAYABLE_MODEL_IDS)
+    assert {
+        model_id
+        for model_id, entry in CHARACTER_ARCHIVE_BY_MODEL.items()
+        if entry.completeness == "High"
+    } == {"h1001"}
+    assert {
+        model_id
+        for model_id, entry in CHARACTER_ARCHIVE_BY_MODEL.items()
+        if entry.has_medium_or_better_kit_coverage
+    } == {
+        "h1001",
+        "h1003",
+        "h1007",
+        "h1012",
+        "h1014",
+        "h1015",
+        "h1016",
+        "h1017",
+        "h1021",
+        "h1022",
+        "h1026",
+        "h1030",
+        "h1032",
+        "h1110",
+    }
+
+    for model_id, character in PLAYABLE_CHARACTERS.items():
+        archive = archive_entry_for_character(character)
+        assert archive is not None
+        assert archive_entry_for_model(model_id) == archive
+        assert archive.base_rank == character.public_rank
+        assert archive.hero_type == character.battle_type
+        if archive.quirk != "not exposed in reviewed page body":
+            assert archive.quirk == character.quirk
+        assert archive.role_note
+        assert archive.kit_note
+
+    assert archive_entry_for_model("h1018") is None
+    assert archive_entry_for_model("h1927") is None
+    deku_archive = CHARACTER_ARCHIVE_BY_MODEL["h1001"]
+    assert deku_archive.is_high_confidence
+    assert "formulas" in deku_archive.kit_note
+    assert deku_archive.data_gaps == ()
+    whm_deku_archive = CHARACTER_ARCHIVE_BY_MODEL["h1027"]
+    assert "October 27, 2021" in whm_deku_archive.kit_note
+    assert whm_deku_archive.data_gaps == ("full parsed move list",)
+    shigaraki_archive = CHARACTER_ARCHIVE_BY_MODEL["h1019"]
+    assert "Nomu for 15 seconds" in shigaraki_archive.kit_note
+    assert "full move coverage" in shigaraki_archive.data_gaps
 
 
 def test_starter_intro_evidence_catalog_tracks_video_and_school_costume() -> None:
